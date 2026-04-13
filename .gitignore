@@ -1,0 +1,45 @@
+# ===== Dépendances =====
+node_modules/
+.pnpm-store/
+
+# ===== Build =====
+dist/
+build/
+*.tsbuildinfo
+
+# ===== Variables d'environnement (CRITIQUE) =====
+.env
+.env.local
+.env.development
+.env.production
+.env.*.local
+apps/backend/.env
+apps/frontend/.env
+
+# ===== Logs =====
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# ===== Éditeurs =====
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+# ===== OS =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== Tests =====
+coverage/
+.vitest-cache/
+
+# ===== Uploads temporaires =====
+apps/backend/uploads/
+
+uploads/
