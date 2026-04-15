@@ -10,18 +10,20 @@ export interface ItemNav {
 
 interface SidebarNavProps {
   items: ItemNav[];
+  onNavigate?: () => void;
 }
 
 /**
  * Navigation verticale avec indicateur de route active.
  */
-export default function SidebarNav({ items }: SidebarNavProps) {
+export default function SidebarNav({ items, onNavigate }: SidebarNavProps) {
   return (
     <nav className="flex flex-col gap-1 px-2">
       {items.map(({ label, href, icone: Icone }) => (
         <NavLink
           key={href}
           to={href}
+          onClick={onNavigate}
           className={({ isActive }) =>
             cn(
               'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',

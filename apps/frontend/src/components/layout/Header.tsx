@@ -1,4 +1,4 @@
-import { LogOut, User, KeyRound, Users } from 'lucide-react'; // ← ajouter Users
+import { LogOut, User, KeyRound, Users, Menu } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
@@ -18,14 +18,14 @@ import { useAuthStore } from '@/stores/auth.store';
 
 interface HeaderProps {
   titre?: string;
+  onToggleSidebar?: () => void; // ← nouveau prop
 }
 
-export default function Header({ titre }: HeaderProps) {
+export default function Header({ titre, onToggleSidebar }: HeaderProps) {
   const navigate = useNavigate();
   const utilisateur = useAuthStore((s) => s.utilisateur);
   const deconnecter = useAuthStore((s) => s.deconnecter);
 
-  // ← Seuls les admins de cabinet voient le lien Équipe
   const estAdminCabinet = utilisateur?.role === 'admin';
 
   const { mutate: seDeconnecter, isPending } = useMutation({
@@ -44,9 +44,24 @@ export default function Header({ titre }: HeaderProps) {
       .join('') ?? 'U';
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-background px-6">
-      <h1 className="text-lg font-semibold text-foreground">{titre ?? 'ERP Avocat'}</h1>
+    <header className="flex h-16 items-center justify-between border-b bg-background px-4 md:px-6">
+      {/* Partie gauche : bouton hamburger (mobile) + titre */}
+      <div className="flex items-center gap-3">
+        {/* Bouton visible uniquement sur mobile */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden"
+          onClick={onToggleSidebar}
+          aria-label="Ouvrir le menu de navigation"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
 
+        <h1 className="text-lg font-semibold text-foreground">{titre ?? 'ERP Avocat'}</h1>
+      </div>
+
+      {/* Partie droite : menu utilisateur */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="relative flex items-center gap-2 px-2">
@@ -80,7 +95,6 @@ export default function Header({ titre }: HeaderProps) {
             Mot de passe
           </DropdownMenuItem>
 
-          {/* ← Visible uniquement pour l'admin du cabinet */}
           {estAdminCabinet && (
             <>
               <DropdownMenuSeparator />

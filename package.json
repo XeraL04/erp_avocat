@@ -18,9 +18,9 @@
     "prettier": "^3.8.1"
   },
   "lint-staged": {
-    "**/*.{ts,tsx}": [
-      "eslint --fix",
-      "prettier --write"
+    "apps/frontend/**/*.{ts,tsx}": [
+      "pnpm --filter frontend lint",
+      "pnpm --filter frontend format"
     ],
     "**/*.{json,md}": [
       "prettier --write"

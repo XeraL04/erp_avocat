@@ -14,6 +14,10 @@ import SidebarNav, { type ItemNav } from './SidebarNav';
 import { useAuthStore } from '@/stores/auth.store';
 import { Separator } from '@/components/ui/separator';
 
+interface SidebarProps {
+  onClose?: () => void;
+}
+
 // Navigation Super Admin
 const navSuperAdmin: ItemNav[] = [
   {
@@ -75,7 +79,7 @@ const navCabinet: ItemNav[] = [
 /**
  * Sidebar fixe avec logo et navigation selon le rôle.
  */
-export default function Sidebar() {
+export default function Sidebar({ onClose }: SidebarProps) {
   const utilisateur = useAuthStore((s) => s.utilisateur);
   const estSuperAdmin = utilisateur?.role === 'superadmin';
 
@@ -96,7 +100,7 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto py-4">
-        <SidebarNav items={estSuperAdmin ? navSuperAdmin : navCabinet} />
+        <SidebarNav items={estSuperAdmin ? navSuperAdmin : navCabinet} onNavigate={onClose} />
       </div>
 
       {/* Pied de sidebar — nom du cabinet ou rôle */}
