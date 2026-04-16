@@ -53,10 +53,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-import {
-  getTenants,
-  changerStatutTenant,
-} from '@/api/superadmin.api';
+import { getTenants, changerStatutTenant } from '@/api/superadmin.api';
 import type { Tenant } from '@/types';
 import { couleurStatutTenant, libellePlan, formaterDate } from '@/lib/utils';
 import { extraireMessageErreur } from '@/api/auth.api';
@@ -77,9 +74,7 @@ export default function TenantsPage() {
   const [filtreStatut, setFiltreStatut] = useState('tous');
   const [filtrePlan, setFiltrePlan] = useState('tous');
   const [page, setPage] = useState(1);
-  const [dialogCreer, setDialogCreer] = useState(
-    searchParams.get('action') === 'nouveau'
-  );
+  const [dialogCreer, setDialogCreer] = useState(searchParams.get('action') === 'nouveau');
   const [tenantAModifier, setTenantAModifier] = useState<Tenant | null>(null);
   const [confirmSuspendre, setConfirmSuspendre] = useState<Tenant | null>(null);
 
@@ -107,13 +102,8 @@ export default function TenantsPage() {
 
   // Mutation — changer statut
   const { mutate: changerStatut, isPending: estEnChangement } = useMutation({
-    mutationFn: ({
-      id,
-      statut,
-    }: {
-      id: string;
-      statut: 'actif' | 'suspendu';
-    }) => changerStatutTenant(id, statut),
+    mutationFn: ({ id, statut }: { id: string; statut: 'actif' | 'suspendu' }) =>
+      changerStatutTenant(id, statut),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['superadmin', 'tenants'] });
       queryClient.invalidateQueries({ queryKey: ['superadmin', 'dashboard'] });
@@ -158,7 +148,13 @@ export default function TenantsPage() {
             onChange={(e) => setRecherche(e.target.value)}
           />
         </div>
-        <Select value={filtreStatut} onValueChange={(v) => { setFiltreStatut(v); setPage(1); }}>
+        <Select
+          value={filtreStatut}
+          onValueChange={(v) => {
+            setFiltreStatut(v);
+            setPage(1);
+          }}
+        >
           <SelectTrigger className="w-full sm:w-40">
             <SelectValue placeholder="Statut" />
           </SelectTrigger>
@@ -170,7 +166,13 @@ export default function TenantsPage() {
             <SelectItem value="expire">Expiré</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={filtrePlan} onValueChange={(v) => { setFiltrePlan(v); setPage(1); }}>
+        <Select
+          value={filtrePlan}
+          onValueChange={(v) => {
+            setFiltrePlan(v);
+            setPage(1);
+          }}
+        >
           <SelectTrigger className="w-full sm:w-40">
             <SelectValue placeholder="Plan" />
           </SelectTrigger>
@@ -228,24 +230,21 @@ export default function TenantsPage() {
                   <TableCell>
                     <div>
                       <p className="font-medium">{tenant.nom}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {tenant.email}
-                      </p>
+                      <p className="text-xs text-muted-foreground">{tenant.email}</p>
                     </div>
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline">{libellePlan(tenant.plan)}</Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={couleurStatutTenant(tenant.statut)}>
-                      {tenant.statut}
-                    </Badge>
+                    <Badge variant={couleurStatutTenant(tenant.statut)}>{tenant.statut}</Badge>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
                     <span className="text-sm">
                       {tenant.compteurs.dossiers}
                       <span className="text-muted-foreground">
-                        {' '}/ {tenant.limites.maxDossiers === -1 ? '∞' : tenant.limites.maxDossiers}
+                        {' '}
+                        / {tenant.limites.maxDossiers === -1 ? '∞' : tenant.limites.maxDossiers}
                       </span>
                     </span>
                   </TableCell>
@@ -253,7 +252,11 @@ export default function TenantsPage() {
                     <span className="text-sm">
                       {tenant.compteurs.utilisateurs}
                       <span className="text-muted-foreground">
-                        {' '}/ {tenant.limites.maxUtilisateurs === -1 ? '∞' : tenant.limites.maxUtilisateurs}
+                        {' '}
+                        /{' '}
+                        {tenant.limites.maxUtilisateurs === -1
+                          ? '∞'
+                          : tenant.limites.maxUtilisateurs}
                       </span>
                     </span>
                   </TableCell>
@@ -270,25 +273,19 @@ export default function TenantsPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuItem
-                          onClick={() =>
-                            navigate(`/superadmin/tenants/${tenant._id}`)
-                          }
+                          onClick={() => navigate(`/superadmin/tenants/${tenant._id}`)}
                         >
                           <Eye className="mr-2 h-4 w-4" />
                           Voir le détail
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setTenantAModifier(tenant)}
-                        >
+                        <DropdownMenuItem onClick={() => setTenantAModifier(tenant)}>
                           <Edit className="mr-2 h-4 w-4" />
                           Modifier
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         {tenant.statut === 'suspendu' ? (
                           <DropdownMenuItem
-                            onClick={() =>
-                              changerStatut({ id: tenant._id, statut: 'actif' })
-                            }
+                            onClick={() => changerStatut({ id: tenant._id, statut: 'actif' })}
                             disabled={estEnChangement}
                           >
                             <ShieldCheck className="mr-2 h-4 w-4 text-green-600" />
@@ -360,17 +357,13 @@ export default function TenantsPage() {
       )}
 
       {/* Confirmation suspension */}
-      <AlertDialog
-        open={!!confirmSuspendre}
-        onOpenChange={() => setConfirmSuspendre(null)}
-      >
+      <AlertDialog open={!!confirmSuspendre} onOpenChange={() => setConfirmSuspendre(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Suspendre ce cabinet ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Le cabinet <strong>{confirmSuspendre?.nom}</strong> et tous ses
-              utilisateurs n'auront plus accès à la plateforme. Cette action est
-              réversible.
+              Le cabinet <strong>{confirmSuspendre?.nom}</strong> et tous ses utilisateurs n'auront
+              plus accès à la plateforme. Cette action est réversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -386,9 +379,7 @@ export default function TenantsPage() {
               }
               disabled={estEnChangement}
             >
-              {estEnChangement && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
+              {estEnChangement && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Suspendre
             </AlertDialogAction>
           </AlertDialogFooter>

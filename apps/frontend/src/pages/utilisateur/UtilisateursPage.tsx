@@ -3,9 +3,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
-  Users, Plus, Pencil, Trash2,
-  CheckCircle2, XCircle, MoreHorizontal,
-  ShieldCheck, Loader2,
+  Users,
+  Plus,
+  Pencil,
+  Trash2,
+  CheckCircle2,
+  XCircle,
+  MoreHorizontal,
+  ShieldCheck,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -14,14 +20,21 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  DropdownMenu, DropdownMenuContent,
-  DropdownMenuItem, DropdownMenuSeparator,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel,
-  AlertDialogContent, AlertDialogDescription,
-  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
 import {
@@ -78,7 +91,9 @@ export default function UtilisateursPage() {
           <h2 className="text-2xl font-bold tracking-tight">Équipe</h2>
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Users className="h-4 w-4" />
-            {isLoading ? 'Chargement…' : `${utilisateurs.length} assistant${utilisateurs.length > 1 ? 's' : ''}`}
+            {isLoading
+              ? 'Chargement…'
+              : `${utilisateurs.length} assistant${utilisateurs.length > 1 ? 's' : ''}`}
           </p>
         </div>
         <Button size="sm" onClick={() => setDialogCreer(true)}>
@@ -135,10 +150,7 @@ export default function UtilisateursPage() {
           <CardContent className="p-0">
             <div className="divide-y">
               {utilisateurs.map((u) => (
-                <div
-                  key={u._id}
-                  className="flex items-center gap-4 px-4 py-3 sm:px-6 sm:py-4"
-                >
+                <div key={u._id} className="flex items-center gap-4 px-4 py-3 sm:px-6 sm:py-4">
                   {/* Avatar initiales */}
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
                     {u.nom.charAt(0).toUpperCase()}
@@ -236,16 +248,13 @@ export default function UtilisateursPage() {
       )}
 
       {/* Confirmation suppression */}
-      <AlertDialog
-        open={!!userASupprimer}
-        onOpenChange={(o) => !o && setUserASupprimer(null)}
-      >
+      <AlertDialog open={!!userASupprimer} onOpenChange={(o) => !o && setUserASupprimer(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Supprimer cet assistant ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Le compte de <strong>{userASupprimer?.nom}</strong> sera définitivement supprimé.
-              Il ne pourra plus se connecter au cabinet.
+              Le compte de <strong>{userASupprimer?.nom}</strong> sera définitivement supprimé. Il
+              ne pourra plus se connecter au cabinet.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

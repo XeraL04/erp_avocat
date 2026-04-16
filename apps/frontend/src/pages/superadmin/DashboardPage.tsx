@@ -1,9 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Building2, Users, TrendingUp, AlertCircle, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import {
-  Card, CardContent, CardHeader, CardTitle, CardDescription,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -74,9 +72,7 @@ export default function SuperAdminDashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Vue d'ensemble</h2>
-          <p className="text-muted-foreground">
-            Statistiques globales de la plateforme ERP Avocat
-          </p>
+          <p className="text-muted-foreground">Statistiques globales de la plateforme ERP Avocat</p>
         </div>
         <Button asChild>
           <Link to="/superadmin/tenants">Gérer les cabinets</Link>
@@ -89,9 +85,7 @@ export default function SuperAdminDashboardPage() {
           <Card key={cle} className="relative overflow-hidden">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {label}
-                </CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
                 <div className={`rounded-lg p-2 ${couleurBg}`}>
                   <Icone className={`h-4 w-4 ${couleurIcone}`} />
                 </div>
@@ -101,13 +95,9 @@ export default function SuperAdminDashboardPage() {
               {isLoading ? (
                 <Skeleton className="h-9 w-16" />
               ) : (
-                <p className="text-3xl font-bold">
-                  {data?.stats[cle] ?? 0}
-                </p>
+                <p className="text-3xl font-bold">{data?.stats[cle] ?? 0}</p>
               )}
-              <CardDescription className="mt-1 text-xs">
-                {description}
-              </CardDescription>
+              <CardDescription className="mt-1 text-xs">{description}</CardDescription>
             </CardContent>
           </Card>
         ))}
@@ -121,9 +111,7 @@ export default function SuperAdminDashboardPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {isLoading ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))
+              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
             ) : data?.derniersInscrits.length === 0 ? (
               <p className="text-sm text-muted-foreground">Aucun cabinet</p>
             ) : (
@@ -135,9 +123,7 @@ export default function SuperAdminDashboardPage() {
                   </div>
                   <div className="flex gap-2">
                     <Badge variant="outline">{libellePlan(cabinet.plan)}</Badge>
-                    <Badge variant={couleurStatutTenant(cabinet.statut)}>
-                      {cabinet.statut}
-                    </Badge>
+                    <Badge variant={couleurStatutTenant(cabinet.statut)}>{cabinet.statut}</Badge>
                   </div>
                 </div>
               ))

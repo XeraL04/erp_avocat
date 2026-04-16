@@ -86,9 +86,7 @@ export function libellePlan(plan: PlanTenant): string {
 // import type { StatutFacture } from '@/api/facture.api';
 import type { StatutFacture } from '@/types';
 
-export function couleurStatutFacture(
-  statut: StatutFacture,
-): 'secondary' | 'default' | 'outline' {
+export function couleurStatutFacture(statut: StatutFacture): 'secondary' | 'default' | 'outline' {
   const map: Record<StatutFacture, 'secondary' | 'default' | 'outline'> = {
     brouillon: 'secondary',
     emise: 'default',

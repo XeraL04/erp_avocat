@@ -90,7 +90,11 @@ function obtenirIconeFichier(nom: string) {
   if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext))
     return { Icone: ImageIcon, cls: 'text-green-600', bg: 'bg-green-50 dark:bg-green-950/30' };
   if (['xls', 'xlsx', 'csv'].includes(ext))
-    return { Icone: FileSpreadsheet, cls: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/30' };
+    return {
+      Icone: FileSpreadsheet,
+      cls: 'text-emerald-600',
+      bg: 'bg-emerald-50 dark:bg-emerald-950/30',
+    };
   if (ext === 'pdf')
     return { Icone: FileText, cls: 'text-red-600', bg: 'bg-red-50 dark:bg-red-950/30' };
   if (['doc', 'docx', 'txt'].includes(ext))
@@ -178,9 +182,7 @@ export default function DocumentsPage() {
 
   // Filtre local par nom (sur la page courante)
   const documentsFiltres = rechercheDebounced
-    ? documents.filter((d) =>
-        d.nom.toLowerCase().includes(rechercheDebounced.toLowerCase())
-      )
+    ? documents.filter((d) => d.nom.toLowerCase().includes(rechercheDebounced.toLowerCase()))
     : documents;
 
   // ── Mutation suppression ──────────────────────────────────────────────────
@@ -404,7 +406,12 @@ export default function DocumentsPage() {
                           </Button>
 
                           {/* Télécharger */}
-                          <a href={urlFichier} download={doc.nom} target="_blank" rel="noopener noreferrer">
+                          <a
+                            href={urlFichier}
+                            download={doc.nom}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
                             <Button
                               variant="ghost"
                               size="icon"
@@ -481,16 +488,13 @@ export default function DocumentsPage() {
       )}
 
       {/* Confirmation suppression */}
-      <AlertDialog
-        open={!!docASupprimer}
-        onOpenChange={(o) => !o && setDocASupprimer(null)}
-      >
+      <AlertDialog open={!!docASupprimer} onOpenChange={(o) => !o && setDocASupprimer(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Supprimer ce document ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Le fichier <strong>{docASupprimer?.nom}</strong> sera définitivement supprimé.
-              Action irréversible.
+              Le fichier <strong>{docASupprimer?.nom}</strong> sera définitivement supprimé. Action
+              irréversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -559,15 +563,16 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
       toast.success('Document ajouté avec succès');
       onSuccess();
     },
-    onError: (err: unknown) =>
-      toast.error(extraireMessageErreur(err, "Erreur lors de l'upload")),
+    onError: (err: unknown) => toast.error(extraireMessageErreur(err, "Erreur lors de l'upload")),
   });
 
   function validerEtSelectionner(f: File) {
     setErreurFichier(null);
     const ext = '.' + (f.name.split('.').pop()?.toLowerCase() ?? '');
     if (!EXTENSIONS_ACCEPTEES.split(',').includes(ext)) {
-      setErreurFichier('Extension non autorisée. Acceptées : PDF, DOC, DOCX, JPG, PNG, XLS, XLSX, TXT');
+      setErreurFichier(
+        'Extension non autorisée. Acceptées : PDF, DOC, DOCX, JPG, PNG, XLS, XLSX, TXT'
+      );
       return;
     }
     if (f.size > TAILLE_MAX_MO * 1024 * 1024) {
@@ -600,7 +605,10 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
                     : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30'
               }`}
               onClick={() => inputRef.current?.click()}
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
               onDragLeave={() => setDragOver(false)}
               onDrop={(e) => {
                 e.preventDefault();
@@ -641,7 +649,9 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
                   <p className="text-sm font-medium">
                     Glissez un fichier ici ou cliquez pour parcourir
                   </p>
-                  <p className="text-xs text-muted-foreground">PDF, DOC, JPG, XLS — max {TAILLE_MAX_MO} Mo</p>
+                  <p className="text-xs text-muted-foreground">
+                    PDF, DOC, JPG, XLS — max {TAILLE_MAX_MO} Mo
+                  </p>
                 </>
               )}
             </div>

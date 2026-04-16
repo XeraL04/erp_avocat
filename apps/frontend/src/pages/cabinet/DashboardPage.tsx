@@ -103,13 +103,13 @@ export default function CabinetDashboardPage() {
           <h2 className="text-2xl font-bold tracking-tight">
             Bonjour, {utilisateur?.nom?.split(' ')[0]} 👋
           </h2>
-          <span  className="text-muted-foreground">
+          <span className="text-muted-foreground">
             {isLoading ? (
               <Skeleton className="mt-1 h-4 w-48" />
             ) : (
               <>Tableau de bord — {cabinet?.nom}</>
             )}
-          </span >
+          </span>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>

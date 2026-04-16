@@ -2,21 +2,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Building2, Users, Mail, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { getTenantDetail } from '@/api/superadmin.api';
-import {
-  couleurStatutTenant,
-  libellePlan,
-  formaterDate,
-} from '@/lib/utils';
+import { couleurStatutTenant, libellePlan, formaterDate } from '@/lib/utils';
 
 export default function TenantDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -44,11 +35,7 @@ export default function TenantDetailPage() {
     <div className="space-y-6">
       {/* Navigation retour */}
       <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate('/superadmin/tenants')}
-        >
+        <Button variant="ghost" size="icon" onClick={() => navigate('/superadmin/tenants')}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
@@ -56,9 +43,7 @@ export default function TenantDetailPage() {
           <p className="text-sm text-muted-foreground">slug : {tenant.slug}</p>
         </div>
         <div className="ml-auto flex gap-2">
-          <Badge variant={couleurStatutTenant(tenant.statut)}>
-            {tenant.statut}
-          </Badge>
+          <Badge variant={couleurStatutTenant(tenant.statut)}>{tenant.statut}</Badge>
           <Badge variant="outline">{libellePlan(tenant.plan)}</Badge>
         </div>
       </div>
@@ -86,17 +71,13 @@ export default function TenantDetailPage() {
               <div>
                 <p className="text-muted-foreground">Début essai</p>
                 <p className="font-medium">
-                  {tenant.dateDebutEssai
-                    ? formaterDate(tenant.dateDebutEssai)
-                    : '—'}
+                  {tenant.dateDebutEssai ? formaterDate(tenant.dateDebutEssai) : '—'}
                 </p>
               </div>
               <div>
                 <p className="text-muted-foreground">Fin essai</p>
                 <p className="font-medium">
-                  {tenant.dateFinEssai
-                    ? formaterDate(tenant.dateFinEssai)
-                    : '—'}
+                  {tenant.dateFinEssai ? formaterDate(tenant.dateFinEssai) : '—'}
                 </p>
               </div>
             </div>
@@ -114,9 +95,7 @@ export default function TenantDetailPage() {
                 <span>Dossiers</span>
                 <span className="font-medium">
                   {tenant.compteurs.dossiers} /{' '}
-                  {tenant.limites.maxDossiers === -1
-                    ? '∞'
-                    : tenant.limites.maxDossiers}
+                  {tenant.limites.maxDossiers === -1 ? '∞' : tenant.limites.maxDossiers}
                 </span>
               </div>
               {tenant.limites.maxDossiers !== -1 && (
@@ -125,9 +104,7 @@ export default function TenantDetailPage() {
                     className="h-full bg-primary rounded-full transition-all"
                     style={{
                       width: `${Math.min(
-                        (tenant.compteurs.dossiers /
-                          tenant.limites.maxDossiers) *
-                          100,
+                        (tenant.compteurs.dossiers / tenant.limites.maxDossiers) * 100,
                         100
                       )}%`,
                     }}
@@ -140,9 +117,7 @@ export default function TenantDetailPage() {
                 <span>Utilisateurs</span>
                 <span className="font-medium">
                   {tenant.compteurs.utilisateurs} /{' '}
-                  {tenant.limites.maxUtilisateurs === -1
-                    ? '∞'
-                    : tenant.limites.maxUtilisateurs}
+                  {tenant.limites.maxUtilisateurs === -1 ? '∞' : tenant.limites.maxUtilisateurs}
                 </span>
               </div>
               {tenant.limites.maxUtilisateurs !== -1 && (
@@ -151,9 +126,7 @@ export default function TenantDetailPage() {
                     className="h-full bg-primary rounded-full transition-all"
                     style={{
                       width: `${Math.min(
-                        (tenant.compteurs.utilisateurs /
-                          tenant.limites.maxUtilisateurs) *
-                          100,
+                        (tenant.compteurs.utilisateurs / tenant.limites.maxUtilisateurs) * 100,
                         100
                       )}%`,
                     }}
@@ -175,9 +148,7 @@ export default function TenantDetailPage() {
         </CardHeader>
         <CardContent>
           {!tenant.utilisateurs?.length ? (
-            <p className="text-sm text-muted-foreground">
-              Aucun utilisateur dans ce cabinet.
-            </p>
+            <p className="text-sm text-muted-foreground">Aucun utilisateur dans ce cabinet.</p>
           ) : (
             <div className="space-y-2">
               {tenant.utilisateurs.map((u) => (
@@ -193,9 +164,7 @@ export default function TenantDetailPage() {
                     <Badge variant="outline" className="capitalize">
                       {u.role}
                     </Badge>
-                    {!u.actif && (
-                      <Badge variant="destructive">Inactif</Badge>
-                    )}
+                    {!u.actif && <Badge variant="destructive">Inactif</Badge>}
                   </div>
                 </div>
               ))}

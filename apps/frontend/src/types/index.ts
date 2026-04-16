@@ -129,12 +129,7 @@ export function nomAffiche(client: ClientNommable): string {
 
 // ─── Module Dossiers ──────────────────────────────────────────────────────────
 
-export type TypeDossier =
-  | 'civil'
-  | 'penal'
-  | 'commercial'
-  | 'administratif'
-  | 'autre';
+export type TypeDossier = 'civil' | 'penal' | 'commercial' | 'administratif' | 'autre';
 
 export type StatutDossier = 'en_cours' | 'suspendu' | 'cloture';
 
@@ -166,7 +161,7 @@ export interface Honoraire {
   dossier: string;
   montantTotal: number;
   type: TypeHonoraire;
-  description?: string;   // ← seul champ optionnel, conforme au modèle backend
+  description?: string; // ← seul champ optionnel, conforme au modèle backend
   createdAt: string;
   updatedAt: string;
 }

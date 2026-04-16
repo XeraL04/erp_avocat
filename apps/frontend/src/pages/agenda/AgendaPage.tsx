@@ -5,15 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import {
-  format,
-  isToday,
-  isTomorrow,
-  isThisWeek,
-  isPast,
-  isFuture,
-  parseISO,
-} from 'date-fns';
+import { format, isToday, isTomorrow, isThisWeek, isPast, isFuture, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
   CalendarClock,
@@ -159,9 +151,7 @@ function appliquerFiltres(
     liste = liste.filter((e) => isThisWeek(parseISO(e.dateHeure), { locale: fr }));
   }
 
-  return liste.sort(
-    (a, b) => parseISO(a.dateHeure).getTime() - parseISO(b.dateHeure).getTime()
-  );
+  return liste.sort((a, b) => parseISO(a.dateHeure).getTime() - parseISO(b.dateHeure).getTime());
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
@@ -265,8 +255,7 @@ export default function AgendaPage() {
     onError: () => toast.error('Une erreur est survenue'),
   });
 
-  const onSubmit = (v: FormValues) =>
-    evenementEdite ? mutModifier.mutate(v) : mutCreer.mutate(v);
+  const onSubmit = (v: FormValues) => (evenementEdite ? mutModifier.mutate(v) : mutCreer.mutate(v));
   const isPending = mutCreer.isPending || mutModifier.isPending;
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -296,10 +285,7 @@ export default function AgendaPage() {
 
       {/* Filtres */}
       <div className="flex flex-col gap-3 sm:flex-row">
-        <Select
-          value={filtrePeriode}
-          onValueChange={(v) => setFiltrePeriode(v as FiltrePeriode)}
-        >
+        <Select value={filtrePeriode} onValueChange={(v) => setFiltrePeriode(v as FiltrePeriode)}>
           <SelectTrigger className="w-full sm:w-44">
             <SelectValue />
           </SelectTrigger>
@@ -311,10 +297,7 @@ export default function AgendaPage() {
           </SelectContent>
         </Select>
 
-        <Select
-          value={filtreType}
-          onValueChange={(v) => setFiltreType(v as FiltreType)}
-        >
+        <Select value={filtreType} onValueChange={(v) => setFiltreType(v as FiltreType)}>
           <SelectTrigger className="w-full sm:w-44">
             <SelectValue />
           </SelectTrigger>
@@ -396,9 +379,7 @@ export default function AgendaPage() {
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-sm font-medium leading-tight">{evt.titre}</span>
-                          <Badge className={`px-1.5 py-0 text-xs ${cfg.classe}`}>
-                            {cfg.label}
-                          </Badge>
+                          <Badge className={`px-1.5 py-0 text-xs ${cfg.classe}`}>{cfg.label}</Badge>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
@@ -535,10 +516,7 @@ export default function AgendaPage() {
                   <FormItem>
                     <FormLabel>Lieu</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="ex : Tribunal de Constantine – Salle 3"
-                        {...field}
-                      />
+                      <Input placeholder="ex : Tribunal de Constantine – Salle 3" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -565,12 +543,7 @@ export default function AgendaPage() {
               />
 
               <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={fermerDialog}
-                  disabled={isPending}
-                >
+                <Button type="button" variant="outline" onClick={fermerDialog} disabled={isPending}>
                   Annuler
                 </Button>
                 <Button type="submit" disabled={isPending}>

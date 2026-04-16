@@ -40,8 +40,7 @@ export const useAuthStore = create<EtatAuth>()(
         }),
 
       // Appelé par l'intercepteur axios après un refresh réussi
-      definirAccessToken: (token) =>
-        set({ accessToken: token, estAuthentifie: true }),
+      definirAccessToken: (token) => set({ accessToken: token, estAuthentifie: true }),
 
       // Mise à jour du profil (ex: changement de nom)
       definirUtilisateur: (utilisateur) => set({ utilisateur }),

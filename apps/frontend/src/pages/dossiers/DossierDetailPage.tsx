@@ -67,10 +67,10 @@ import TabEtapes from '@/components/dossier/TabEtapes';
 
 const TABS = [
   { value: 'honoraires', label: 'Honoraires', icon: DollarSign },
-  { value: 'factures',   label: 'Factures',   icon: Receipt    },
-  { value: 'documents',  label: 'Documents',  icon: FileText   },
-  { value: 'agenda',     label: 'Agenda',     icon: Calendar   },
-  { value: 'etapes',     label: 'Étapes',     icon: ListChecks },
+  { value: 'factures', label: 'Factures', icon: Receipt },
+  { value: 'documents', label: 'Documents', icon: FileText },
+  { value: 'agenda', label: 'Agenda', icon: Calendar },
+  { value: 'etapes', label: 'Étapes', icon: ListChecks },
 ] as const;
 
 export default function DossierDetailPage() {
