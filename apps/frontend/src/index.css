@@ -3,277 +3,277 @@
 @layer base {
   :root {
     /* ─── Surfaces ─── */
-    --background:           oklch(0.98 0.004 240);
-    --foreground:           oklch(0.15 0.01 250);
-    --card:                 oklch(1 0 0);
-    --card-foreground:      oklch(0.15 0.01 250);
-    --popover:              oklch(1 0 0);
-    --popover-foreground:   oklch(0.15 0.01 250);
+    --background: oklch(0.98 0.004 240);
+    --foreground: oklch(0.15 0.01 250);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.15 0.01 250);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.15 0.01 250);
 
     /* ─── Primaire — Bleu ardoise juridique ─── */
-    --primary:              oklch(0.38 0.12 255);
-    --primary-foreground:   oklch(0.98 0 0);
+    --primary: oklch(0.38 0.12 255);
+    --primary-foreground: oklch(0.98 0 0);
 
     /* ─── Secondaire / Muted / Accent ─── */
-    --secondary:            oklch(0.94 0.005 250);
+    --secondary: oklch(0.94 0.005 250);
     --secondary-foreground: oklch(0.25 0.01 250);
-    --muted:                oklch(0.94 0.005 250);
-    --muted-foreground:     oklch(0.52 0.01 250);
-    --accent:               oklch(0.91 0.015 255);
-    --accent-foreground:    oklch(0.25 0.01 250);
+    --muted: oklch(0.94 0.005 250);
+    --muted-foreground: oklch(0.52 0.01 250);
+    --accent: oklch(0.91 0.015 255);
+    --accent-foreground: oklch(0.25 0.01 250);
 
     /* ─── Destructive ─── */
-    --destructive:          oklch(0.577 0.245 27.325);
+    --destructive: oklch(0.577 0.245 27.325);
     --destructive-foreground: oklch(0.985 0 0);
 
     /* ─── Bordures / Inputs ─── */
-    --border:               oklch(0.88 0.005 250);
-    --input:                oklch(0.88 0.005 250);
-    --ring:                 oklch(0.38 0.12 255);
+    --border: oklch(0.88 0.005 250);
+    --input: oklch(0.88 0.005 250);
+    --ring: oklch(0.38 0.12 255);
 
     /* ─── Radius ─── */
     --radius: 0.625rem;
 
     /* ─── Sidebar ─── */
-    --sidebar-background:           oklch(0.20 0.02 255);
-    --sidebar-foreground:           oklch(0.88 0.005 250);
-    --sidebar-primary:              oklch(0.70 0.12 255);
-    --sidebar-primary-foreground:   oklch(0.12 0.02 255);
-    --sidebar-accent:               oklch(0.28 0.03 255);
-    --sidebar-accent-foreground:    oklch(0.95 0.005 250);
-    --sidebar-border:               oklch(1 0 0 / 8%);
-    --sidebar-ring:                 oklch(0.70 0.12 255);
+    --sidebar-background: oklch(0.2 0.02 255);
+    --sidebar-foreground: oklch(0.88 0.005 250);
+    --sidebar-primary: oklch(0.7 0.12 255);
+    --sidebar-primary-foreground: oklch(0.12 0.02 255);
+    --sidebar-accent: oklch(0.28 0.03 255);
+    --sidebar-accent-foreground: oklch(0.95 0.005 250);
+    --sidebar-border: oklch(1 0 0 / 8%);
+    --sidebar-ring: oklch(0.7 0.12 255);
 
     /* ─── Statuts dossier ─── */
-    --status-encours:           oklch(0.50 0.16 145);
-    --status-encours-bg:        oklch(0.94 0.05 145);
-    --status-encours-border:    oklch(0.82 0.10 145);
+    --status-encours: oklch(0.5 0.16 145);
+    --status-encours-bg: oklch(0.94 0.05 145);
+    --status-encours-border: oklch(0.82 0.1 145);
 
-    --status-suspendu:          oklch(0.60 0.17 75);
-    --status-suspendu-bg:       oklch(0.96 0.06 80);
-    --status-suspendu-border:   oklch(0.86 0.12 75);
+    --status-suspendu: oklch(0.6 0.17 75);
+    --status-suspendu-bg: oklch(0.96 0.06 80);
+    --status-suspendu-border: oklch(0.86 0.12 75);
 
-    --status-cloture:           oklch(0.52 0.01 250);
-    --status-cloture-bg:        oklch(0.93 0.005 250);
-    --status-cloture-border:    oklch(0.80 0.008 250);
+    --status-cloture: oklch(0.52 0.01 250);
+    --status-cloture-bg: oklch(0.93 0.005 250);
+    --status-cloture-border: oklch(0.8 0.008 250);
 
     /* ─── Statuts tenant ─── */
-    --status-actif:             oklch(0.50 0.16 145);
-    --status-actif-bg:          oklch(0.94 0.05 145);
-    --status-essai:             oklch(0.45 0.14 255);
-    --status-essai-bg:          oklch(0.91 0.04 255);
-    --status-expire:            oklch(0.52 0.01 250);
-    --status-expire-bg:         oklch(0.93 0.005 250);
+    --status-actif: oklch(0.5 0.16 145);
+    --status-actif-bg: oklch(0.94 0.05 145);
+    --status-essai: oklch(0.45 0.14 255);
+    --status-essai-bg: oklch(0.91 0.04 255);
+    --status-expire: oklch(0.52 0.01 250);
+    --status-expire-bg: oklch(0.93 0.005 250);
 
     /* ─── Plans d'abonnement ─── */
-    --plan-starter:             oklch(0.52 0.01 250);
-    --plan-starter-bg:          oklch(0.93 0.005 250);
-    --plan-pro:                 oklch(0.45 0.14 255);
-    --plan-pro-bg:              oklch(0.91 0.04 255);
-    --plan-premium:             oklch(0.55 0.17 295);
-    --plan-premium-bg:          oklch(0.93 0.06 295);
+    --plan-starter: oklch(0.52 0.01 250);
+    --plan-starter-bg: oklch(0.93 0.005 250);
+    --plan-pro: oklch(0.45 0.14 255);
+    --plan-pro-bg: oklch(0.91 0.04 255);
+    --plan-premium: oklch(0.55 0.17 295);
+    --plan-premium-bg: oklch(0.93 0.06 295);
 
     /* ─── Types de paiement ─── */
-    --mode-especes:             oklch(0.50 0.16 145);
-    --mode-especes-bg:          oklch(0.94 0.05 145);
-    --mode-virement:            oklch(0.45 0.14 255);
-    --mode-virement-bg:         oklch(0.91 0.04 255);
-    --mode-cheque:              oklch(0.60 0.17 75);
-    --mode-cheque-bg:           oklch(0.96 0.06 80);
+    --mode-especes: oklch(0.5 0.16 145);
+    --mode-especes-bg: oklch(0.94 0.05 145);
+    --mode-virement: oklch(0.45 0.14 255);
+    --mode-virement-bg: oklch(0.91 0.04 255);
+    --mode-cheque: oklch(0.6 0.17 75);
+    --mode-cheque-bg: oklch(0.96 0.06 80);
 
     /* ─── Statuts facture ─── */
-    --facture-brouillon:        oklch(0.52 0.01 250);
-    --facture-brouillon-bg:     oklch(0.93 0.005 250);
-    --facture-emise:            oklch(0.45 0.14 255);
-    --facture-emise-bg:         oklch(0.91 0.04 255);
-    --facture-payee:            oklch(0.50 0.16 145);
-    --facture-payee-bg:         oklch(0.94 0.05 145);
+    --facture-brouillon: oklch(0.52 0.01 250);
+    --facture-brouillon-bg: oklch(0.93 0.005 250);
+    --facture-emise: oklch(0.45 0.14 255);
+    --facture-emise-bg: oklch(0.91 0.04 255);
+    --facture-payee: oklch(0.5 0.16 145);
+    --facture-payee-bg: oklch(0.94 0.05 145);
 
     /* ─── KPIs dashboard ─── */
-    --kpi-dossiers:             oklch(0.45 0.14 255);
-    --kpi-dossiers-bg:          oklch(0.91 0.04 255);
-    --kpi-clients:              oklch(0.55 0.17 295);
-    --kpi-clients-bg:           oklch(0.93 0.06 295);
-    --kpi-revenus:              oklch(0.50 0.16 145);
-    --kpi-revenus-bg:           oklch(0.94 0.05 145);
-    --kpi-audiences:            oklch(0.60 0.17 75);
-    --kpi-audiences-bg:         oklch(0.96 0.06 80);
+    --kpi-dossiers: oklch(0.45 0.14 255);
+    --kpi-dossiers-bg: oklch(0.91 0.04 255);
+    --kpi-clients: oklch(0.55 0.17 295);
+    --kpi-clients-bg: oklch(0.93 0.06 295);
+    --kpi-revenus: oklch(0.5 0.16 145);
+    --kpi-revenus-bg: oklch(0.94 0.05 145);
+    --kpi-audiences: oklch(0.6 0.17 75);
+    --kpi-audiences-bg: oklch(0.96 0.06 80);
   }
 
   .dark {
     /* ─── Surfaces ─── */
-    --background:           oklch(0.13 0.015 255);
-    --foreground:           oklch(0.93 0.005 250);
-    --card:                 oklch(0.18 0.018 255);
-    --card-foreground:      oklch(0.93 0.005 250);
-    --popover:              oklch(0.18 0.018 255);
-    --popover-foreground:   oklch(0.93 0.005 250);
+    --background: oklch(0.13 0.015 255);
+    --foreground: oklch(0.93 0.005 250);
+    --card: oklch(0.18 0.018 255);
+    --card-foreground: oklch(0.93 0.005 250);
+    --popover: oklch(0.18 0.018 255);
+    --popover-foreground: oklch(0.93 0.005 250);
 
     /* ─── Primaire ─── */
-    --primary:              oklch(0.65 0.14 255);
-    --primary-foreground:   oklch(0.12 0.02 255);
+    --primary: oklch(0.65 0.14 255);
+    --primary-foreground: oklch(0.12 0.02 255);
 
     /* ─── Secondaire / Muted / Accent ─── */
-    --secondary:            oklch(0.24 0.02 255);
-    --secondary-foreground: oklch(0.90 0.005 250);
-    --muted:                oklch(0.24 0.02 255);
-    --muted-foreground:     oklch(0.62 0.01 250);
-    --accent:               oklch(0.28 0.025 255);
-    --accent-foreground:    oklch(0.93 0.005 250);
+    --secondary: oklch(0.24 0.02 255);
+    --secondary-foreground: oklch(0.9 0.005 250);
+    --muted: oklch(0.24 0.02 255);
+    --muted-foreground: oklch(0.62 0.01 250);
+    --accent: oklch(0.28 0.025 255);
+    --accent-foreground: oklch(0.93 0.005 250);
 
     /* ─── Destructive ─── */
-    --destructive:          oklch(0.704 0.191 22.216);
+    --destructive: oklch(0.704 0.191 22.216);
     --destructive-foreground: oklch(0.985 0 0);
 
     /* ─── Bordures / Inputs ─── */
-    --border:               oklch(1 0 0 / 10%);
-    --input:                oklch(1 0 0 / 15%);
-    --ring:                 oklch(0.65 0.14 255);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.65 0.14 255);
 
     /* ─── Sidebar ─── */
-    --sidebar-background:           oklch(0.16 0.02 255);
-    --sidebar-foreground:           oklch(0.85 0.008 250);
-    --sidebar-primary:              oklch(0.65 0.14 255);
-    --sidebar-primary-foreground:   oklch(0.12 0.02 255);
-    --sidebar-accent:               oklch(0.24 0.025 255);
-    --sidebar-accent-foreground:    oklch(0.93 0.005 250);
-    --sidebar-border:               oklch(1 0 0 / 8%);
-    --sidebar-ring:                 oklch(0.65 0.14 255);
+    --sidebar-background: oklch(0.16 0.02 255);
+    --sidebar-foreground: oklch(0.85 0.008 250);
+    --sidebar-primary: oklch(0.65 0.14 255);
+    --sidebar-primary-foreground: oklch(0.12 0.02 255);
+    --sidebar-accent: oklch(0.24 0.025 255);
+    --sidebar-accent-foreground: oklch(0.93 0.005 250);
+    --sidebar-border: oklch(1 0 0 / 8%);
+    --sidebar-ring: oklch(0.65 0.14 255);
 
     /* ─── Statuts dossier ─── */
-    --status-encours:           oklch(0.65 0.16 145);
-    --status-encours-bg:        oklch(0.22 0.05 145);
-    --status-encours-border:    oklch(0.35 0.10 145);
+    --status-encours: oklch(0.65 0.16 145);
+    --status-encours-bg: oklch(0.22 0.05 145);
+    --status-encours-border: oklch(0.35 0.1 145);
 
-    --status-suspendu:          oklch(0.75 0.16 75);
-    --status-suspendu-bg:       oklch(0.22 0.06 80);
-    --status-suspendu-border:   oklch(0.38 0.12 75);
+    --status-suspendu: oklch(0.75 0.16 75);
+    --status-suspendu-bg: oklch(0.22 0.06 80);
+    --status-suspendu-border: oklch(0.38 0.12 75);
 
-    --status-cloture:           oklch(0.62 0.01 250);
-    --status-cloture-bg:        oklch(0.22 0.01 250);
-    --status-cloture-border:    oklch(0.35 0.01 250);
+    --status-cloture: oklch(0.62 0.01 250);
+    --status-cloture-bg: oklch(0.22 0.01 250);
+    --status-cloture-border: oklch(0.35 0.01 250);
 
     /* ─── Statuts tenant ─── */
-    --status-actif:             oklch(0.65 0.16 145);
-    --status-actif-bg:          oklch(0.22 0.05 145);
-    --status-essai:             oklch(0.65 0.14 255);
-    --status-essai-bg:          oklch(0.22 0.04 255);
-    --status-expire:            oklch(0.62 0.01 250);
-    --status-expire-bg:         oklch(0.22 0.01 250);
+    --status-actif: oklch(0.65 0.16 145);
+    --status-actif-bg: oklch(0.22 0.05 145);
+    --status-essai: oklch(0.65 0.14 255);
+    --status-essai-bg: oklch(0.22 0.04 255);
+    --status-expire: oklch(0.62 0.01 250);
+    --status-expire-bg: oklch(0.22 0.01 250);
 
     /* ─── Plans d'abonnement ─── */
-    --plan-starter:             oklch(0.62 0.01 250);
-    --plan-starter-bg:          oklch(0.22 0.01 250);
-    --plan-pro:                 oklch(0.65 0.14 255);
-    --plan-pro-bg:              oklch(0.22 0.04 255);
-    --plan-premium:             oklch(0.72 0.16 295);
-    --plan-premium-bg:          oklch(0.22 0.06 295);
+    --plan-starter: oklch(0.62 0.01 250);
+    --plan-starter-bg: oklch(0.22 0.01 250);
+    --plan-pro: oklch(0.65 0.14 255);
+    --plan-pro-bg: oklch(0.22 0.04 255);
+    --plan-premium: oklch(0.72 0.16 295);
+    --plan-premium-bg: oklch(0.22 0.06 295);
 
     /* ─── Types de paiement ─── */
-    --mode-especes:             oklch(0.65 0.16 145);
-    --mode-especes-bg:          oklch(0.22 0.05 145);
-    --mode-virement:            oklch(0.65 0.14 255);
-    --mode-virement-bg:         oklch(0.22 0.04 255);
-    --mode-cheque:              oklch(0.75 0.16 75);
-    --mode-cheque-bg:           oklch(0.22 0.06 80);
+    --mode-especes: oklch(0.65 0.16 145);
+    --mode-especes-bg: oklch(0.22 0.05 145);
+    --mode-virement: oklch(0.65 0.14 255);
+    --mode-virement-bg: oklch(0.22 0.04 255);
+    --mode-cheque: oklch(0.75 0.16 75);
+    --mode-cheque-bg: oklch(0.22 0.06 80);
 
     /* ─── Statuts facture ─── */
-    --facture-brouillon:        oklch(0.62 0.01 250);
-    --facture-brouillon-bg:     oklch(0.22 0.01 250);
-    --facture-emise:            oklch(0.65 0.14 255);
-    --facture-emise-bg:         oklch(0.22 0.04 255);
-    --facture-payee:            oklch(0.65 0.16 145);
-    --facture-payee-bg:         oklch(0.22 0.05 145);
+    --facture-brouillon: oklch(0.62 0.01 250);
+    --facture-brouillon-bg: oklch(0.22 0.01 250);
+    --facture-emise: oklch(0.65 0.14 255);
+    --facture-emise-bg: oklch(0.22 0.04 255);
+    --facture-payee: oklch(0.65 0.16 145);
+    --facture-payee-bg: oklch(0.22 0.05 145);
 
     /* ─── KPIs dashboard ─── */
-    --kpi-dossiers:             oklch(0.65 0.14 255);
-    --kpi-dossiers-bg:          oklch(0.22 0.04 255);
-    --kpi-clients:              oklch(0.72 0.16 295);
-    --kpi-clients-bg:           oklch(0.22 0.06 295);
-    --kpi-revenus:              oklch(0.65 0.16 145);
-    --kpi-revenus-bg:           oklch(0.22 0.05 145);
-    --kpi-audiences:            oklch(0.75 0.16 75);
-    --kpi-audiences-bg:         oklch(0.22 0.06 80);
+    --kpi-dossiers: oklch(0.65 0.14 255);
+    --kpi-dossiers-bg: oklch(0.22 0.04 255);
+    --kpi-clients: oklch(0.72 0.16 295);
+    --kpi-clients-bg: oklch(0.22 0.06 295);
+    --kpi-revenus: oklch(0.65 0.16 145);
+    --kpi-revenus-bg: oklch(0.22 0.05 145);
+    --kpi-audiences: oklch(0.75 0.16 75);
+    --kpi-audiences-bg: oklch(0.22 0.06 80);
   }
 }
 
 @theme inline {
-  --color-background:               var(--background);
-  --color-foreground:               var(--foreground);
-  --color-card:                     var(--card);
-  --color-card-foreground:          var(--card-foreground);
-  --color-popover:                  var(--popover);
-  --color-popover-foreground:       var(--popover-foreground);
-  --color-primary:                  var(--primary);
-  --color-primary-foreground:       var(--primary-foreground);
-  --color-secondary:                var(--secondary);
-  --color-secondary-foreground:     var(--secondary-foreground);
-  --color-muted:                    var(--muted);
-  --color-muted-foreground:         var(--muted-foreground);
-  --color-accent:                   var(--accent);
-  --color-accent-foreground:        var(--accent-foreground);
-  --color-destructive:              var(--destructive);
-  --color-destructive-foreground:   var(--destructive-foreground);
-  --color-border:                   var(--border);
-  --color-input:                    var(--input);
-  --color-ring:                     var(--ring);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 
-  --color-sidebar-background:           var(--sidebar-background);
-  --color-sidebar-foreground:           var(--sidebar-foreground);
-  --color-sidebar-primary:              var(--sidebar-primary);
-  --color-sidebar-primary-foreground:   var(--sidebar-primary-foreground);
-  --color-sidebar-accent:               var(--sidebar-accent);
-  --color-sidebar-accent-foreground:    var(--sidebar-accent-foreground);
-  --color-sidebar-border:               var(--sidebar-border);
-  --color-sidebar-ring:                 var(--sidebar-ring);
+  --color-sidebar-background: var(--sidebar-background);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 
   /* Statuts — accessibles via bg-status-encours, text-status-encours, etc. */
-  --color-status-encours:           var(--status-encours);
-  --color-status-encours-bg:        var(--status-encours-bg);
-  --color-status-encours-border:    var(--status-encours-border);
-  --color-status-suspendu:          var(--status-suspendu);
-  --color-status-suspendu-bg:       var(--status-suspendu-bg);
-  --color-status-suspendu-border:   var(--status-suspendu-border);
-  --color-status-cloture:           var(--status-cloture);
-  --color-status-cloture-bg:        var(--status-cloture-bg);
-  --color-status-cloture-border:    var(--status-cloture-border);
+  --color-status-encours: var(--status-encours);
+  --color-status-encours-bg: var(--status-encours-bg);
+  --color-status-encours-border: var(--status-encours-border);
+  --color-status-suspendu: var(--status-suspendu);
+  --color-status-suspendu-bg: var(--status-suspendu-bg);
+  --color-status-suspendu-border: var(--status-suspendu-border);
+  --color-status-cloture: var(--status-cloture);
+  --color-status-cloture-bg: var(--status-cloture-bg);
+  --color-status-cloture-border: var(--status-cloture-border);
 
-  --color-status-actif:             var(--status-actif);
-  --color-status-actif-bg:          var(--status-actif-bg);
-  --color-status-essai:             var(--status-essai);
-  --color-status-essai-bg:          var(--status-essai-bg);
-  --color-status-expire:            var(--status-expire);
-  --color-status-expire-bg:         var(--status-expire-bg);
+  --color-status-actif: var(--status-actif);
+  --color-status-actif-bg: var(--status-actif-bg);
+  --color-status-essai: var(--status-essai);
+  --color-status-essai-bg: var(--status-essai-bg);
+  --color-status-expire: var(--status-expire);
+  --color-status-expire-bg: var(--status-expire-bg);
 
-  --color-plan-starter:             var(--plan-starter);
-  --color-plan-starter-bg:          var(--plan-starter-bg);
-  --color-plan-pro:                 var(--plan-pro);
-  --color-plan-pro-bg:              var(--plan-pro-bg);
-  --color-plan-premium:             var(--plan-premium);
-  --color-plan-premium-bg:          var(--plan-premium-bg);
+  --color-plan-starter: var(--plan-starter);
+  --color-plan-starter-bg: var(--plan-starter-bg);
+  --color-plan-pro: var(--plan-pro);
+  --color-plan-pro-bg: var(--plan-pro-bg);
+  --color-plan-premium: var(--plan-premium);
+  --color-plan-premium-bg: var(--plan-premium-bg);
 
-  --color-mode-especes:             var(--mode-especes);
-  --color-mode-especes-bg:          var(--mode-especes-bg);
-  --color-mode-virement:            var(--mode-virement);
-  --color-mode-virement-bg:         var(--mode-virement-bg);
-  --color-mode-cheque:              var(--mode-cheque);
-  --color-mode-cheque-bg:           var(--mode-cheque-bg);
+  --color-mode-especes: var(--mode-especes);
+  --color-mode-especes-bg: var(--mode-especes-bg);
+  --color-mode-virement: var(--mode-virement);
+  --color-mode-virement-bg: var(--mode-virement-bg);
+  --color-mode-cheque: var(--mode-cheque);
+  --color-mode-cheque-bg: var(--mode-cheque-bg);
 
-  --color-facture-brouillon:        var(--facture-brouillon);
-  --color-facture-brouillon-bg:     var(--facture-brouillon-bg);
-  --color-facture-emise:            var(--facture-emise);
-  --color-facture-emise-bg:         var(--facture-emise-bg);
-  --color-facture-payee:            var(--facture-payee);
-  --color-facture-payee-bg:         var(--facture-payee-bg);
+  --color-facture-brouillon: var(--facture-brouillon);
+  --color-facture-brouillon-bg: var(--facture-brouillon-bg);
+  --color-facture-emise: var(--facture-emise);
+  --color-facture-emise-bg: var(--facture-emise-bg);
+  --color-facture-payee: var(--facture-payee);
+  --color-facture-payee-bg: var(--facture-payee-bg);
 
-  --color-kpi-dossiers:             var(--kpi-dossiers);
-  --color-kpi-dossiers-bg:          var(--kpi-dossiers-bg);
-  --color-kpi-clients:              var(--kpi-clients);
-  --color-kpi-clients-bg:           var(--kpi-clients-bg);
-  --color-kpi-revenus:              var(--kpi-revenus);
-  --color-kpi-revenus-bg:           var(--kpi-revenus-bg);
-  --color-kpi-audiences:            var(--kpi-audiences);
-  --color-kpi-audiences-bg:         var(--kpi-audiences-bg);
+  --color-kpi-dossiers: var(--kpi-dossiers);
+  --color-kpi-dossiers-bg: var(--kpi-dossiers-bg);
+  --color-kpi-clients: var(--kpi-clients);
+  --color-kpi-clients-bg: var(--kpi-clients-bg);
+  --color-kpi-revenus: var(--kpi-revenus);
+  --color-kpi-revenus-bg: var(--kpi-revenus-bg);
+  --color-kpi-audiences: var(--kpi-audiences);
+  --color-kpi-audiences-bg: var(--kpi-audiences-bg);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -287,13 +287,25 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: 'rlig' 1, 'calt' 1;
+    font-feature-settings:
+      'rlig' 1,
+      'calt' 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
   /* Scrollbar discrète */
-  ::-webkit-scrollbar        { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track  { background: transparent; }
-  ::-webkit-scrollbar-thumb  { background: var(--border); border-radius: 9999px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+  }
 }
