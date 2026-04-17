@@ -1,4 +1,13 @@
-import { Banknote, CreditCard, Wallet, AlertCircle, Clock, CheckCircle } from 'lucide-react';
+// paiement.config.ts  ← redevient .ts (plus de JSX direct)
+import {
+  Banknote,
+  CreditCard,
+  Wallet,
+  AlertCircle,
+  Clock,
+  CheckCircle,
+  type LucideIcon,
+} from 'lucide-react';
 import { z } from 'zod';
 import type { ModePaiement } from '@/api/paiement.api';
 
@@ -8,46 +17,81 @@ export function formaterMontant(montant: number): string {
   return new Intl.NumberFormat('fr-DZ').format(montant) + ' DA';
 }
 
-// ─── Configs visuelles ────────────────────────────────────────────────────────
+// ─── Config modes de paiement ─────────────────────────────────────────────────
+// FIX #2 : on stocke le composant Lucide, pas l'instance JSX
+// FIX #1 : couleurs via variables CSS plutôt que classes Tailwind statiques
 
 export const CONFIG_MODE: Record<
   ModePaiement,
-  { label: string; icone: React.ReactNode; badge: string }
+  {
+    label: string;
+    Icone: LucideIcon;
+    // style inline pour badge — s'adapte automatiquement au dark mode
+    badgeStyle: { color: string; backgroundColor: string };
+  }
 > = {
   cash: {
     label: 'Espèces',
-    icone: <Banknote className="h-3.5 w-3.5" />,
-    badge: 'bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400',
+    Icone: Banknote,
+    badgeStyle: {
+      color: 'var(--color-success)',
+      backgroundColor: 'color-mix(in oklch, var(--color-success) 12%, transparent)',
+    },
   },
   virement: {
     label: 'Virement',
-    icone: <CreditCard className="h-3.5 w-3.5" />,
-    badge: 'bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400',
+    Icone: CreditCard,
+    badgeStyle: {
+      color: 'var(--color-blue)',
+      backgroundColor: 'color-mix(in oklch, var(--color-blue) 12%, transparent)',
+    },
   },
   ccp: {
     label: 'CCP',
-    icone: <Wallet className="h-3.5 w-3.5" />,
-    badge: 'bg-purple-100 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400',
+    Icone: Wallet,
+    badgeStyle: {
+      color: 'var(--color-purple)',
+      backgroundColor: 'color-mix(in oklch, var(--color-purple) 12%, transparent)',
+    },
   },
 };
 
-export const CONFIG_STATUT = {
+// ─── Config statuts honoraire ─────────────────────────────────────────────────
+// FIX #1 : même approche — style inline via variables CSS sémantiques
+
+export const CONFIG_STATUT: Record<
+  'non_paye' | 'partiel' | 'paye',
+  {
+    label: string;
+    Icone: LucideIcon;
+    style: { color: string; backgroundColor: string };
+  }
+> = {
   non_paye: {
     label: 'Non réglé',
-    icone: <AlertCircle className="h-3.5 w-3.5" />,
-    cls: 'text-destructive bg-destructive/10',
+    Icone: AlertCircle,
+    style: {
+      color: 'var(--color-error)',
+      backgroundColor: 'color-mix(in oklch, var(--color-error) 12%, transparent)',
+    },
   },
   partiel: {
     label: 'Partiel',
-    icone: <Clock className="h-3.5 w-3.5" />,
-    cls: 'text-orange-600 bg-orange-100 dark:bg-orange-950/30 dark:text-orange-400',
+    Icone: Clock,
+    style: {
+      color: 'var(--color-warning)',
+      backgroundColor: 'color-mix(in oklch, var(--color-warning) 12%, transparent)',
+    },
   },
   paye: {
     label: 'Réglé',
-    icone: <CheckCircle className="h-3.5 w-3.5" />,
-    cls: 'text-green-600 bg-green-100 dark:bg-green-950/30 dark:text-green-400',
+    Icone: CheckCircle,
+    style: {
+      color: 'var(--color-success)',
+      backgroundColor: 'color-mix(in oklch, var(--color-success) 12%, transparent)',
+    },
   },
-} as const;
+};
 
 export type StatutKey = keyof typeof CONFIG_STATUT;
 export type FiltreModeType = ModePaiement | 'tous';
@@ -67,10 +111,14 @@ export const schemaCreer = z.object({
 });
 export type FormCreer = z.infer<typeof schemaCreer>;
 
+// FIX #3 : montant requis dans le formulaire de modification
+// (le backend l'accepte optionnel pour PATCH partiel, mais l'UI exige toujours un montant)
 export const schemaModifier = z.object({
-  montant: z.number({ invalid_type_error: 'Montant invalide' }).positive().optional(),
+  montant: z
+    .number({ invalid_type_error: 'Montant invalide' })
+    .positive('Le montant doit être positif'),
   mode: z.enum(['cash', 'virement', 'ccp'] as const),
-  date: z.string().min(1),
+  date: z.string().min(1, 'La date est obligatoire'),
   reference: z.string().optional(),
   note: z.string().optional(),
 });

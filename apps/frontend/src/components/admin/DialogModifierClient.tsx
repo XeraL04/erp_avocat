@@ -21,16 +21,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 
 import { modifierClient } from '@/api/client.api';
 import { extraireMessageErreur } from '@/api/auth.api';
 import { nomAffiche } from '@/types';
 import type { Client } from '@/types';
 
-// ─── Type formulaire (input) — toujours des strings pour react-hook-form ──────
-// z.preprocess infère unknown en entrée ce qui casse useForm<z.infer<schema>>.
-// On déclare manuellement le type input (strings) séparé du type output (Zod).
+// ─── Type formulaire input ────────────────────────────────────────────────────
 interface FormModifier {
   telephone: string;
   nom?: string;
@@ -45,9 +42,7 @@ interface FormModifier {
   notes?: string;
 }
 
-// ─── Schéma Zod (output après transformation) ─────────────────────────────────
-// z.preprocess convertit '' → undefined avant .min() pour éviter l'échec
-// silencieux sur les champs cachés (ex: raisonSociale pour un client physique).
+// ─── Schéma Zod ───────────────────────────────────────────────────────────────
 const vide = (min?: number) =>
   z.preprocess(
     (v) => (v === '' ? undefined : v),
@@ -74,6 +69,7 @@ const schema = z.object({
   notes: vide(),
 });
 
+// ─── Composant ────────────────────────────────────────────────────────────────
 interface Props {
   client: Client;
   onFermer: () => void;
@@ -88,8 +84,6 @@ export default function DialogModifierClient({ client, onFermer }: Props) {
     reset,
     formState: { errors },
   } = useForm<FormModifier>({
-    // ✅ Cast nécessaire : le type input du schema est unknown (à cause de preprocess)
-    // mais le formulaire travaille avec des strings — le resolver gère la transformation
     resolver: zodResolver(schema) as Resolver<FormModifier>,
     defaultValues: {
       nom: client.nom ?? '',
@@ -137,87 +131,155 @@ export default function DialogModifierClient({ client, onFermer }: Props) {
 
   return (
     <Dialog open onOpenChange={(o) => !o && onFermer()}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             Modifier le client
-            <Badge variant={client.type === 'morale' ? 'secondary' : 'outline'}>
+            {/* Badge type — span inline, cohérent avec le reste du projet */}
+            <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
               {client.type === 'physique' ? 'Physique' : 'Morale'}
-            </Badge>
+            </span>
           </DialogTitle>
           <DialogDescription>{nomAffiche(client)}</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit((data) => mutate(data))} className="space-y-4">
+        <form onSubmit={handleSubmit((data) => mutate(data))} className="space-y-4" noValidate>
+          {/* ── Champs spécifiques au type ─────────────────────── */}
           {client.type === 'physique' ? (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Prénom</Label>
-                  <Input {...register('prenom')} />
+                  <Label htmlFor="mod-prenom">Prénom</Label>
+                  <Input
+                    id="mod-prenom"
+                    disabled={isPending}
+                    aria-invalid={!!errors.prenom}
+                    aria-describedby={errors.prenom ? 'mod-prenom-error' : undefined}
+                    {...register('prenom')}
+                  />
                   {errors.prenom && (
-                    <p className="text-xs text-destructive">{errors.prenom.message}</p>
+                    <p id="mod-prenom-error" className="text-xs text-destructive" role="alert">
+                      {errors.prenom.message}
+                    </p>
                   )}
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Nom</Label>
-                  <Input {...register('nom')} />
-                  {errors.nom && <p className="text-xs text-destructive">{errors.nom.message}</p>}
+                  <Label htmlFor="mod-nom">Nom</Label>
+                  <Input
+                    id="mod-nom"
+                    disabled={isPending}
+                    aria-invalid={!!errors.nom}
+                    aria-describedby={errors.nom ? 'mod-nom-error' : undefined}
+                    {...register('nom')}
+                  />
+                  {errors.nom && (
+                    <p id="mod-nom-error" className="text-xs text-destructive" role="alert">
+                      {errors.nom.message}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>CIN</Label>
-                <Input {...register('cin')} />
+                <Label htmlFor="mod-cin">
+                  Numéro d'identification nationale
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">
+                    (optionnel)
+                  </span>
+                </Label>
+                <Input
+                  id="mod-cin"
+                  maxLength={18}
+                  inputMode="numeric"
+                  disabled={isPending}
+                  {...register('cin')}
+                />
               </div>
             </div>
           ) : (
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label>Raison sociale</Label>
-                <Input {...register('raisonSociale')} />
+                <Label htmlFor="mod-rs">Raison sociale</Label>
+                <Input
+                  id="mod-rs"
+                  disabled={isPending}
+                  aria-invalid={!!errors.raisonSociale}
+                  aria-describedby={errors.raisonSociale ? 'mod-rs-error' : undefined}
+                  {...register('raisonSociale')}
+                />
                 {errors.raisonSociale && (
-                  <p className="text-xs text-destructive">{errors.raisonSociale.message}</p>
+                  <p id="mod-rs-error" className="text-xs text-destructive" role="alert">
+                    {errors.raisonSociale.message}
+                  </p>
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label>Représentant légal</Label>
-                <Input {...register('representantLegal')} />
+                <Label htmlFor="mod-rep">Représentant légal</Label>
+                <Input id="mod-rep" disabled={isPending} {...register('representantLegal')} />
               </div>
               <div className="space-y-1.5">
-                <Label>NIF / RC</Label>
-                <Input {...register('nifRc')} />
+                <Label htmlFor="mod-nif">NIF / RC</Label>
+                <Input id="mod-nif" disabled={isPending} {...register('nifRc')} />
               </div>
             </div>
           )}
 
           <Separator />
 
+          {/* ── Champs communs ──────────────────────────────────── */}
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Téléphone *</Label>
-                <Input {...register('telephone')} />
+                <Label htmlFor="mod-tel">Téléphone *</Label>
+                <Input
+                  id="mod-tel"
+                  disabled={isPending}
+                  aria-invalid={!!errors.telephone}
+                  aria-describedby={errors.telephone ? 'mod-tel-error' : undefined}
+                  {...register('telephone')}
+                />
                 {errors.telephone && (
-                  <p className="text-xs text-destructive">{errors.telephone.message}</p>
+                  <p id="mod-tel-error" className="text-xs text-destructive" role="alert">
+                    {errors.telephone.message}
+                  </p>
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label>Tél. secondaire</Label>
-                <Input {...register('telephoneSecondaire')} />
+                <Label htmlFor="mod-tel2">Tél. secondaire</Label>
+                <Input id="mod-tel2" disabled={isPending} {...register('telephoneSecondaire')} />
               </div>
             </div>
+
             <div className="space-y-1.5">
-              <Label>Email</Label>
-              <Input type="email" {...register('email')} />
-              {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+              <Label htmlFor="mod-email">Email</Label>
+              <Input
+                id="mod-email"
+                type="email"
+                disabled={isPending}
+                aria-invalid={!!errors.email}
+                aria-describedby={errors.email ? 'mod-email-error' : undefined}
+                {...register('email')}
+              />
+              {errors.email && (
+                <p id="mod-email-error" className="text-xs text-destructive" role="alert">
+                  {errors.email.message}
+                </p>
+              )}
             </div>
+
             <div className="space-y-1.5">
-              <Label>Adresse</Label>
-              <Input {...register('adresse')} />
+              <Label htmlFor="mod-adresse">Adresse</Label>
+              <Input id="mod-adresse" disabled={isPending} {...register('adresse')} />
             </div>
+
             <div className="space-y-1.5">
-              <Label>Notes</Label>
-              <Textarea rows={2} {...register('notes')} />
+              <Label htmlFor="mod-notes">Notes</Label>
+              <Textarea
+                id="mod-notes"
+                rows={2}
+                className="resize-none"
+                disabled={isPending}
+                {...register('notes')}
+              />
             </div>
           </div>
 
@@ -226,8 +288,8 @@ export default function DialogModifierClient({ client, onFermer }: Props) {
               Annuler
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isPending ? 'Enregistrement...' : 'Enregistrer'}
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+              {isPending ? 'Enregistrement en cours…' : 'Enregistrer'}
             </Button>
           </DialogFooter>
         </form>

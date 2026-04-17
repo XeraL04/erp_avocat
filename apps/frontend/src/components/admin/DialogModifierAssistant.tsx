@@ -1,9 +1,9 @@
+import { useState, useId, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
-import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ import {
 
 import { modifierUtilisateur, type Utilisateur } from '@/api/utilisateur.api';
 
+// ─── Schéma ───────────────────────────────────────────────────────────────────
 const schema = z.object({
   nom: z.string().trim().min(2, 'Minimum 2 caractères'),
   email: z.string().email('Email invalide'),
@@ -33,13 +34,16 @@ const schema = z.object({
 });
 type FormData = z.infer<typeof schema>;
 
+// ─── Props ────────────────────────────────────────────────────────────────────
 interface Props {
   utilisateur: Utilisateur;
   onFermer: () => void;
   onSuccess: () => void;
 }
 
+// ─── Composant ────────────────────────────────────────────────────────────────
 export default function DialogModifierAssistant({ utilisateur, onFermer, onSuccess }: Props) {
+  const uid = useId();
   const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<FormData>({
@@ -51,12 +55,28 @@ export default function DialogModifierAssistant({ utilisateur, onFermer, onSucce
     },
   });
 
+  // Resynchronise les champs du formulaire quand l'utilisateur change
+  useEffect(() => {
+    form.reset({
+      nom: utilisateur.nom,
+      email: utilisateur.email,
+      motDePasse: '',
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [utilisateur._id]);
+
+  // Réinitialise la visibilité du mot de passe quand l'utilisateur change
+  // (séparé intentionnellement pour éviter un setState en cascade dans le même effect)
+  useEffect(() => {
+    setShowPassword(false);
+  }, [utilisateur._id]);
+
+  // ── Mutation ───────────────────────────────────────────────────────────────
   const { mutate, isPending } = useMutation({
     mutationFn: (values: FormData) =>
       modifierUtilisateur(utilisateur._id, {
         nom: values.nom,
         email: values.email,
-        // Envoyer motDePasse seulement si rempli
         ...(values.motDePasse ? { motDePasse: values.motDePasse } : {}),
       }),
     onSuccess: () => {
@@ -74,7 +94,7 @@ export default function DialogModifierAssistant({ utilisateur, onFermer, onSucce
   });
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onFermer()}>
+    <Dialog open onOpenChange={(o) => !o && !isPending && onFermer()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Modifier l'assistant</DialogTitle>
@@ -84,7 +104,13 @@ export default function DialogModifierAssistant({ utilisateur, onFermer, onSucce
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit((v) => mutate(v))} className="space-y-4">
+          <form
+            id={`${uid}-form`}
+            onSubmit={form.handleSubmit((v) => mutate(v))}
+            className="space-y-4"
+            noValidate
+          >
+            {/* Nom */}
             <FormField
               control={form.control}
               name="nom"
@@ -92,13 +118,14 @@ export default function DialogModifierAssistant({ utilisateur, onFermer, onSucce
                 <FormItem>
                   <FormLabel>Nom complet *</FormLabel>
                   <FormControl>
-                    <Input {...field} />
+                    <Input autoComplete="name" disabled={isPending} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
+            {/* Email */}
             <FormField
               control={form.control}
               name="email"
@@ -106,13 +133,14 @@ export default function DialogModifierAssistant({ utilisateur, onFermer, onSucce
                 <FormItem>
                   <FormLabel>Email *</FormLabel>
                   <FormControl>
-                    <Input type="email" {...field} />
+                    <Input type="email" autoComplete="email" disabled={isPending} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
+            {/* Mot de passe */}
             <FormField
               control={form.control}
               name="motDePasse"
@@ -128,19 +156,27 @@ export default function DialogModifierAssistant({ utilisateur, onFermer, onSucce
                         type={showPassword ? 'text' : 'password'}
                         placeholder="Laisser vide pour ne pas changer"
                         className="pr-10"
+                        autoComplete="new-password"
+                        disabled={isPending}
                         {...field}
                       />
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2"
+                        className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2
+                          text-muted-foreground hover:text-foreground"
                         onClick={() => setShowPassword((v) => !v)}
+                        aria-label={
+                          showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'
+                        }
+                        aria-pressed={showPassword}
+                        disabled={isPending}
                       >
                         {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
+                          <EyeOff className="h-4 w-4" aria-hidden="true" />
                         ) : (
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-4 w-4" aria-hidden="true" />
                         )}
                       </Button>
                     </div>
@@ -154,8 +190,8 @@ export default function DialogModifierAssistant({ utilisateur, onFermer, onSucce
               <Button type="button" variant="outline" onClick={onFermer} disabled={isPending}>
                 Annuler
               </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button type="submit" form={`${uid}-form`} disabled={isPending}>
+                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
                 {isPending ? 'Enregistrement…' : 'Enregistrer'}
               </Button>
             </div>

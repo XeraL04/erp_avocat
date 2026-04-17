@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/select';
 
 import { modifierPaiement, nomClient, type PaiementPopule } from '@/api/paiement.api';
-import { schemaModifier, FormModifier } from './paiement.config';
+import { schemaModifier, type FormModifier, formaterMontant } from './paiement.config';
 
 interface Props {
   paiement: PaiementPopule;
@@ -50,6 +50,9 @@ export default function DialogModifierPaiement({ paiement, onFermer, onSuccess }
       note: paiement.note ?? '',
     },
   });
+
+  // FIX #2 : isDirty pour bloquer la soumission sans modification
+  const { isDirty } = form.formState;
 
   const { mutate, isPending } = useMutation({
     mutationFn: (v: FormModifier) =>
@@ -75,9 +78,19 @@ export default function DialogModifierPaiement({ paiement, onFermer, onSuccess }
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Modifier le paiement</DialogTitle>
-          <DialogDescription className="sr-only">Formulaire de modification</DialogDescription>
+          {/* FIX #1 & #5 : description visible et informative, pas sr-only */}
+          <DialogDescription>
+            {formaterMontant(paiement.montant)}
+            {paiement.dossier && (
+              <>
+                {' '}
+                · <span className="font-mono">{paiement.dossier.reference}</span>
+              </>
+            )}
+          </DialogDescription>
         </DialogHeader>
 
+        {/* Bandeau contextuel dossier + client */}
         {paiement.dossier && (
           <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
             <span className="font-mono">{paiement.dossier.reference}</span>
@@ -156,10 +169,14 @@ export default function DialogModifierPaiement({ paiement, onFermer, onSuccess }
                 name="reference"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Référence</FormLabel>
+                    <FormLabel>
+                      Référence <span className="font-normal text-muted-foreground">(opt.)</span>
+                    </FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
+                    {/* FIX #3 : FormMessage manquant */}
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -170,7 +187,9 @@ export default function DialogModifierPaiement({ paiement, onFermer, onSuccess }
               name="note"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Note</FormLabel>
+                  <FormLabel>
+                    Note <span className="font-normal text-muted-foreground">(opt.)</span>
+                  </FormLabel>
                   <FormControl>
                     <Textarea className="resize-none" rows={2} {...field} />
                   </FormControl>
@@ -182,9 +201,10 @@ export default function DialogModifierPaiement({ paiement, onFermer, onSuccess }
               <Button type="button" variant="outline" onClick={onFermer} disabled={isPending}>
                 Annuler
               </Button>
-              <Button type="submit" disabled={isPending}>
+              {/* FIX #2 : désactivé si rien n'a changé OU si en cours de soumission */}
+              <Button type="submit" disabled={isPending || !isDirty}>
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Enregistrer
+                {isPending ? 'Enregistrement…' : 'Enregistrer'}
               </Button>
             </div>
           </form>

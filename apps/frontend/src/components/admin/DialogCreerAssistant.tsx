@@ -1,9 +1,9 @@
+import { useState, useId } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
-import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ import {
 
 import { creerAssistant } from '@/api/utilisateur.api';
 
+// ─── Schéma ───────────────────────────────────────────────────────────────────
 const schema = z.object({
   nom: z.string().trim().min(2, 'Minimum 2 caractères'),
   email: z.string().email('Email invalide'),
@@ -33,12 +34,15 @@ const schema = z.object({
 });
 type FormData = z.infer<typeof schema>;
 
+// ─── Props ────────────────────────────────────────────────────────────────────
 interface Props {
   onFermer: () => void;
   onSuccess: () => void;
 }
 
+// ─── Composant ────────────────────────────────────────────────────────────────
 export default function DialogCreerAssistant({ onFermer, onSuccess }: Props) {
+  const uid = useId();
   const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<FormData>({
@@ -63,7 +67,8 @@ export default function DialogCreerAssistant({ onFermer, onSuccess }: Props) {
   });
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onFermer()}>
+    // Guard !isPending : empêche la fermeture pendant une mutation
+    <Dialog open onOpenChange={(o) => !o && !isPending && onFermer()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Ajouter un assistant</DialogTitle>
@@ -74,7 +79,13 @@ export default function DialogCreerAssistant({ onFermer, onSuccess }: Props) {
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit((v) => mutate(v))} className="space-y-4">
+          <form
+            id={`${uid}-form`}
+            onSubmit={form.handleSubmit((v) => mutate(v))}
+            className="space-y-4"
+            noValidate
+          >
+            {/* Nom */}
             <FormField
               control={form.control}
               name="nom"
@@ -82,13 +93,19 @@ export default function DialogCreerAssistant({ onFermer, onSuccess }: Props) {
                 <FormItem>
                   <FormLabel>Nom complet *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ex : Amira Benali" {...field} />
+                    <Input
+                      placeholder="Ex : Amira Benali"
+                      autoComplete="name"
+                      disabled={isPending}
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
+            {/* Email */}
             <FormField
               control={form.control}
               name="email"
@@ -96,13 +113,20 @@ export default function DialogCreerAssistant({ onFermer, onSuccess }: Props) {
                 <FormItem>
                   <FormLabel>Email *</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="assistant@cabinet.dz" {...field} />
+                    <Input
+                      type="email"
+                      placeholder="assistant@cabinet.dz"
+                      autoComplete="email"
+                      disabled={isPending}
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
+            {/* Mot de passe */}
             <FormField
               control={form.control}
               name="motDePasse"
@@ -115,19 +139,31 @@ export default function DialogCreerAssistant({ onFermer, onSuccess }: Props) {
                         type={showPassword ? 'text' : 'password'}
                         placeholder="Minimum 6 caractères"
                         className="pr-10"
+                        autoComplete="new-password"
+                        disabled={isPending}
                         {...field}
                       />
+                      {/*
+                        aria-label dynamique : annonce l'action ET l'état actuel
+                        aria-controls pointe sur l'input mot de passe via useId
+                      */}
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2"
+                        className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2
+                          text-muted-foreground hover:text-foreground"
                         onClick={() => setShowPassword((v) => !v)}
+                        aria-label={
+                          showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'
+                        }
+                        aria-pressed={showPassword}
+                        disabled={isPending}
                       >
                         {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
+                          <EyeOff className="h-4 w-4" aria-hidden="true" />
                         ) : (
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-4 w-4" aria-hidden="true" />
                         )}
                       </Button>
                     </div>
@@ -141,8 +177,8 @@ export default function DialogCreerAssistant({ onFermer, onSuccess }: Props) {
               <Button type="button" variant="outline" onClick={onFermer} disabled={isPending}>
                 Annuler
               </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button type="submit" form={`${uid}-form`} disabled={isPending}>
+                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
                 {isPending ? 'Création…' : 'Créer le compte'}
               </Button>
             </div>

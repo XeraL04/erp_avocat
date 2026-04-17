@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -34,12 +34,11 @@ import {
 import { ajouterPaiement, modifierPaiement } from '@/api/paiement.api';
 import type { Paiement } from '@/api/paiement.api';
 
-// ─── Schéma Zod ───────────────────────────────────────────────────────────────
+// ─── Schéma ───────────────────────────────────────────────────────────────────
 const schema = z.object({
   montant: z
     .number({ invalid_type_error: 'Montant requis' })
     .positive('Le montant doit être positif'),
-  // ✅ input type="date" renvoie "YYYY-MM-DD" → on convertit en ISO avant envoi
   date: z.string().min(1, 'Date requise'),
   mode: z.enum(['cash', 'virement', 'ccp'], {
     required_error: 'Mode de paiement requis',
@@ -50,17 +49,33 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-// ─── Helper : "2026-04-05" → "2026-04-05T00:00:00.000Z" ─────────────────────
+// ─── Helpers date ─────────────────────────────────────────────────────────────
 function dateLocaleVersISO(dateLocale: string): string {
   if (!dateLocale) return new Date().toISOString();
-  // On parse en UTC pour éviter les décalages de fuseau horaire
   return new Date(`${dateLocale}T00:00:00.000Z`).toISOString();
 }
-
-// ─── Helper inverse : ISO → "YYYY-MM-DD" pour l'input type="date" ────────────
 function isoVersDateLocale(iso: string): string {
   if (!iso) return new Date().toISOString().split('T')[0];
   return iso.split('T')[0];
+}
+
+// ─── Helper erreur Axios ──────────────────────────────────────────────────────
+function extraireMessageErreur(err: unknown, fallback: string): string {
+  if (
+    err &&
+    typeof err === 'object' &&
+    'response' in err &&
+    err.response &&
+    typeof err.response === 'object' &&
+    'data' in err.response &&
+    err.response.data &&
+    typeof err.response.data === 'object' &&
+    'message' in err.response.data &&
+    typeof (err.response.data as { message?: unknown }).message === 'string'
+  ) {
+    return (err.response.data as { message: string }).message;
+  }
+  return fallback;
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -72,6 +87,7 @@ interface Props {
   onFermer: () => void;
 }
 
+// ─── Composant ────────────────────────────────────────────────────────────────
 export default function DialogAjouterPaiement({
   dossierId,
   honoraireId,
@@ -80,60 +96,36 @@ export default function DialogAjouterPaiement({
   onFermer,
 }: Props) {
   const queryClient = useQueryClient();
-  const modeModification = !!paiement;
+  const uid = useId();
+  const modeModif = !!paiement;
+
+  const valeursDef = () => ({
+    montant: paiement?.montant ?? undefined,
+    date: paiement?.date
+      ? isoVersDateLocale(paiement.date)
+      : new Date().toISOString().split('T')[0],
+    mode: paiement?.mode ?? ('cash' as const),
+    reference: paiement?.reference ?? '',
+    note: paiement?.note ?? '',
+  });
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      montant: paiement?.montant ?? undefined,
-      date: paiement?.date
-        ? isoVersDateLocale(paiement.date)
-        : new Date().toISOString().split('T')[0],
-      mode: paiement?.mode ?? 'cash',
-      reference: paiement?.reference ?? '',
-      note: paiement?.note ?? '',
-    },
+    defaultValues: valeursDef(),
   });
 
   useEffect(() => {
-    form.reset({
-      montant: paiement?.montant ?? undefined,
-      date: paiement?.date
-        ? isoVersDateLocale(paiement.date)
-        : new Date().toISOString().split('T')[0],
-      mode: paiement?.mode ?? 'cash',
-      reference: paiement?.reference ?? '',
-      note: paiement?.note ?? '',
-    });
-  }, [paiement, form]);
+    form.reset(valeursDef());
+  }, [paiement]);
 
-  // ─── Helper : extrait le message d'erreur Axios sans utiliser `any` ──────────
-  function extraireMessageErreur(err: unknown, fallback: string): string {
-    if (
-      err &&
-      typeof err === 'object' &&
-      'response' in err &&
-      err.response &&
-      typeof err.response === 'object' &&
-      'data' in err.response &&
-      err.response.data &&
-      typeof err.response.data === 'object' &&
-      'message' in err.response.data &&
-      typeof (err.response.data as { message?: unknown }).message === 'string'
-    ) {
-      return (err.response.data as { message: string }).message;
-    }
-    return fallback;
-  }
-
-  // ─── Mutation ajout ────────────────────────────────────────────────────────
+  // ── Mutation ajout ─────────────────────────────────────────────────────────
   const { mutate: ajouter, isPending: ajoutEnCours } = useMutation({
     mutationFn: (values: FormValues) =>
       ajouterPaiement({
-        honoraireId, // ✅ correspond au backend
-        dossierId, // ✅ correspond au backend
+        honoraireId,
+        dossierId,
         montant: values.montant,
-        date: dateLocaleVersISO(values.date), // ✅ ISO 8601 complet
+        date: dateLocaleVersISO(values.date),
         mode: values.mode,
         reference: values.reference || undefined,
         note: values.note || undefined,
@@ -144,18 +136,16 @@ export default function DialogAjouterPaiement({
       toast.success('Paiement enregistré');
       onFermer();
     },
-    onError: (err: unknown) => {
-      // Affiche le message métier du backend si disponible
-      toast.error(extraireMessageErreur(err, "Erreur lors de l'enregistrement"));
-    },
+    onError: (err: unknown) =>
+      toast.error(extraireMessageErreur(err, "Erreur lors de l'enregistrement")),
   });
 
-  // ─── Mutation modification ─────────────────────────────────────────────────
+  // ── Mutation modification ──────────────────────────────────────────────────
   const { mutate: modifier, isPending: modifEnCours } = useMutation({
     mutationFn: (values: FormValues) =>
       modifierPaiement(paiement!._id, {
         montant: values.montant,
-        date: dateLocaleVersISO(values.date), // ✅ ISO 8601 complet
+        date: dateLocaleVersISO(values.date),
         mode: values.mode,
         reference: values.reference || undefined,
         note: values.note || undefined,
@@ -166,33 +156,37 @@ export default function DialogAjouterPaiement({
       toast.success('Paiement modifié');
       onFermer();
     },
-    onError: (err: unknown) => {
-      toast.error(extraireMessageErreur(err, 'Erreur lors de la modification'));
-    },
+    onError: (err: unknown) =>
+      toast.error(extraireMessageErreur(err, 'Erreur lors de la modification')),
   });
 
   const enCours = ajoutEnCours || modifEnCours;
-  const onSubmit = (values: FormValues) => (modeModification ? modifier(values) : ajouter(values));
+  const onSubmit = (values: FormValues) => (modeModif ? modifier(values) : ajouter(values));
 
   const da = (n: number) => n.toLocaleString('fr-DZ') + ' DA';
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onFermer()}>
+    <Dialog open onOpenChange={(o) => !o && !enCours && onFermer()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {modeModification ? 'Modifier le paiement' : 'Enregistrer un paiement'}
+            {modeModif ? 'Modifier le paiement' : 'Enregistrer un paiement'}
           </DialogTitle>
           <DialogDescription>
-            {modeModification
+            {modeModif
               ? 'Modifiez les informations du paiement.'
               : `Reste à payer : ${da(resteAPayer)}`}
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Montant */}
+          <form
+            id={`${uid}-form`}
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="space-y-4"
+            noValidate
+          >
+            {/* ── Montant ───────────────────────────────────────── */}
             <FormField
               control={form.control}
               name="montant"
@@ -202,12 +196,14 @@ export default function DialogAjouterPaiement({
                   <FormControl>
                     <Input
                       type="number"
-                      placeholder="Ex : 15000"
-                      {...field}
+                      placeholder="Ex : 15 000"
+                      disabled={enCours}
                       value={field.value ?? ''}
                       onChange={(e) =>
                         field.onChange(e.target.value === '' ? undefined : Number(e.target.value))
                       }
+                      // évite la modification accidentelle au scroll
+                      onWheel={(e) => (e.target as HTMLInputElement).blur()}
                     />
                   </FormControl>
                   <FormMessage />
@@ -215,7 +211,7 @@ export default function DialogAjouterPaiement({
               )}
             />
 
-            {/* Date */}
+            {/* ── Date ──────────────────────────────────────────── */}
             <FormField
               control={form.control}
               name="date"
@@ -223,21 +219,21 @@ export default function DialogAjouterPaiement({
                 <FormItem>
                   <FormLabel>Date</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} />
+                    <Input type="date" disabled={enCours} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Mode */}
+            {/* ── Mode de paiement ──────────────────────────────── */}
             <FormField
               control={form.control}
               name="mode"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Mode de paiement</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={enCours}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Choisir un mode" />
@@ -254,34 +250,46 @@ export default function DialogAjouterPaiement({
               )}
             />
 
-            {/* Référence */}
+            {/* ── Référence ─────────────────────────────────────── */}
             <FormField
               control={form.control}
               name="reference"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    Référence <span className="text-xs text-muted-foreground">(optionnelle)</span>
+                    Référence{' '}
+                    <span className="text-xs font-normal text-muted-foreground">(optionnelle)</span>
                   </FormLabel>
                   <FormControl>
-                    <Input placeholder="N° reçu, virement…" {...field} value={field.value ?? ''} />
+                    <Input
+                      placeholder="N° reçu, virement…"
+                      disabled={enCours}
+                      {...field}
+                      value={field.value ?? ''}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Note */}
+            {/* ── Note ──────────────────────────────────────────── */}
             <FormField
               control={form.control}
               name="note"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    Note <span className="text-xs text-muted-foreground">(optionnelle)</span>
+                    Note{' '}
+                    <span className="text-xs font-normal text-muted-foreground">(optionnelle)</span>
                   </FormLabel>
                   <FormControl>
-                    <Input placeholder="Remarque libre…" {...field} value={field.value ?? ''} />
+                    <Input
+                      placeholder="Remarque libre…"
+                      disabled={enCours}
+                      {...field}
+                      value={field.value ?? ''}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -292,9 +300,15 @@ export default function DialogAjouterPaiement({
               <Button type="button" variant="outline" onClick={onFermer} disabled={enCours}>
                 Annuler
               </Button>
-              <Button type="submit" disabled={enCours}>
-                {enCours && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {modeModification ? 'Modifier' : 'Enregistrer'}
+              <Button type="submit" form={`${uid}-form`} disabled={enCours}>
+                {enCours && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+                {enCours
+                  ? modeModif
+                    ? 'Modification…'
+                    : 'Enregistrement…'
+                  : modeModif
+                    ? 'Modifier'
+                    : 'Enregistrer'}
               </Button>
             </div>
           </form>

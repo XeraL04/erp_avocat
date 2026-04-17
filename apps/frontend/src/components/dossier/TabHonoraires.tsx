@@ -27,20 +27,21 @@ import { formaterDate, formaterDateCourte } from '@/lib/utils';
 import DialogDefinirHonoraire from '@/components/dossier/DialogDefinirHonoraire';
 import DialogAjouterPaiement from '@/components/dossier/DialogAjouterPaiement';
 
-interface Props {
-  dossierId: string;
-}
-
+// ─── Libellés ─────────────────────────────────────────────────────────────────
 const libelleTypeHonoraire: Record<string, string> = {
   forfait: 'Forfait global',
   echelonne: 'Échelonné',
 };
-
 const libelleMode: Record<string, string> = {
   cash: 'Espèces',
   virement: 'Virement bancaire',
   ccp: 'CCP',
 };
+
+// ─── Composant ────────────────────────────────────────────────────────────────
+interface Props {
+  dossierId: string;
+}
 
 export default function TabHonoraires({ dossierId }: Props) {
   const queryClient = useQueryClient();
@@ -53,8 +54,7 @@ export default function TabHonoraires({ dossierId }: Props) {
   const [paiementASupprimer, setPaiementASupprimer] = useState<Paiement | null>(null);
   const [confirmerSupprimerHonoraire, setConfirmerSupprimerHonoraire] = useState(false);
 
-  // ─── Query honoraire ──────────────────────────────────────────────────────
-  // reponseHonoraire = { honoraire: Honoraire, totalPaye, resteAPayer, statut, devise }
+  // ── Query honoraire ────────────────────────────────────────────────────────
   const {
     data: reponseHonoraire,
     isLoading: chargementHonoraire,
@@ -65,12 +65,11 @@ export default function TabHonoraires({ dossierId }: Props) {
     throwOnError: false,
   });
 
-  // honoraire = le vrai objet Honoraire extrait de l'enveloppe backend
   const honoraire = reponseHonoraire?.honoraire ?? null;
   const totalPayeInitial = reponseHonoraire?.totalPaye ?? 0;
   const resteAPayerInitial = reponseHonoraire?.resteAPayer ?? honoraire?.montantTotal ?? 0;
 
-  // ─── Query paiements (uniquement si honoraire existe) ────────────────────
+  // ── Query paiements ────────────────────────────────────────────────────────
   const { data: reponsePaiements, isLoading: chargementPaiements } = useQuery({
     queryKey: ['cabinet', 'paiements', dossierId],
     queryFn: () => listerPaiements(dossierId),
@@ -81,7 +80,7 @@ export default function TabHonoraires({ dossierId }: Props) {
   const paiements = reponsePaiements?.paiements ?? [];
   const meta = reponsePaiements?.meta ?? null;
 
-  // ─── Mutations ────────────────────────────────────────────────────────────
+  // ── Mutations ──────────────────────────────────────────────────────────────
   const { mutate: effacerHonoraire, isPending: suppressionHonoraire } = useMutation({
     mutationFn: () => supprimerHonoraire(dossierId),
     onSuccess: () => {
@@ -103,8 +102,7 @@ export default function TabHonoraires({ dossierId }: Props) {
     onError: () => toast.error('Erreur lors de la suppression'),
   });
 
-  // ─── Calculs financiers ───────────────────────────────────────────────────
-  // Après chargement des paiements : meta (temps réel) prime sur les valeurs initiales
+  // ── Calculs ────────────────────────────────────────────────────────────────
   const montantTotal = honoraire?.montantTotal ?? 0;
   const totalPaye = meta?.totalPaye ?? totalPayeInitial;
   const resteAPayer = meta?.resteAPayer ?? resteAPayerInitial;
@@ -113,23 +111,40 @@ export default function TabHonoraires({ dossierId }: Props) {
 
   const da = (n: number) => n.toLocaleString('fr-DZ') + ' DA';
 
-  // ─── État : chargement ────────────────────────────────────────────────────
+  // ── État : chargement ──────────────────────────────────────────────────────
   if (chargementHonoraire) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-36 w-full rounded-lg" />
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-5 w-24" />
+                <Skeleton className="h-5 w-20 rounded-full" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-16 rounded-lg" />
+              ))}
+            </div>
+            <Skeleton className="h-2 w-full rounded-full" />
+          </CardContent>
+        </Card>
         <Skeleton className="h-48 w-full rounded-lg" />
       </div>
     );
   }
 
-  // ─── État : erreur réseau ─────────────────────────────────────────────────
+  // ── État : erreur réseau ───────────────────────────────────────────────────
   if (erreurHonoraire) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
-            <WifiOff className="h-7 w-7 text-destructive" />
+            <WifiOff className="h-7 w-7 text-destructive" aria-hidden="true" />
           </div>
           <div>
             <p className="font-medium">Impossible de charger les honoraires</p>
@@ -150,14 +165,14 @@ export default function TabHonoraires({ dossierId }: Props) {
     );
   }
 
-  // ─── État : aucun honoraire défini (null = 404 backend, valide) ───────────
+  // ── État : aucun honoraire ─────────────────────────────────────────────────
   if (!honoraire) {
     return (
       <>
         <Card>
           <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-              <DollarSign className="h-7 w-7 text-muted-foreground" />
+              <DollarSign className="h-7 w-7 text-muted-foreground" aria-hidden="true" />
             </div>
             <div>
               <p className="font-medium">Aucun honoraire défini</p>
@@ -166,12 +181,11 @@ export default function TabHonoraires({ dossierId }: Props) {
               </p>
             </div>
             <Button onClick={() => setDialogHonoraire(true)}>
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
               Définir l'honoraire
             </Button>
           </CardContent>
         </Card>
-
         {dialogHonoraire && (
           <DialogDefinirHonoraire
             dossierId={dossierId}
@@ -182,10 +196,10 @@ export default function TabHonoraires({ dossierId }: Props) {
     );
   }
 
-  // ─── État principal : honoraire existant ──────────────────────────────────
+  // ── État principal ─────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      {/* Bloc honoraire */}
+      {/* ── Bloc honoraire ─────────────────────────────────────── */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -202,43 +216,50 @@ export default function TabHonoraires({ dossierId }: Props) {
                   size="icon"
                   className="h-8 w-8"
                   onClick={() => setDialogHonoraire(true)}
+                  aria-label="Modifier l'honoraire"
                 >
-                  <Pencil className="h-4 w-4" />
+                  <Pencil className="h-4 w-4" aria-hidden="true" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-destructive hover:text-destructive"
+                  className="h-8 w-8 text-destructive hover:bg-destructive/5 hover:text-destructive"
                   onClick={() => setConfirmerSupprimerHonoraire(true)}
+                  aria-label="Supprimer l'honoraire"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </div>
             )}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Chiffres clés */}
+          {/* KPIs ── tokens CSS, plus de couleurs hardcodées */}
           <div className="grid grid-cols-3 gap-3">
+            {/* Total — neutre */}
             <div className="rounded-lg bg-muted/50 p-3 text-center">
               <p className="text-xs text-muted-foreground">Total</p>
               <p className="mt-0.5 font-semibold tabular-nums">{da(montantTotal)}</p>
             </div>
-            <div className="rounded-lg bg-green-50 p-3 text-center dark:bg-green-950/20">
+
+            {/* Payé — token success */}
+            <div className="rounded-lg bg-(--color-success)/10 p-3 text-center">
               <p className="text-xs text-muted-foreground">Payé</p>
-              <p className="mt-0.5 font-semibold tabular-nums text-green-700 dark:text-green-400">
+              <p className="mt-0.5 font-semibold tabular-nums text-(--color-success)">
                 {da(totalPaye)}
               </p>
             </div>
+
+            {/* Reste — token warning si > 0, neutre si soldé */}
             <div
               className={`rounded-lg p-3 text-center ${
-                resteAPayer > 0 ? 'bg-orange-50 dark:bg-orange-950/20' : 'bg-muted/50'
+                resteAPayer > 0 ? 'bg-(--color-warning)/10' : 'bg-muted/50'
               }`}
             >
               <p className="text-xs text-muted-foreground">Reste</p>
               <p
                 className={`mt-0.5 font-semibold tabular-nums ${
-                  resteAPayer > 0 ? 'text-orange-700 dark:text-orange-400' : 'text-muted-foreground'
+                  resteAPayer > 0 ? 'text-(--color-warning)' : 'text-muted-foreground'
                 }`}
               >
                 {da(resteAPayer)}
@@ -256,22 +277,20 @@ export default function TabHonoraires({ dossierId }: Props) {
           </div>
 
           {honoraire.description && (
-            <p className="text-xs text-muted-foreground italic">"{honoraire.description}"</p>
+            <p className="text-xs italic text-muted-foreground">"{honoraire.description}"</p>
           )}
 
+          {/* Bannière soldé — token success */}
           {resteAPayer === 0 && (
-            <div
-              className="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm
-              text-green-700 dark:bg-green-950/20 dark:text-green-400"
-            >
-              <TrendingUp className="h-4 w-4" />
+            <div className="flex items-center gap-2 rounded-lg bg-(--color-success)/10 px-3 py-2 text-sm text-[(--color-success)">
+              <TrendingUp className="h-4 w-4" aria-hidden="true" />
               Honoraires intégralement réglés
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Liste des paiements */}
+      {/* ── Liste des paiements ─────────────────────────────────── */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -280,7 +299,7 @@ export default function TabHonoraires({ dossierId }: Props) {
             </CardTitle>
             {resteAPayer > 0 && (
               <Button size="sm" onClick={() => setDialogPaiement(true)}>
-                <Plus className="mr-2 h-4 w-4" />
+                <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
                 Paiement
               </Button>
             )}
@@ -288,18 +307,30 @@ export default function TabHonoraires({ dossierId }: Props) {
         </CardHeader>
         <CardContent className="p-0">
           {chargementPaiements ? (
-            <div className="space-y-px px-6 pb-4">
+            <div className="divide-y">
               {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
+                <div key={i} className="flex items-center gap-4 px-6 py-3">
+                  <div className="flex-1 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-5 w-20 rounded-full" />
+                    </div>
+                    <Skeleton className="h-3 w-36" />
+                  </div>
+                  <div className="flex gap-1">
+                    <Skeleton className="h-7 w-7 rounded-md" />
+                    <Skeleton className="h-7 w-7 rounded-md" />
+                  </div>
+                </div>
               ))}
             </div>
           ) : paiements.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-10 text-center">
-              <AlertCircle className="h-8 w-8 text-muted-foreground/30" />
+              <AlertCircle className="h-8 w-8 text-muted-foreground/30" aria-hidden="true" />
               <p className="text-sm text-muted-foreground">Aucun paiement enregistré</p>
               {resteAPayer > 0 && (
                 <Button variant="outline" size="sm" onClick={() => setDialogPaiement(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
+                  <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
                   Enregistrer le premier paiement
                 </Button>
               )}
@@ -322,13 +353,13 @@ export default function TabHonoraires({ dossierId }: Props) {
                       <span>{formaterDateCourte(p.date)}</span>
                       {p.reference && (
                         <>
-                          <span>·</span>
+                          <span aria-hidden="true">·</span>
                           <span className="font-mono">{p.reference}</span>
                         </>
                       )}
                       {p.note && (
                         <>
-                          <span>·</span>
+                          <span aria-hidden="true">·</span>
                           <span className="truncate italic">{p.note}</span>
                         </>
                       )}
@@ -340,17 +371,19 @@ export default function TabHonoraires({ dossierId }: Props) {
                       size="icon"
                       className="h-7 w-7"
                       onClick={() => setPaiementAModifier(p)}
+                      aria-label={`Modifier le paiement du ${formaterDateCourte(p.date)}`}
                     >
-                      <Pencil className="h-3.5 w-3.5" />
+                      <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                     </Button>
                     {estAdmin && (
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        className="h-7 w-7 text-destructive hover:bg-destructive/5 hover:text-destructive"
                         onClick={() => setPaiementASupprimer(p)}
+                        aria-label={`Supprimer le paiement du ${formaterDateCourte(p.date)}`}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                       </Button>
                     )}
                   </div>
@@ -361,7 +394,7 @@ export default function TabHonoraires({ dossierId }: Props) {
         </CardContent>
       </Card>
 
-      {/* Dialogs */}
+      {/* ── Dialogs ──────────────────────────────────────────────── */}
       {dialogHonoraire && (
         <DialogDefinirHonoraire
           dossierId={dossierId}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -69,8 +69,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-// ─── Schéma Zod pour modifier le montant ─────────────────────────────────────
-
+// ─── Schéma ───────────────────────────────────────────────────────────────────
 const schemaModifier = z.object({
   montant: z
     .number({ invalid_type_error: 'Montant invalide' })
@@ -78,8 +77,7 @@ const schemaModifier = z.object({
 });
 type FormModifier = z.infer<typeof schemaModifier>;
 
-// ─── Composant WorkflowStatut ─────────────────────────────────────────────────
-
+// ─── WorkflowStatut ───────────────────────────────────────────────────────────
 const etapes: { statut: StatutFacture; label: string; Icon: React.ElementType }[] = [
   { statut: 'brouillon', label: 'Brouillon', Icon: FileText },
   { statut: 'emise', label: 'Émise', Icon: Send },
@@ -96,36 +94,53 @@ function WorkflowStatut({ statut }: { statut: StatutFacture }) {
   const indexActuel = ordreStatut[statut];
 
   return (
-    <div className="flex items-center gap-0">
+    <div className="flex items-center gap-0" role="list" aria-label="Progression de la facture">
       {etapes.map((etape, index) => {
         const estActif = index === indexActuel;
         const estPasse = index < indexActuel;
         const { Icon } = etape;
 
         return (
-          <div key={etape.statut} className="flex items-center">
-            {/* Ligne de connexion (sauf pour le premier) */}
+          <div
+            key={etape.statut}
+            className="flex items-center"
+            role="listitem"
+            aria-current={estActif ? 'step' : undefined}
+          >
+            {/* Connecteur entre étapes */}
             {index > 0 && (
               <div
-                className={`h-px w-12 transition-colors ${estPasse ? 'bg-primary' : 'bg-border'}`}
+                // token primary quand passé, border sinon — plus de couleur hardcodée
+                className={`h-px w-12 transition-colors ${
+                  estPasse ? 'bg-(--color-primary)' : 'bg-border'
+                }`}
+                aria-hidden="true"
               />
             )}
+
             {/* Cercle d'étape */}
             <div className="flex flex-col items-center gap-1.5">
               <div
                 className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all ${
                   estActif
-                    ? 'border-primary bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2'
+                    ? // Actif : fond primary + ring
+                      'border-(--color-primary) bg-(--color-primary) text-white ring-2 ring-(--color-primary) ring-offset-2'
                     : estPasse
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border bg-muted text-muted-foreground'
+                      ? // Passé : fond primary/10, texte primary
+                        'border-(--color-primary) bg-(--color-primary)/10 text-(--color-primary)'
+                      : // Futur : surface muted
+                        'border-border bg-muted text-muted-foreground'
                 }`}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-4 w-4" aria-hidden="true" />
               </div>
               <span
                 className={`text-xs font-medium ${
-                  estActif ? 'text-primary' : estPasse ? 'text-primary/70' : 'text-muted-foreground'
+                  estActif
+                    ? 'text-(--color-primary)'
+                    : estPasse
+                      ? 'text-primary/70'
+                      : 'text-muted-foreground'
                 }`}
               >
                 {etape.label}
@@ -139,11 +154,11 @@ function WorkflowStatut({ statut }: { statut: StatutFacture }) {
 }
 
 // ─── Page principale ──────────────────────────────────────────────────────────
-
 export default function FactureDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const uid = useId();
   const utilisateur = useAuthStore((s) => s.utilisateur);
   const estAdmin = utilisateur?.role === 'admin';
 
@@ -171,9 +186,7 @@ export default function FactureDetailPage() {
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<FormModifier>({
-    resolver: zodResolver(schemaModifier),
-  });
+  } = useForm<FormModifier>({ resolver: zodResolver(schemaModifier) });
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const { mutate: sauvegarderModif, isPending: enregistrementEnCours } = useMutation({
@@ -222,23 +235,19 @@ export default function FactureDetailPage() {
     }
   }
 
-  // ── Visualiser ─────────────────────────────────────────────────────
+  // ── Visualisation PDF ──────────────────────────────────────────────────────
   async function handleVisualiserPDF() {
     if (!facture) return;
     setVisualisationEnCours(true);
     try {
       const token = useAuthStore.getState().accessToken;
       const apiUrl = (import.meta.env.VITE_API_URL as string) ?? 'http://localhost:3000/api';
-
       const response = await fetch(`${apiUrl}/cabinet/factures/${facture.id}/pdf`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
       if (!response.ok) throw new Error();
-
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      setVisualisationUrl(url);
+      setVisualisationUrl(URL.createObjectURL(blob));
     } catch {
       toast.error('Impossible de charger la prévisualisation');
     } finally {
@@ -247,7 +256,7 @@ export default function FactureDetailPage() {
   }
 
   function fermerVisualisation() {
-    if (visualisationUrl) URL.revokeObjectURL(visualisationUrl); // libérer la mémoire
+    if (visualisationUrl) URL.revokeObjectURL(visualisationUrl);
     setVisualisationUrl(null);
   }
 
@@ -260,9 +269,8 @@ export default function FactureDetailPage() {
 
   function nomClient(): string {
     if (!facture) return '';
-    if (typeof facture.client === 'object' && facture.client !== null) {
+    if (typeof facture.client === 'object' && facture.client !== null)
       return nomAffiche(facture.client as ClientPopule);
-    }
     return '';
   }
 
@@ -293,13 +301,11 @@ export default function FactureDetailPage() {
     return facture.dossier;
   }
 
-  // ── Chargement ─────────────────────────────────────────────────────────────
+  // ── État : chargement ──────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="space-y-6 p-6">
-        {/* Breadcrumb skeleton */}
         <Skeleton className="h-4 w-48" />
-        {/* Header skeleton */}
         <div className="flex items-start justify-between">
           <div className="space-y-2">
             <Skeleton className="h-8 w-48" />
@@ -307,9 +313,7 @@ export default function FactureDetailPage() {
           </div>
           <Skeleton className="h-12 w-40" />
         </div>
-        {/* Workflow skeleton */}
         <Skeleton className="h-20 w-full rounded-lg" />
-        {/* Cards skeleton */}
         <div className="grid gap-4 md:grid-cols-2">
           <Skeleton className="h-40 rounded-lg" />
           <Skeleton className="h-40 rounded-lg" />
@@ -318,17 +322,17 @@ export default function FactureDetailPage() {
     );
   }
 
-  // ── Erreur ─────────────────────────────────────────────────────────────────
+  // ── État : erreur ──────────────────────────────────────────────────────────
   if (isError || !facture) {
     return (
       <div className="flex flex-col items-center gap-4 py-24 text-center">
-        <FileText className="h-12 w-12 text-muted-foreground/30" />
+        <FileText className="h-12 w-12 text-muted-foreground/30" aria-hidden="true" />
         <p className="font-medium">Facture introuvable</p>
         <p className="text-sm text-muted-foreground">
           Cette facture n'existe pas ou vous n'y avez pas accès.
         </p>
         <Button variant="outline" onClick={() => navigate('/cabinet/factures')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
+          <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
           Retour aux factures
         </Button>
       </div>
@@ -341,16 +345,21 @@ export default function FactureDetailPage() {
   // ── Rendu principal ────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* ── Breadcrumb ──────────────────────────────────────────────────── */}
-      <nav className="flex items-center gap-1 text-sm text-muted-foreground">
+      {/* Breadcrumb */}
+      <nav
+        aria-label="Fil d'Ariane"
+        className="flex items-center gap-1 text-sm text-muted-foreground"
+      >
         <Link to="/cabinet/factures" className="transition-colors hover:text-foreground">
           Factures
         </Link>
-        <ChevronRight className="h-4 w-4" />
-        <span className="font-mono font-medium text-foreground">{facture.numero}</span>
+        <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        <span className="font-mono font-medium text-foreground" aria-current="page">
+          {facture.numero}
+        </span>
       </nav>
 
-      {/* ── En-tête ──────────────────────────────────────────────────────── */}
+      {/* En-tête */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         {/* Gauche : numéro + badge + montant */}
         <div className="space-y-2">
@@ -360,7 +369,7 @@ export default function FactureDetailPage() {
               {libelleStatutFacture(facture.statut)}
             </Badge>
           </div>
-          <p className="text-3xl font-bold tabular-nums text-foreground">
+          <p className="tabular-nums text-3xl font-bold text-foreground">
             {formaterMontantDA(facture.montant)}
           </p>
           <p className="text-sm text-muted-foreground">
@@ -370,70 +379,63 @@ export default function FactureDetailPage() {
 
         {/* Droite : actions */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* visualiser */}
           <Button variant="outline" onClick={handleVisualiserPDF} disabled={visualisationEnCours}>
             {visualisationEnCours ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
             ) : (
-              <Eye className="mr-2 h-4 w-4" />
+              <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
             )}
             Prévisualiser
           </Button>
-          {/* PDF — toujours visible */}
+
           <Button variant="outline" onClick={handleTelechargerPDF} disabled={telechargementEnCours}>
             {telechargementEnCours ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
             ) : (
-              <Download className="mr-2 h-4 w-4" />
+              <Download className="mr-2 h-4 w-4" aria-hidden="true" />
             )}
             Télécharger PDF
           </Button>
 
-          {/* Modifier montant — brouillon uniquement */}
           {estBrouillon && (
             <Button variant="outline" onClick={ouvrirDialogModifier}>
-              <Pencil className="mr-2 h-4 w-4" />
+              <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
               Modifier
             </Button>
           )}
 
-          {/* Dropdown statut + suppression — admin uniquement */}
           {estAdmin && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <MoreHorizontal className="h-4 w-4" />
-                  <span className="sr-only">Actions</span>
+                <Button variant="outline" size="icon" aria-label="Actions supplémentaires">
+                  <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                {/* Transitions de statut */}
                 {facture.statut !== 'emise' && facture.statut !== 'payee' && (
                   <DropdownMenuItem onClick={() => setConfirmerStatut('emise')}>
-                    <Send className="mr-2 h-4 w-4" />
+                    <Send className="mr-2 h-4 w-4" aria-hidden="true" />
                     Passer en Émise
                   </DropdownMenuItem>
                 )}
                 {facture.statut === 'emise' && (
                   <>
                     <DropdownMenuItem onClick={() => setConfirmerStatut('brouillon')}>
-                      <FileText className="mr-2 h-4 w-4" />
+                      <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
                       Repasser en Brouillon
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setConfirmerStatut('payee')}>
-                      <CheckCircle className="mr-2 h-4 w-4" />
+                      <CheckCircle className="mr-2 h-4 w-4" aria-hidden="true" />
                       Marquer comme Payée
                     </DropdownMenuItem>
                   </>
                 )}
                 {facture.statut === 'payee' && (
                   <DropdownMenuItem onClick={() => setConfirmerStatut('emise')}>
-                    <Send className="mr-2 h-4 w-4" />
+                    <Send className="mr-2 h-4 w-4" aria-hidden="true" />
                     Repasser en Émise
                   </DropdownMenuItem>
                 )}
-
-                {/* Suppression — brouillon uniquement */}
                 {estBrouillon && (
                   <>
                     <DropdownMenuSeparator />
@@ -441,7 +443,7 @@ export default function FactureDetailPage() {
                       className="text-destructive focus:text-destructive"
                       onClick={() => setConfirmerSupprimer(true)}
                     >
-                      <Trash2 className="mr-2 h-4 w-4" />
+                      <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
                       Supprimer
                     </DropdownMenuItem>
                   </>
@@ -452,14 +454,14 @@ export default function FactureDetailPage() {
         </div>
       </div>
 
-      {/* ── Workflow visuel ───────────────────────────────────────────────── */}
+      {/* Workflow visuel */}
       <Card>
         <CardContent className="flex items-center justify-center py-6">
           <WorkflowStatut statut={facture.statut} />
         </CardContent>
       </Card>
 
-      {/* ── Grille Client + Dossier ───────────────────────────────────────── */}
+      {/* Grille Client + Dossier */}
       <div className="grid gap-4 md:grid-cols-2">
         {/* Card Client */}
         <Card>
@@ -467,14 +469,14 @@ export default function FactureDetailPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-                  <User className="h-4 w-4 text-muted-foreground" />
+                  <User className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 </div>
                 <CardTitle className="text-base">Client</CardTitle>
               </div>
               <Button variant="ghost" size="sm" asChild>
                 <Link to={`/cabinet/clients/${clientId()}`}>
                   Voir la fiche
-                  <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                  <ChevronRight className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
                 </Link>
               </Button>
             </div>
@@ -491,7 +493,7 @@ export default function FactureDetailPage() {
                 )}
               </>
             ) : (
-              <p className="text-sm text-muted-foreground italic">
+              <p className="text-sm italic text-muted-foreground">
                 Informations client non disponibles
               </p>
             )}
@@ -504,14 +506,14 @@ export default function FactureDetailPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-                  <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                  <FolderOpen className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 </div>
                 <CardTitle className="text-base">Dossier</CardTitle>
               </div>
               <Button variant="ghost" size="sm" asChild>
                 <Link to={`/cabinet/dossiers/${dossierId()}`}>
                   Voir le dossier
-                  <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                  <ChevronRight className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
                 </Link>
               </Button>
             </div>
@@ -519,7 +521,9 @@ export default function FactureDetailPage() {
           <CardContent className="space-y-2">
             {dossier ? (
               <>
-                <p className="font-mono text-sm font-semibold text-primary">{dossier.reference}</p>
+                <p className="font-mono text-sm font-semibold text-(--color-primary)">
+                  {dossier.reference}
+                </p>
                 <p className="font-medium">{dossier.titre}</p>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-xs capitalize">
@@ -535,7 +539,7 @@ export default function FactureDetailPage() {
                 </div>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground italic">
+              <p className="text-sm italic text-muted-foreground">
                 Informations dossier non disponibles
               </p>
             )}
@@ -543,8 +547,7 @@ export default function FactureDetailPage() {
         </Card>
       </div>
 
-      {/* ── Dialog : visualier le document ─────────────────────────────────── */}
-
+      {/* Dialog : prévisualisation PDF */}
       <Dialog open={!!visualisationUrl} onOpenChange={(open) => !open && fermerVisualisation()}>
         <DialogContent className="flex h-[90vh] max-w-4xl flex-col gap-0 p-0">
           <DialogHeader className="flex shrink-0 flex-row items-center justify-between border-b px-6 py-4">
@@ -556,15 +559,13 @@ export default function FactureDetailPage() {
               disabled={telechargementEnCours}
             >
               {telechargementEnCours ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
               ) : (
-                <Download className="mr-2 h-4 w-4" />
+                <Download className="mr-2 h-4 w-4" aria-hidden="true" />
               )}
               Télécharger
             </Button>
           </DialogHeader>
-
-          {/* Iframe PDF */}
           <div className="min-h-0 flex-1">
             {visualisationUrl && (
               <iframe
@@ -577,34 +578,36 @@ export default function FactureDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Dialog : Modifier le montant ─────────────────────────────────── */}
+      {/* Dialog : modifier le montant */}
       <Dialog
         open={dialogModifier}
-        onOpenChange={(open) => {
-          setDialogModifier(open);
-        }}
+        onOpenChange={(open) => !open && !enregistrementEnCours && setDialogModifier(false)}
       >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Modifier la facture</DialogTitle>
           </DialogHeader>
           <form
-            id="form-modifier-facture"
+            id={`${uid}-form-modifier`}
             onSubmit={handleSubmit((data) => sauvegarderModif(data))}
             className="space-y-4 py-2"
+            noValidate
           >
             <div className="space-y-2">
-              <Label htmlFor="montant">Montant (DA)</Label>
+              <Label htmlFor={`${uid}-montant`}>Montant (DA)</Label>
               <Input
-                id="montant"
+                id={`${uid}-montant`}
                 type="number"
                 step="0.01"
                 min="1"
                 placeholder="Ex. 150000"
+                disabled={enregistrementEnCours}
                 {...register('montant', { valueAsNumber: true })}
               />
               {errors.montant && (
-                <p className="text-sm text-destructive">{errors.montant.message}</p>
+                <p className="text-sm text-destructive" role="alert">
+                  {errors.montant.message}
+                </p>
               )}
             </div>
           </form>
@@ -616,15 +619,17 @@ export default function FactureDetailPage() {
             >
               Annuler
             </Button>
-            <Button type="submit" form="form-modifier-facture" disabled={enregistrementEnCours}>
-              {enregistrementEnCours && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" form={`${uid}-form-modifier`} disabled={enregistrementEnCours}>
+              {enregistrementEnCours && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+              )}
               Enregistrer
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ── AlertDialog : Changer le statut ──────────────────────────────── */}
+      {/* AlertDialog : changer le statut */}
       <AlertDialog
         open={!!confirmerStatut}
         onOpenChange={(open) => !open && setConfirmerStatut(null)}
@@ -632,18 +637,23 @@ export default function FactureDetailPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmer le changement de statut</AlertDialogTitle>
-            <AlertDialogDescription>
-              Voulez-vous passer la facture{' '}
-              <span className="font-mono font-semibold">{facture.numero}</span> en{' '}
-              <span className="font-semibold">
-                « {confirmerStatut ? libelleStatutFacture(confirmerStatut) : ''} »
-              </span>{' '}
-              ?
-              {confirmerStatut === 'emise' && (
-                <span className="mt-2 block text-amber-600">
-                  Une fois émise, le montant ne pourra plus être modifié.
+            <AlertDialogDescription asChild>
+              <div>
+                <span>
+                  Voulez-vous passer la facture{' '}
+                  <span className="font-mono font-semibold">{facture.numero}</span> en{' '}
+                  <span className="font-semibold">
+                    « {confirmerStatut ? libelleStatutFacture(confirmerStatut) : ''} »
+                  </span>{' '}
+                  ?
                 </span>
-              )}
+                {/* token warning au lieu de text-amber-600 */}
+                {confirmerStatut === 'emise' && (
+                  <span className="mt-2 block text-sm text-(--color-warning)">
+                    Une fois émise, le montant ne pourra plus être modifié.
+                  </span>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -652,14 +662,16 @@ export default function FactureDetailPage() {
               onClick={() => confirmerStatut && changerStatut(confirmerStatut)}
               disabled={changementEnCours}
             >
-              {changementEnCours && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {changementEnCours && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+              )}
               Confirmer
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ── AlertDialog : Supprimer ───────────────────────────────────────── */}
+      {/* AlertDialog : supprimer */}
       <AlertDialog open={confirmerSupprimer} onOpenChange={setConfirmerSupprimer}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -677,7 +689,9 @@ export default function FactureDetailPage() {
               onClick={() => effacer()}
               disabled={suppressionEnCours}
             >
-              {suppressionEnCours && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {suppressionEnCours && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+              )}
               Supprimer
             </AlertDialogAction>
           </AlertDialogFooter>

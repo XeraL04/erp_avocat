@@ -46,25 +46,22 @@ import type { ClientPopule, StatutDossier } from '@/types';
 import { nomAffiche } from '@/types';
 
 import { obtenirDossier, supprimerDossier, changerStatutDossier } from '@/api/dossier.api';
-
 import {
   couleurStatutDossier,
   libelleStatutDossier,
   libelleTypeDossier,
   formaterDate,
 } from '@/lib/utils';
-
 import { useAuthStore } from '@/stores/auth.store';
 
 import DialogModifierDossier from '@/components/dossier/DialogModifierDossier';
-
-// tabs
 import TabHonoraires from '@/components/dossier/TabHonoraires';
 import TabFactures from '@/components/dossier/TabFactures';
 import TabDocuments from '@/components/dossier/TabDocuments';
 import TabAgenda from '@/components/dossier/TabAgenda';
 import TabEtapes from '@/components/dossier/TabEtapes';
 
+// ─── Config tabs ──────────────────────────────────────────────────────────────
 const TABS = [
   { value: 'honoraires', label: 'Honoraires', icon: DollarSign },
   { value: 'factures', label: 'Factures', icon: Receipt },
@@ -73,6 +70,7 @@ const TABS = [
   { value: 'etapes', label: 'Étapes', icon: ListChecks },
 ] as const;
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function DossierDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -83,12 +81,14 @@ export default function DossierDetailPage() {
   const [dialogModifier, setDialogModifier] = useState(false);
   const [confirmerSupprimer, setConfirmerSupprimer] = useState(false);
 
+  // ── Query ──────────────────────────────────────────────────────────────────
   const { data: dossier, isLoading } = useQuery({
     queryKey: ['cabinet', 'dossier', id],
     queryFn: () => obtenirDossier(id!),
     enabled: !!id,
   });
 
+  // ── Mutations ──────────────────────────────────────────────────────────────
   const { mutate: changerStatut, isPending: changementStatut } = useMutation({
     mutationFn: (statut: StatutDossier) => changerStatutDossier(id!, { statut }),
     onSuccess: (dossierMaj) => {
@@ -111,6 +111,7 @@ export default function DossierDetailPage() {
     onError: () => toast.error('Erreur lors de la suppression'),
   });
 
+  // ── Dérivations ────────────────────────────────────────────────────────────
   const clientPopule =
     typeof dossier?.client === 'object' ? (dossier.client as ClientPopule) : null;
 
@@ -119,12 +120,13 @@ export default function DossierDetailPage() {
       ? dossier.client
       : ((dossier?.client as ClientPopule)?._id ?? '');
 
+  // ── États de chargement / erreur ───────────────────────────────────────────
   if (isLoading) return <DossierDetailSkeleton />;
 
   if (!dossier) {
     return (
       <div className="flex flex-col items-center gap-3 py-24 text-center">
-        <FolderOpen className="h-12 w-12 text-muted-foreground/30" />
+        <FolderOpen className="h-12 w-12 text-muted-foreground/30" aria-hidden="true" />
         <p className="font-medium">Dossier introuvable</p>
         <Button variant="outline" onClick={() => navigate(-1)}>
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -136,20 +138,23 @@ export default function DossierDetailPage() {
 
   return (
     <div className="space-y-6">
-      {/* ── Fil d'Ariane ── */}
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      {/* ── Fil d'Ariane ────────────────────────────────────────── */}
+      <nav
+        aria-label="Fil d'Ariane"
+        className="flex items-center gap-2 text-sm text-muted-foreground"
+      >
         <Link to="/cabinet/dossiers" className="transition-colors hover:text-foreground">
           Dossiers
         </Link>
-        <span>/</span>
+        <span aria-hidden="true">/</span>
         <span className="truncate font-medium text-foreground">{dossier.titre}</span>
-      </div>
+      </nav>
 
-      {/* ── En-tête ── */}
+      {/* ── En-tête ─────────────────────────────────────────────── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-            <Scale className="h-5 w-5 text-primary" />
+            <Scale className="h-5 w-5 text-primary" aria-hidden="true" />
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -160,7 +165,9 @@ export default function DossierDetailPage() {
             </div>
             <div className="mt-1 flex items-center gap-2">
               <span className="font-mono text-sm text-muted-foreground">{dossier.reference}</span>
-              <span className="text-muted-foreground">·</span>
+              <span className="text-muted-foreground" aria-hidden="true">
+                ·
+              </span>
               <span className="text-sm text-muted-foreground">
                 {libelleTypeDossier(dossier.type)}
               </span>
@@ -168,56 +175,70 @@ export default function DossierDetailPage() {
           </div>
         </div>
 
+        {/* Actions */}
         <div className="flex shrink-0 items-center gap-2">
           {estAdmin && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" disabled={changementStatut}>
-                  <Clock className="mr-2 h-4 w-4" />
+                  <Clock className="mr-2 h-4 w-4" aria-hidden="true" />
                   Statut
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {dossier.statut !== 'en_cours' && (
                   <DropdownMenuItem onClick={() => changerStatut('en_cours')}>
-                    <Play className="mr-2 h-4 w-4 text-green-600" />
+                    {/* token success — plus de text-green-600 hardcodé */}
+                    <Play className="mr-2 h-4 w-4 text-(--color-success)" aria-hidden="true" />
                     Remettre en cours
                   </DropdownMenuItem>
                 )}
                 {dossier.statut !== 'suspendu' && (
                   <DropdownMenuItem onClick={() => changerStatut('suspendu')}>
-                    <PauseCircle className="mr-2 h-4 w-4 text-yellow-500" />
+                    {/* token warning/gold — plus de text-yellow-500 hardcodé */}
+                    <PauseCircle
+                      className="mr-2 h-4 w-4 text-(--color-warning)"
+                      aria-hidden="true"
+                    />
                     Suspendre
                   </DropdownMenuItem>
                 )}
                 {dossier.statut !== 'cloture' && (
                   <DropdownMenuItem onClick={() => changerStatut('cloture')}>
-                    <CheckCircle className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <CheckCircle
+                      className="mr-2 h-4 w-4 text-muted-foreground"
+                      aria-hidden="true"
+                    />
                     Clôturer
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
+
           <Button variant="outline" size="sm" onClick={() => setDialogModifier(true)}>
-            <Pencil className="mr-2 h-4 w-4" />
+            <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
             Modifier
           </Button>
+
           {estAdmin && (
+            // Bouton destructif — border token, cohérent avec ClientDetailPage
             <Button
               variant="outline"
               size="sm"
-              className="text-destructive hover:text-destructive"
+              className="border-destructive/30 text-destructive hover:bg-destructive/5 hover:text-destructive"
               onClick={() => setConfirmerSupprimer(true)}
+              aria-label="Archiver ce dossier"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
             </Button>
           )}
         </div>
       </div>
 
-      {/* ── Infos permanentes ── */}
+      {/* ── Infos permanentes ───────────────────────────────────── */}
       <div className="grid gap-4 sm:grid-cols-2">
+        {/* Client */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Client</CardTitle>
@@ -234,7 +255,7 @@ export default function DossierDetailPage() {
                   <p className="text-sm text-muted-foreground">{clientPopule.adresse}</p>
                 )}
                 <Button variant="outline" size="sm" className="mt-2" asChild>
-                  <Link to="/cabinet/clients">Voir la fiche client</Link>
+                  <Link to={`/cabinet/clients/${clientPopule._id}`}>Voir la fiche client</Link>
                 </Button>
               </>
             ) : (
@@ -243,6 +264,7 @@ export default function DossierDetailPage() {
           </CardContent>
         </Card>
 
+        {/* Informations */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Informations</CardTitle>
@@ -265,7 +287,7 @@ export default function DossierDetailPage() {
         </Card>
       </div>
 
-      {/* Description (optionnelle) */}
+      {/* Description */}
       {dossier.description && (
         <Card>
           <CardHeader className="pb-3">
@@ -279,9 +301,8 @@ export default function DossierDetailPage() {
         </Card>
       )}
 
-      {/* ── Tabs — underline navigation ── */}
-      <Tabs defaultValue="honoraires" className="space-y-0 flex flex-col">
-        {/* Barre de navigation */}
+      {/* ── Tabs underline ──────────────────────────────────────── */}
+      <Tabs defaultValue="honoraires" className="flex flex-col space-y-0">
         <div className="border-b">
           <TabsList className="flex h-auto w-full justify-start gap-0 overflow-x-auto rounded-none bg-transparent p-0">
             {TABS.map(({ value, label, icon: Icon }) => (
@@ -293,48 +314,43 @@ export default function DossierDetailPage() {
                   px-4 py-3 text-sm font-medium text-muted-foreground
                   transition-colors duration-150
                   hover:text-foreground
-                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0
+                  focus-visible:outline-none focus-visible:ring-2
+                  focus-visible:ring-ring focus-visible:ring-offset-0
                   data-[state=active]:border-primary
+                  data-[state=active]:bg-transparent
                   data-[state=active]:text-primary
                   data-[state=active]:shadow-none
-                  data-[state=active]:bg-transparent
                 "
               >
-                <Icon className="h-4 w-4 shrink-0" />
+                <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span className="whitespace-nowrap">{label}</span>
               </TabsTrigger>
             ))}
           </TabsList>
         </div>
 
-        {/* Contenus */}
         <TabsContent value="honoraires" className="mt-6 focus-visible:outline-none">
           <TabHonoraires dossierId={id!} />
         </TabsContent>
-
         <TabsContent value="factures" className="mt-6 focus-visible:outline-none">
           <TabFactures dossierId={id!} clientId={clientId} />
         </TabsContent>
-
         <TabsContent value="documents" className="mt-6 focus-visible:outline-none">
           <TabDocuments dossierId={id!} />
         </TabsContent>
-
         <TabsContent value="agenda" className="mt-6 focus-visible:outline-none">
           <TabAgenda dossierId={dossier._id} />
         </TabsContent>
-
         <TabsContent value="etapes" className="mt-6 focus-visible:outline-none">
           <TabEtapes dossierId={dossier._id} />
         </TabsContent>
       </Tabs>
 
-      {/* Dialog modifier */}
+      {/* ── Dialogs ──────────────────────────────────────────────── */}
       {dialogModifier && (
         <DialogModifierDossier dossier={dossier} onFermer={() => setDialogModifier(false)} />
       )}
 
-      {/* Confirmation suppression */}
       <AlertDialog open={confirmerSupprimer} onOpenChange={setConfirmerSupprimer}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -361,6 +377,7 @@ export default function DossierDetailPage() {
   );
 }
 
+// ─── Sous-composants ──────────────────────────────────────────────────────────
 function InfoLigne({
   label,
   valeur,
@@ -373,7 +390,7 @@ function InfoLigne({
   return (
     <div className="flex items-center justify-between text-sm">
       <span className="text-muted-foreground">{label}</span>
-      <span className={`font-medium ${mono ? 'font-mono' : ''}`}>{valeur}</span>
+      <span className={mono ? 'font-mono font-medium' : 'font-medium'}>{valeur}</span>
     </div>
   );
 }
@@ -381,20 +398,27 @@ function InfoLigne({
 function DossierDetailSkeleton() {
   return (
     <div className="space-y-6">
+      {/* Fil d'Ariane */}
       <Skeleton className="h-4 w-48" />
+      {/* En-tête */}
       <div className="flex items-start gap-3">
         <Skeleton className="h-11 w-11 rounded-lg" />
         <div className="space-y-2">
-          <Skeleton className="h-6 w-64" />
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-6 w-56" />
+            <Skeleton className="h-5 w-20 rounded-full" />
+          </div>
           <Skeleton className="h-4 w-40" />
         </div>
       </div>
+      {/* Cards infos */}
       <div className="grid gap-4 sm:grid-cols-2">
         <Skeleton className="h-52" />
         <Skeleton className="h-52" />
       </div>
+      {/* Tabs */}
       <div className="border-b">
-        <div className="flex gap-1 pb-0">
+        <div className="flex gap-0">
           {Array.from({ length: 5 }).map((_, i) => (
             <Skeleton key={i} className="h-11 w-24 rounded-none" />
           ))}

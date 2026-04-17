@@ -1,4 +1,3 @@
-// apps/frontend/src/pages/cabinet/DocumentsPage.tsx
 import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -27,11 +26,11 @@ import {
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import {
   Select,
   SelectContent,
@@ -64,7 +63,8 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Separator } from '@/components/ui/separator';
+import { EmptyState } from '@/components/ui/empty-state';
+import { SkeletonTable } from '@/components/ui/skeleton-table';
 
 import {
   listerTousDocuments,
@@ -75,31 +75,31 @@ import {
   type TypeDocument,
 } from '@/api/document.api';
 import { listerDossiers } from '@/api/dossier.api';
+import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth.store';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function formaterTaille(bytes: number): string {
   if (bytes < 1024) return `${bytes} o`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
-function obtenirIconeFichier(nom: string) {
+// Icônes fichier avec tokens CSS — plus de dark: manuel
+function obtenirIconeFichier(nom: string): {
+  Icone: React.ElementType;
+  text: string;
+  bg: string;
+} {
   const ext = nom.split('.').pop()?.toLowerCase() ?? '';
   if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext))
-    return { Icone: ImageIcon, cls: 'text-green-600', bg: 'bg-green-50 dark:bg-green-950/30' };
+    return { Icone: ImageIcon, text: 'text-status-actif', bg: 'bg-status-actif-bg' };
   if (['xls', 'xlsx', 'csv'].includes(ext))
-    return {
-      Icone: FileSpreadsheet,
-      cls: 'text-emerald-600',
-      bg: 'bg-emerald-50 dark:bg-emerald-950/30',
-    };
-  if (ext === 'pdf')
-    return { Icone: FileText, cls: 'text-red-600', bg: 'bg-red-50 dark:bg-red-950/30' };
+    return { Icone: FileSpreadsheet, text: 'text-status-encours', bg: 'bg-status-encours-bg' };
+  if (ext === 'pdf') return { Icone: FileText, text: 'text-destructive', bg: 'bg-destructive/10' };
   if (['doc', 'docx', 'txt'].includes(ext))
-    return { Icone: FileText, cls: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950/30' };
-  return { Icone: File, cls: 'text-muted-foreground', bg: 'bg-muted' };
+    return { Icone: FileText, text: 'text-mode-virement', bg: 'bg-mode-virement-bg' };
+  return { Icone: File, text: 'text-muted-foreground', bg: 'bg-muted' };
 }
 
 interface ErreurAxios {
@@ -116,28 +116,23 @@ function extraireMessageErreur(err: unknown, fallback: string): string {
   return fallback;
 }
 
-// ─── Config types ─────────────────────────────────────────────────────────────
+// ─── Config types document — tokens CSS ───────────────────────────────────────
+interface TypeDocConfig {
+  label: string;
+  text: string;
+  bg: string;
+}
 
-const CONFIG_TYPE: Record<TypeDocument, { label: string; classe: string }> = {
-  contrat: {
-    label: 'Contrat',
-    classe: 'bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400',
-  },
-  jugement: {
-    label: 'Jugement',
-    classe: 'bg-purple-100 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400',
-  },
-  piece: {
-    label: 'Pièce justificative',
-    classe: 'bg-orange-100 text-orange-700 dark:bg-orange-950/30 dark:text-orange-400',
-  },
-  autre: { label: 'Autre', classe: '' },
+const CONFIG_TYPE: Record<TypeDocument, TypeDocConfig> = {
+  contrat: { label: 'Contrat', text: 'text-mode-virement', bg: 'bg-mode-virement-bg' },
+  jugement: { label: 'Jugement', text: 'text-status-suspendu', bg: 'bg-status-suspendu-bg' },
+  piece: { label: 'Pièce justificative', text: 'text-status-suspendu', bg: 'bg-mode-cheque-bg' },
+  autre: { label: 'Autre', text: 'text-muted-foreground', bg: 'bg-muted/60' },
 };
 
 type FiltreType = TypeDocument | 'tous';
 
 // ─── Schéma upload ────────────────────────────────────────────────────────────
-
 const schemaUpload = z.object({
   nom: z.string().trim().min(2, 'Minimum 2 caractères'),
   type: z.enum(['contrat', 'jugement', 'piece', 'autre'] as const),
@@ -150,22 +145,21 @@ const EXTENSIONS_ACCEPTEES = '.pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx,.txt';
 const TAILLE_MAX_MO = 10;
 
 // ─── Composant principal ──────────────────────────────────────────────────────
-
 export default function DocumentsPage() {
   const queryClient = useQueryClient();
   const utilisateur = useAuthStore((s) => s.utilisateur);
   const estAdmin = utilisateur?.role === 'admin';
 
   const [recherche, setRecherche] = useState('');
-  const [rechercheDebounced] = useDebounce(recherche, 300);
   const [filtreType, setFiltreType] = useState<FiltreType>('tous');
   const [page, setPage] = useState(1);
   const [dialogUpload, setDialogUpload] = useState(false);
   const [docASupprimer, setDocASupprimer] = useState<DocumentFichier | null>(null);
+  const [rechercheDebounced] = useDebounce(recherche, 300);
 
   const LIMIT = 20;
 
-  // ── Query ─────────────────────────────────────────────────────────────────
+  // ── Query ──────────────────────────────────────────────────────────────────
   const { data, isLoading, isError } = useQuery({
     queryKey: ['cabinet', 'documents', 'global', filtreType, page],
     queryFn: () =>
@@ -180,12 +174,14 @@ export default function DocumentsPage() {
   const documents = data?.documents ?? [];
   const meta = data?.meta;
 
-  // Filtre local par nom (sur la page courante)
+  // Filtre local par nom sur la page courante
   const documentsFiltres = rechercheDebounced
     ? documents.filter((d) => d.nom.toLowerCase().includes(rechercheDebounced.toLowerCase()))
     : documents;
 
-  // ── Mutation suppression ──────────────────────────────────────────────────
+  const filtresActifs = !!(recherche || filtreType !== 'tous');
+
+  // ── Suppression ────────────────────────────────────────────────────────────
   const { mutate: effacer, isPending: suppressionEnCours } = useMutation({
     mutationFn: () => supprimerDocument(docASupprimer!._id),
     onSuccess: () => {
@@ -202,12 +198,9 @@ export default function DocumentsPage() {
     setPage(1);
   };
 
-  const filtresActifs = recherche || filtreType !== 'tous';
-
-  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* En-tête */}
+      {/* ── En-tête ─────────────────────────────────────────────── */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Documents</h2>
@@ -222,7 +215,7 @@ export default function DocumentsPage() {
         </Button>
       </div>
 
-      {/* Filtres */}
+      {/* ── Filtres ─────────────────────────────────────────────── */}
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -236,7 +229,6 @@ export default function DocumentsPage() {
             }}
           />
         </div>
-
         <Select
           value={filtreType}
           onValueChange={(v) => {
@@ -255,7 +247,6 @@ export default function DocumentsPage() {
             <SelectItem value="autre">Autres</SelectItem>
           </SelectContent>
         </Select>
-
         {filtresActifs && (
           <Button variant="ghost" onClick={reinitialiserFiltres} className="shrink-0">
             <X className="mr-1.5 h-4 w-4" />
@@ -264,7 +255,7 @@ export default function DocumentsPage() {
         )}
       </div>
 
-      {/* Erreur réseau */}
+      {/* ── Erreur réseau ───────────────────────────────────────── */}
       {isError && (
         <Card>
           <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
@@ -289,47 +280,51 @@ export default function DocumentsPage() {
         </Card>
       )}
 
-      {/* Skeleton */}
+      {/* ── Skeleton ────────────────────────────────────────────── */}
       {isLoading && (
-        <div className="space-y-2">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-18 w-full rounded-lg" />
-          ))}
-        </div>
+        <Card>
+          <CardContent className="p-0">
+            <SkeletonTable lignes={5} avecAvatar={true} avecBadge={true} />
+          </CardContent>
+        </Card>
       )}
 
-      {/* Liste */}
+      {/* ── Contenu ─────────────────────────────────────────────── */}
       {!isLoading && !isError && (
         <>
-          {documentsFiltres.length === 0 ? (
-            /* Empty state */
-            <div className="flex flex-col items-center gap-3 py-16 text-center text-muted-foreground">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-                <Files className="h-7 w-7 opacity-40" />
-              </div>
-              <div>
-                <p className="font-medium text-foreground">
-                  {filtresActifs ? 'Aucun document trouvé' : 'Aucun document'}
-                </p>
-                <p className="mt-1 text-sm">
-                  {filtresActifs
-                    ? 'Modifiez vos critères de recherche'
-                    : 'Ajoutez votre premier document depuis un dossier ou ici'}
-                </p>
-              </div>
-              {!filtresActifs && (
-                <Button variant="outline" size="sm" onClick={() => setDialogUpload(true)}>
-                  <Upload className="mr-1.5 h-4 w-4" />
-                  Ajouter un document
-                </Button>
-              )}
-            </div>
-          ) : (
+          {/* Empty state */}
+          {documentsFiltres.length === 0 && (
+            <Card>
+              <CardContent className="p-0">
+                <EmptyState
+                  icone={Files}
+                  titre={filtresActifs ? 'Aucun document trouvé' : 'Aucun document'}
+                  description={
+                    filtresActifs
+                      ? 'Aucun document ne correspond à vos critères. Modifiez ou réinitialisez les filtres.'
+                      : 'Ajoutez votre premier document depuis un dossier ou depuis cette page.'
+                  }
+                  action={
+                    !filtresActifs
+                      ? {
+                          label: 'Ajouter un document',
+                          onClick: () => setDialogUpload(true),
+                          icone: Upload,
+                        }
+                      : undefined
+                  }
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Liste */}
+          {documentsFiltres.length > 0 && (
             <Card>
               <CardContent className="p-0">
                 <div className="divide-y">
                   {documentsFiltres.map((doc) => {
-                    const { Icone, cls, bg } = obtenirIconeFichier(doc.nom);
+                    const { Icone, text, bg } = obtenirIconeFichier(doc.nom);
                     const cfg = CONFIG_TYPE[doc.type];
                     const ext = (doc.nom.split('.').pop() ?? '').toUpperCase();
                     const urlFichier = construireUrlDocument(doc.url);
@@ -341,22 +336,29 @@ export default function DocumentsPage() {
                       >
                         {/* Icône fichier */}
                         <div
-                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${bg}`}
+                          className={cn(
+                            'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
+                            bg
+                          )}
                         >
-                          <Icone className={`h-4 w-4 ${cls}`} />
+                          <Icone className={cn('h-4 w-4', text)} aria-hidden="true" />
                         </div>
 
-                        {/* Infos principales */}
+                        {/* Infos */}
                         <div className="min-w-0 flex-1">
                           {/* Ligne 1 : nom + badge type */}
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="truncate text-sm font-medium">{doc.nom}</span>
-                            <Badge
-                              variant="secondary"
-                              className={`shrink-0 px-1.5 py-0 text-xs ${cfg.classe}`}
+                            {/* Badge type sémantique */}
+                            <span
+                              className={cn(
+                                'shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
+                                cfg.text,
+                                cfg.bg
+                              )}
                             >
                               {cfg.label}
-                            </Badge>
+                            </span>
                           </div>
 
                           {/* Ligne 2 : métadonnées */}
@@ -394,7 +396,6 @@ export default function DocumentsPage() {
 
                         {/* Actions */}
                         <div className="flex shrink-0 items-center gap-0.5">
-                          {/* Visualiser */}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -404,8 +405,6 @@ export default function DocumentsPage() {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-
-                          {/* Télécharger */}
                           <a
                             href={urlFichier}
                             download={doc.nom}
@@ -421,8 +420,6 @@ export default function DocumentsPage() {
                               <Download className="h-4 w-4" />
                             </Button>
                           </a>
-
-                          {/* Supprimer — admin uniquement */}
                           {estAdmin && (
                             <Button
                               variant="ghost"
@@ -476,7 +473,7 @@ export default function DocumentsPage() {
         </>
       )}
 
-      {/* Dialog upload global (avec sélecteur dossier) */}
+      {/* ── Dialog upload ────────────────────────────────────────── */}
       {dialogUpload && (
         <DialogUploadGlobal
           onFermer={() => setDialogUpload(false)}
@@ -487,7 +484,7 @@ export default function DocumentsPage() {
         />
       )}
 
-      {/* Confirmation suppression */}
+      {/* ── Confirmation suppression ─────────────────────────────── */}
       <AlertDialog open={!!docASupprimer} onOpenChange={(o) => !o && setDocASupprimer(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -514,8 +511,7 @@ export default function DocumentsPage() {
   );
 }
 
-// ─── Dialog upload global (avec sélecteur de dossier) ────────────────────────
-
+// ─── Dialog upload global ─────────────────────────────────────────────────────
 interface DialogUploadGlobalProps {
   onFermer: () => void;
   onSuccess: () => void;
@@ -527,7 +523,6 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Recherche dossier
   const [rechercheDossier, setRechercheDossier] = useState('');
   const [rechercheDossierDebounced] = useDebounce(rechercheDossier, 300);
   const [dossierSelectionne, setDossierSelectionne] = useState<{
@@ -597,13 +592,15 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
           <form onSubmit={form.handleSubmit((v) => uploader(v))} className="space-y-4">
             {/* Zone drag & drop */}
             <div
-              className={`relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-8 text-center transition-colors ${
-                dragOver
-                  ? 'border-primary bg-primary/5'
-                  : fichier
-                    ? 'border-green-500 bg-green-50/50 dark:bg-green-950/10'
-                    : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30'
-              }`}
+              className={cn(
+                'relative flex cursor-pointer flex-col items-center justify-center gap-2',
+                'rounded-lg border-2 border-dashed px-6 py-8 text-center transition-colors',
+                dragOver && 'border-primary bg-primary/5',
+                fichier && !dragOver && 'border-status-actif bg-status-actif-bg',
+                !fichier &&
+                  !dragOver &&
+                  'border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30'
+              )}
               onClick={() => inputRef.current?.click()}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -629,13 +626,11 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
               />
               {fichier ? (
                 <>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 dark:bg-green-950/30">
-                    <FileText className="h-5 w-5 text-green-600" />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-actif-bg">
+                    <FileText className="h-5 w-5 text-status-actif" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-green-700 dark:text-green-400">
-                      {fichier.name}
-                    </p>
+                    <p className="text-sm font-medium text-status-actif">{fichier.name}</p>
                     <p className="text-xs text-muted-foreground">
                       {formaterTaille(fichier.size)} — Cliquer pour changer
                     </p>
@@ -657,7 +652,7 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
             </div>
             {erreurFichier && <p className="text-xs text-destructive">{erreurFichier}</p>}
 
-            {/* Sélecteur de dossier */}
+            {/* Sélecteur dossier */}
             <FormField
               control={form.control}
               name="dossierId"

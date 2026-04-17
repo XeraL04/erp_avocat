@@ -25,7 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { creerClient } from '@/api/client.api';
 import { extraireMessageErreur } from '@/api/auth.api';
 
-// ─── Helper normalisation ─────────────────────────────────────────────────────
+// ─── Helper ───────────────────────────────────────────────────────────────────
 function normaliserTel(val?: string): string | undefined {
   if (!val) return undefined;
   const nettoye = val.replace(/[\s\-.]+/g, '').trim();
@@ -33,7 +33,6 @@ function normaliserTel(val?: string): string | undefined {
 }
 
 // ─── Schémas ──────────────────────────────────────────────────────────────────
-
 const baseSchema = z.object({
   telephone: z
     .string()
@@ -49,7 +48,6 @@ const physiqueSchema = baseSchema.extend({
   type: z.literal('physique'),
   nom: z.string().min(2, 'Nom requis'),
   prenom: z.string().min(2, 'Prénom requis'),
-  // ↓ MODIFIÉ : regex 18 chiffres, facultatif
   cin: z
     .string()
     .regex(/^\d{18}$/, 'Le NIN doit contenir exactement 18 chiffres')
@@ -68,21 +66,30 @@ type FormPhysique = z.infer<typeof physiqueSchema>;
 type FormMorale = z.infer<typeof moraleSchema>;
 
 // ─── ChampsCommuns ────────────────────────────────────────────────────────────
-
 interface ChampsCommunsProps {
   register: ReturnType<typeof useForm<FormPhysique | FormMorale>>['register'];
   errors: Partial<Record<string, { message?: string }>>;
+  isPending: boolean;
 }
 
-function ChampsCommuns({ register, errors }: ChampsCommunsProps) {
+function ChampsCommuns({ register, errors, isPending }: ChampsCommunsProps) {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="telephone">Téléphone *</Label>
-          <Input id="telephone" placeholder="0550 00 00 00" {...register('telephone')} />
+          <Input
+            id="telephone"
+            placeholder="0550 00 00 00"
+            disabled={isPending}
+            aria-invalid={!!errors.telephone}
+            aria-describedby={errors.telephone ? 'tel-error' : undefined}
+            {...register('telephone')}
+          />
           {errors.telephone && (
-            <p className="text-xs text-destructive">{errors.telephone.message}</p>
+            <p id="tel-error" className="text-xs text-destructive" role="alert">
+              {errors.telephone.message}
+            </p>
           )}
         </div>
         <div className="space-y-1.5">
@@ -90,6 +97,7 @@ function ChampsCommuns({ register, errors }: ChampsCommunsProps) {
           <Input
             id="telephoneSecondaire"
             placeholder="Optionnel"
+            disabled={isPending}
             {...register('telephoneSecondaire')}
           />
         </div>
@@ -97,21 +105,40 @@ function ChampsCommuns({ register, errors }: ChampsCommunsProps) {
 
       <div className="space-y-1.5">
         <Label htmlFor="email">Email</Label>
-        <Input id="email" type="email" placeholder="email@exemple.dz" {...register('email')} />
-        {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+        <Input
+          id="email"
+          type="email"
+          placeholder="email@exemple.dz"
+          disabled={isPending}
+          aria-invalid={!!errors.email}
+          aria-describedby={errors.email ? 'email-error' : undefined}
+          {...register('email')}
+        />
+        {errors.email && (
+          <p id="email-error" className="text-xs text-destructive" role="alert">
+            {errors.email.message}
+          </p>
+        )}
       </div>
 
       <div className="space-y-1.5">
         <Label htmlFor="adresse">Adresse</Label>
-        <Input id="adresse" placeholder="Wilaya, commune..." {...register('adresse')} />
+        <Input
+          id="adresse"
+          placeholder="Wilaya, commune…"
+          disabled={isPending}
+          {...register('adresse')}
+        />
       </div>
 
       <div className="space-y-1.5">
         <Label htmlFor="notes">Notes</Label>
         <Textarea
           id="notes"
-          placeholder="Informations complémentaires..."
+          placeholder="Informations complémentaires…"
           rows={2}
+          className="resize-none"
+          disabled={isPending}
           {...register('notes')}
         />
       </div>
@@ -120,7 +147,6 @@ function ChampsCommuns({ register, errors }: ChampsCommunsProps) {
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
-
 interface Props {
   ouvert: boolean;
   onFermer: () => void;
@@ -163,25 +189,23 @@ export default function DialogCreerClient({ ouvert, onFermer }: Props) {
     }
   };
 
-  const onSubmitPhysique = (data: FormPhysique) => {
+  const onSubmitPhysique = (data: FormPhysique) =>
     mutate({
       ...data,
       telephone: normaliserTel(data.telephone)!,
       telephoneSecondaire: normaliserTel(data.telephoneSecondaire),
     });
-  };
 
-  const onSubmitMorale = (data: FormMorale) => {
+  const onSubmitMorale = (data: FormMorale) =>
     mutate({
       ...data,
       telephone: normaliserTel(data.telephone)!,
       telephoneSecondaire: normaliserTel(data.telephoneSecondaire),
     });
-  };
 
   return (
     <Dialog open={ouvert} onOpenChange={handleFermer}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Nouveau client</DialogTitle>
           <DialogDescription>
@@ -200,42 +224,70 @@ export default function DialogCreerClient({ ouvert, onFermer }: Props) {
           </TabsList>
         </Tabs>
 
-        {/* Formulaire Physique */}
+        {/* ── Formulaire Physique ─────────────────────────────── */}
         {typeClient === 'physique' && (
-          <form onSubmit={physiqueForm.handleSubmit(onSubmitPhysique)} className="space-y-4">
+          <form
+            onSubmit={physiqueForm.handleSubmit(onSubmitPhysique)}
+            className="space-y-4"
+            noValidate
+          >
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="prenom">Prénom *</Label>
-                  <Input id="prenom" placeholder="Ahmed" {...physiqueForm.register('prenom')} />
+                  <Input
+                    id="prenom"
+                    placeholder="Ahmed"
+                    disabled={isPending}
+                    aria-invalid={!!physiqueForm.formState.errors.prenom}
+                    aria-describedby={
+                      physiqueForm.formState.errors.prenom ? 'prenom-error' : undefined
+                    }
+                    {...physiqueForm.register('prenom')}
+                  />
                   {physiqueForm.formState.errors.prenom && (
-                    <p className="text-xs text-destructive">
+                    <p id="prenom-error" className="text-xs text-destructive" role="alert">
                       {physiqueForm.formState.errors.prenom.message}
                     </p>
                   )}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="nom">Nom *</Label>
-                  <Input id="nom" placeholder="Bensalem" {...physiqueForm.register('nom')} />
+                  <Input
+                    id="nom"
+                    placeholder="Bensalem"
+                    disabled={isPending}
+                    aria-invalid={!!physiqueForm.formState.errors.nom}
+                    aria-describedby={physiqueForm.formState.errors.nom ? 'nom-error' : undefined}
+                    {...physiqueForm.register('nom')}
+                  />
                   {physiqueForm.formState.errors.nom && (
-                    <p className="text-xs text-destructive">
+                    <p id="nom-error" className="text-xs text-destructive" role="alert">
                       {physiqueForm.formState.errors.nom.message}
                     </p>
                   )}
                 </div>
               </div>
 
-              {/* ↓ MODIFIÉ : maxLength + affichage erreur */}
               <div className="space-y-1.5">
-                <Label htmlFor="cin">Numéro d'identification nationale</Label>
+                <Label htmlFor="cin">
+                  Numéro d'identification nationale
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">
+                    (optionnel)
+                  </span>
+                </Label>
                 <Input
                   id="cin"
                   placeholder="18 chiffres"
                   maxLength={18}
+                  inputMode="numeric"
+                  disabled={isPending}
+                  aria-invalid={!!physiqueForm.formState.errors.cin}
+                  aria-describedby={physiqueForm.formState.errors.cin ? 'cin-error' : undefined}
                   {...physiqueForm.register('cin')}
                 />
                 {physiqueForm.formState.errors.cin && (
-                  <p className="text-xs text-destructive">
+                  <p id="cin-error" className="text-xs text-destructive" role="alert">
                     {physiqueForm.formState.errors.cin.message}
                   </p>
                 )}
@@ -247,6 +299,7 @@ export default function DialogCreerClient({ ouvert, onFermer }: Props) {
             <ChampsCommuns
               register={physiqueForm.register as ChampsCommunsProps['register']}
               errors={physiqueForm.formState.errors}
+              isPending={isPending}
             />
 
             <DialogFooter>
@@ -254,43 +307,52 @@ export default function DialogCreerClient({ ouvert, onFermer }: Props) {
                 Annuler
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isPending ? 'Création...' : 'Créer le client'}
+                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+                {isPending ? 'Création en cours…' : 'Créer le client'}
               </Button>
             </DialogFooter>
           </form>
         )}
 
-        {/* Formulaire Morale */}
+        {/* ── Formulaire Morale ───────────────────────────────── */}
         {typeClient === 'morale' && (
-          <form onSubmit={moraleForm.handleSubmit(onSubmitMorale)} className="space-y-4">
+          <form onSubmit={moraleForm.handleSubmit(onSubmitMorale)} className="space-y-4" noValidate>
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label htmlFor="raisonSociale">Raison sociale *</Label>
                 <Input
                   id="raisonSociale"
-                  placeholder="SARL, EURL, SPA..."
+                  placeholder="SARL, EURL, SPA…"
+                  disabled={isPending}
+                  aria-invalid={!!moraleForm.formState.errors.raisonSociale}
+                  aria-describedby={
+                    moraleForm.formState.errors.raisonSociale ? 'rs-error' : undefined
+                  }
                   {...moraleForm.register('raisonSociale')}
                 />
                 {moraleForm.formState.errors.raisonSociale && (
-                  <p className="text-xs text-destructive">
+                  <p id="rs-error" className="text-xs text-destructive" role="alert">
                     {moraleForm.formState.errors.raisonSociale.message}
                   </p>
                 )}
               </div>
+
               <div className="space-y-1.5">
                 <Label htmlFor="representantLegal">Représentant légal</Label>
                 <Input
                   id="representantLegal"
                   placeholder="Nom du gérant ou PDG"
+                  disabled={isPending}
                   {...moraleForm.register('representantLegal')}
                 />
               </div>
+
               <div className="space-y-1.5">
                 <Label htmlFor="nifRc">NIF / Registre de commerce</Label>
                 <Input
                   id="nifRc"
                   placeholder="Numéro NIF ou RC"
+                  disabled={isPending}
                   {...moraleForm.register('nifRc')}
                 />
               </div>
@@ -301,6 +363,7 @@ export default function DialogCreerClient({ ouvert, onFermer }: Props) {
             <ChampsCommuns
               register={moraleForm.register as ChampsCommunsProps['register']}
               errors={moraleForm.formState.errors}
+              isPending={isPending}
             />
 
             <DialogFooter>
@@ -308,8 +371,8 @@ export default function DialogCreerClient({ ouvert, onFermer }: Props) {
                 Annuler
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isPending ? 'Création...' : 'Créer le client'}
+                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+                {isPending ? 'Création en cours…' : 'Créer le client'}
               </Button>
             </DialogFooter>
           </form>

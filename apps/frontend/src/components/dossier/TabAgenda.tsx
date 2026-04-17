@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -69,58 +69,56 @@ import {
   type TypeEvenement,
 } from '@/api/evenement.api';
 
-// ─── Schéma Zod ────────────────────────────────────────────────────────────────
-
+// ─── Schéma ───────────────────────────────────────────────────────────────────
 const schema = z.object({
   titre: z.string().trim().min(2, 'Le titre doit contenir au moins 2 caractères'),
   type: z.enum(['audience', 'rdv', 'rappel'], { required_error: 'Le type est obligatoire' }),
-  // <input type="datetime-local"> donne "2026-04-15T09:00"
   dateHeure: z.string().min(1, 'La date et heure sont obligatoires'),
   lieu: z.string().trim().optional(),
   notes: z.string().trim().optional(),
 });
-
 type FormValues = z.infer<typeof schema>;
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-
+// ─── Config type — tokens CSS uniquement ─────────────────────────────────────
 const TYPE_CONFIG: Record<
   TypeEvenement,
   {
     label: string;
     icone: React.ElementType;
-    variant: 'default' | 'secondary' | 'outline' | 'destructive';
+    // className pour Badge — tokens CSS, pas de couleurs hardcodées
     classe: string;
   }
 > = {
   audience: {
     label: 'Audience',
     icone: Scale,
-    variant: 'default',
-    classe: 'bg-blue-600 hover:bg-blue-700 text-white',
+    // token primary (teal) — accent fort pour les audiences
+    classe:
+      'border-[var(--color-primary)]/40 bg-[var(--color-primary)]/10 text-[var(--color-primary)]',
   },
   rdv: {
     label: 'Rendez-vous',
     icone: Users,
-    variant: 'secondary',
-    classe: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+    // token success (vert) — RDV à venir
+    classe:
+      'border-[var(--color-success)]/40 bg-[var(--color-success)]/10 text-[var(--color-success)]',
   },
   rappel: {
     label: 'Rappel',
     icone: Bell,
-    variant: 'outline',
-    classe: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+    // token warning (terra brown) — rappel/alerte
+    classe:
+      'border-[var(--color-warning)]/40 bg-[var(--color-warning)]/10 text-[var(--color-warning)]',
   },
 };
 
-/** Convertit "2026-04-15T09:00:00.000Z" → "2026-04-15T11:00" (locale) */
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function isoToDatetimeLocal(iso: string): string {
   const d = parseISO(iso);
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** Convertit "2026-04-15T09:00" (datetime-local) → ISO 8601 UTC */
 function datetimeLocalToISO(local: string): string {
   return new Date(local).toISOString();
 }
@@ -143,14 +141,14 @@ function grouperParJour(evenements: Evenement[]): Map<string, Evenement[]> {
   return map;
 }
 
-// ─── Composant principal ───────────────────────────────────────────────────────
-
+// ─── Composant ────────────────────────────────────────────────────────────────
 interface Props {
   dossierId: string;
 }
 
 export default function TabAgenda({ dossierId }: Props) {
   const qc = useQueryClient();
+  const uid = useId();
   const role = useAuthStore((s) => s.utilisateur?.role);
   const peutModifier = role === 'admin' || role === 'assistant';
   const peutSupprimer = role === 'admin';
@@ -243,10 +241,7 @@ export default function TabAgenda({ dossierId }: Props) {
   });
 
   const onSubmit = (v: FormValues) => (evenementEdite ? mutModifier.mutate(v) : mutCreer.mutate(v));
-
   const isPending = mutCreer.isPending || mutModifier.isPending;
-
-  // ── Affichage ──────────────────────────────────────────────────────────────
   const groupes = grouperParJour(evenements);
 
   return (
@@ -254,14 +249,14 @@ export default function TabAgenda({ dossierId }: Props) {
       {/* En-tête */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <CalendarClock className="h-4 w-4" />
+          <CalendarClock className="h-4 w-4" aria-hidden="true" />
           <span>
             {evenements.length} événement{evenements.length > 1 ? 's' : ''}
           </span>
         </div>
         {peutModifier && (
           <Button size="sm" onClick={ouvrirCreation}>
-            <Plus className="mr-1.5 h-4 w-4" />
+            <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />
             Ajouter
           </Button>
         )}
@@ -270,8 +265,17 @@ export default function TabAgenda({ dossierId }: Props) {
       {/* Skeleton */}
       {isLoading && (
         <div className="space-y-3">
-          {[...Array(3)].map((_, i) => (
-            <Skeleton key={i} className="h-20 w-full rounded-lg" />
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex items-start gap-3 rounded-lg border p-3">
+              <Skeleton className="mt-0.5 h-4 w-4 rounded" />
+              <div className="flex-1 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                </div>
+                <Skeleton className="h-3 w-28" />
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -279,11 +283,11 @@ export default function TabAgenda({ dossierId }: Props) {
       {/* Empty state */}
       {!isLoading && evenements.length === 0 && (
         <div className="flex flex-col items-center gap-3 py-12 text-muted-foreground">
-          <CalendarX className="h-10 w-10 opacity-30" />
+          <CalendarX className="h-10 w-10 opacity-30" aria-hidden="true" />
           <p className="text-sm">Aucun événement pour ce dossier</p>
           {peutModifier && (
             <Button variant="outline" size="sm" onClick={ouvrirCreation}>
-              <Plus className="mr-1.5 h-4 w-4" />
+              <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />
               Planifier une audience ou un RDV
             </Button>
           )}
@@ -300,10 +304,10 @@ export default function TabAgenda({ dossierId }: Props) {
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {etiquetteDate(items[0].dateHeure)}
                 </span>
-                <div className="flex-1 border-t" />
+                <div className="flex-1 border-t" aria-hidden="true" />
               </div>
 
-              {/* Événements du jour */}
+              {/* Événements */}
               <div className="space-y-2">
                 {items.map((evt) => {
                   const cfg = TYPE_CONFIG[evt.type];
@@ -313,32 +317,34 @@ export default function TabAgenda({ dossierId }: Props) {
                   return (
                     <div
                       key={evt.id}
-                      className={`flex items-start gap-3 rounded-lg border p-3 transition-colors
-                        ${passe ? 'opacity-60 bg-muted/30' : 'bg-card hover:bg-accent/30'}`}
+                      className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
+                        passe ? 'bg-muted/30 opacity-60' : 'bg-card hover:bg-accent/30'
+                      }`}
                     >
                       {/* Icône type */}
                       <div className="mt-0.5 shrink-0">
-                        <Icone className="h-4 w-4 text-muted-foreground" />
+                        <Icone className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                       </div>
 
                       {/* Contenu */}
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-sm font-medium leading-tight">{evt.titre}</span>
-                          <Badge className={`text-xs px-1.5 py-0 ${cfg.classe}`}>{cfg.label}</Badge>
+                          <Badge variant="outline" className={`px-1.5 py-0 text-xs ${cfg.classe}`}>
+                            {cfg.label}
+                          </Badge>
                         </div>
-
                         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                           <span>{format(parseISO(evt.dateHeure), "HH'h'mm", { locale: fr })}</span>
                           {evt.lieu && (
                             <span className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
+                              <MapPin className="h-3 w-3" aria-hidden="true" />
                               {evt.lieu}
                             </span>
                           )}
                           {evt.notes && (
                             <span className="flex items-center gap-1">
-                              <FileText className="h-3 w-3" />
+                              <FileText className="h-3 w-3" aria-hidden="true" />
                               <span className="max-w-50 truncate">{evt.notes}</span>
                             </span>
                           )}
@@ -353,18 +359,20 @@ export default function TabAgenda({ dossierId }: Props) {
                             size="icon"
                             className="h-7 w-7"
                             onClick={() => ouvrirEdition(evt)}
+                            aria-label={`Modifier l'événement ${evt.titre}`}
                           >
-                            <Pencil className="h-3.5 w-3.5" />
+                            <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                           </Button>
                         )}
                         {peutSupprimer && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            className="h-7 w-7 text-destructive hover:bg-destructive/5 hover:text-destructive"
                             onClick={() => setIdASupprimer(evt.id)}
+                            aria-label={`Supprimer l'événement ${evt.titre}`}
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                           </Button>
                         )}
                       </div>
@@ -377,9 +385,9 @@ export default function TabAgenda({ dossierId }: Props) {
         </div>
       )}
 
-      {/* ── Dialog Créer / Modifier ── */}
-      <Dialog open={dialogOuvert} onOpenChange={(o) => !o && fermerDialog()}>
-        <DialogContent className="max-w-md">
+      {/* ── Dialog Créer / Modifier ──────────────────────────────── */}
+      <Dialog open={dialogOuvert} onOpenChange={(o) => !o && !isPending && fermerDialog()}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
               {evenementEdite ? "Modifier l'événement" : 'Nouvel événement'}
@@ -390,7 +398,12 @@ export default function TabAgenda({ dossierId }: Props) {
           </DialogHeader>
 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form
+              id={`${uid}-form`}
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="space-y-4"
+              noValidate
+            >
               {/* Titre */}
               <FormField
                 control={form.control}
@@ -399,7 +412,11 @@ export default function TabAgenda({ dossierId }: Props) {
                   <FormItem>
                     <FormLabel>Titre *</FormLabel>
                     <FormControl>
-                      <Input placeholder="ex : Audience correctionnelle" {...field} />
+                      <Input
+                        placeholder="ex : Audience correctionnelle"
+                        disabled={isPending}
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -414,16 +431,36 @@ export default function TabAgenda({ dossierId }: Props) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Type *</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        disabled={isPending}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Type" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="audience">⚖️ Audience</SelectItem>
-                          <SelectItem value="rdv">👥 Rendez-vous</SelectItem>
-                          <SelectItem value="rappel">🔔 Rappel</SelectItem>
+                          {/* Lucide à la place des emojis — accessibles et thémables */}
+                          <SelectItem value="audience">
+                            <span className="flex items-center gap-2">
+                              <Scale className="h-3.5 w-3.5" aria-hidden="true" />
+                              Audience
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="rdv">
+                            <span className="flex items-center gap-2">
+                              <Users className="h-3.5 w-3.5" aria-hidden="true" />
+                              Rendez-vous
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="rappel">
+                            <span className="flex items-center gap-2">
+                              <Bell className="h-3.5 w-3.5" aria-hidden="true" />
+                              Rappel
+                            </span>
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -438,7 +475,7 @@ export default function TabAgenda({ dossierId }: Props) {
                     <FormItem>
                       <FormLabel>Date & heure *</FormLabel>
                       <FormControl>
-                        <Input type="datetime-local" {...field} />
+                        <Input type="datetime-local" disabled={isPending} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -454,7 +491,11 @@ export default function TabAgenda({ dossierId }: Props) {
                   <FormItem>
                     <FormLabel>Lieu</FormLabel>
                     <FormControl>
-                      <Input placeholder="ex : Tribunal de Constantine – Salle 3" {...field} />
+                      <Input
+                        placeholder="ex : Tribunal de Constantine – Salle 3"
+                        disabled={isPending}
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -470,9 +511,10 @@ export default function TabAgenda({ dossierId }: Props) {
                     <FormLabel>Notes</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Informations complémentaires..."
+                        placeholder="Informations complémentaires…"
                         className="resize-none"
                         rows={3}
+                        disabled={isPending}
                         {...field}
                       />
                     </FormControl>
@@ -485,9 +527,17 @@ export default function TabAgenda({ dossierId }: Props) {
                 <Button type="button" variant="outline" onClick={fermerDialog} disabled={isPending}>
                   Annuler
                 </Button>
-                <Button type="submit" disabled={isPending}>
-                  {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {evenementEdite ? 'Enregistrer' : 'Ajouter'}
+                <Button type="submit" form={`${uid}-form`} disabled={isPending}>
+                  {isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                  )}
+                  {isPending
+                    ? evenementEdite
+                      ? 'Enregistrement…'
+                      : 'Ajout en cours…'
+                    : evenementEdite
+                      ? 'Enregistrer'
+                      : 'Ajouter'}
                 </Button>
               </DialogFooter>
             </form>
@@ -495,7 +545,7 @@ export default function TabAgenda({ dossierId }: Props) {
         </DialogContent>
       </Dialog>
 
-      {/* ── Alert suppression ── */}
+      {/* ── Alert suppression ───────────────────────────────────── */}
       <AlertDialog open={!!idASupprimer} onOpenChange={(o) => !o && setIdASupprimer(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

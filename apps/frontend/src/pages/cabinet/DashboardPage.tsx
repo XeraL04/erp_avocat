@@ -19,14 +19,14 @@ import {
 } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth.store';
 import { nomAffiche } from '@/types';
-// import { ClientResume } from '@/api/cabinet.api';
+import { cn } from '@/lib/utils';
 
-// ─── Cartes de stats ───────────────────────────────────────────────────────
-
+// ─── Config cartes stats — tokens CSS ────────────────────────────────────────
 interface CarteStat {
   cle: keyof StatsCabinet;
   label: string;
   icone: React.ElementType;
+  // tokens sémantiques du projet, adaptatifs dark/light
   couleurIcone: string;
   couleurBg: string;
   description: string;
@@ -37,46 +37,45 @@ const carteStats: CarteStat[] = [
     cle: 'totalDossiers',
     label: 'Total dossiers',
     icone: FolderOpen,
-    couleurIcone: 'text-blue-600',
-    couleurBg: 'bg-blue-50 dark:bg-blue-950',
+    couleurIcone: 'text-mode-virement', // bleu token
+    couleurBg: 'bg-mode-virement-bg',
     description: 'Dossiers créés',
   },
   {
     cle: 'dossiersEnCours',
     label: 'En cours',
     icone: Clock,
-    couleurIcone: 'text-green-600',
-    couleurBg: 'bg-green-50 dark:bg-green-950',
+    couleurIcone: 'text-status-actif', // vert token
+    couleurBg: 'bg-status-actif-bg',
     description: 'Dossiers actifs',
   },
   {
     cle: 'dossiersSuspendus',
     label: 'Suspendus',
     icone: PauseCircle,
-    couleurIcone: 'text-yellow-600',
-    couleurBg: 'bg-yellow-50 dark:bg-yellow-950',
+    couleurIcone: 'text-status-suspendu', // orange token
+    couleurBg: 'bg-status-suspendu-bg',
     description: 'En attente',
   },
   {
     cle: 'dossiersClotures',
     label: 'Clôturés',
     icone: CheckCircle,
-    couleurIcone: 'text-gray-500',
-    couleurBg: 'bg-gray-50 dark:bg-gray-900',
+    couleurIcone: 'text-muted-foreground',
+    couleurBg: 'bg-muted',
     description: 'Affaires terminées',
   },
   {
     cle: 'totalUtilisateurs',
     label: 'Utilisateurs',
     icone: Users,
-    couleurIcone: 'text-purple-600',
-    couleurBg: 'bg-purple-50 dark:bg-purple-950',
+    couleurIcone: 'text-primary', // primary token
+    couleurBg: 'bg-primary/10',
     description: 'Membres actifs',
   },
 ];
 
-// ─── Composant principal ──────────────────────────────────────────────────
-
+// ─── Composant principal ──────────────────────────────────────────────────────
 export default function CabinetDashboardPage() {
   const utilisateur = useAuthStore((s) => s.utilisateur);
 
@@ -89,15 +88,19 @@ export default function CabinetDashboardPage() {
   const stats = data?.stats;
   const derniersDossiers = data?.derniersDossiers ?? [];
 
-  // Calcul % utilisation dossiers
   const pourcentageDossiers =
     cabinet && cabinet.limites.maxDossiers > 0
       ? Math.min(((stats?.totalDossiers ?? 0) / cabinet.limites.maxDossiers) * 100, 100)
       : 0;
 
+  const pourcentageUtilisateurs =
+    cabinet?.limites.maxUtilisateurs && cabinet.limites.maxUtilisateurs !== 99999
+      ? Math.min(((stats?.totalUtilisateurs ?? 0) / cabinet.limites.maxUtilisateurs) * 100, 100)
+      : 0;
+
   return (
     <div className="space-y-6">
-      {/* ── En-tête ─────────────────────────────────────────────────── */}
+      {/* ── En-tête ─────────────────────────────────────────────── */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">
@@ -127,15 +130,15 @@ export default function CabinetDashboardPage() {
         </div>
       </div>
 
-      {/* ── Cartes stats ────────────────────────────────────────────── */}
+      {/* ── Cartes stats ────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
         {carteStats.map(({ cle, label, icone: Icone, couleurIcone, couleurBg, description }) => (
           <Card key={cle}>
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xs font-medium text-muted-foreground">{label}</CardTitle>
-                <div className={`rounded-lg p-1.5 ${couleurBg}`}>
-                  <Icone className={`h-3.5 w-3.5 ${couleurIcone}`} />
+                <div className={cn('rounded-lg p-1.5', couleurBg)}>
+                  <Icone className={cn('h-3.5 w-3.5', couleurIcone)} aria-hidden="true" />
                 </div>
               </div>
             </CardHeader>
@@ -143,7 +146,7 @@ export default function CabinetDashboardPage() {
               {isLoading ? (
                 <Skeleton className="h-8 w-12" />
               ) : (
-                <p className="text-2xl font-bold">{stats?.[cle] ?? 0}</p>
+                <p className="text-2xl font-bold tabular-nums">{stats?.[cle] ?? 0}</p>
               )}
               <CardDescription className="mt-0.5 text-xs">{description}</CardDescription>
             </CardContent>
@@ -151,7 +154,7 @@ export default function CabinetDashboardPage() {
         ))}
       </div>
 
-      {/* ── Contenu principal ───────────────────────────────────────── */}
+      {/* ── Contenu principal ───────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Derniers dossiers — 2/3 */}
         <Card className="lg:col-span-2">
@@ -166,19 +169,24 @@ export default function CabinetDashboardPage() {
           </CardHeader>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="space-y-0 divide-y">
+              /* Skeleton fidèle au layout réel */
+              <div className="divide-y">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="flex items-center gap-3 p-4">
-                    <Skeleton className="h-9 w-9 rounded-lg" />
+                    <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
                     <div className="flex-1 space-y-1.5">
-                      <Skeleton className="h-4 w-48" />
-                      <Skeleton className="h-3 w-32" />
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-4 w-40" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
+                      <Skeleton className="h-3 w-52" />
                     </div>
                     <Skeleton className="h-5 w-16 rounded-full" />
                   </div>
                 ))}
               </div>
             ) : derniersDossiers.length === 0 ? (
+              /* Empty state inline (pas de Card wrapping car on est déjà dans une Card) */
               <div className="flex flex-col items-center gap-3 py-12 text-center">
                 <FolderOpen className="h-10 w-10 text-muted-foreground/40" />
                 <div>
@@ -202,16 +210,13 @@ export default function CabinetDashboardPage() {
                     to={`/cabinet/dossiers/${dossier._id}`}
                     className="flex items-center gap-3 p-4 transition-colors hover:bg-muted/50"
                   >
-                    {/* Icône type */}
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                      <FolderOpen className="h-4 w-4 text-primary" />
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                      <FolderOpen className="h-4 w-4 text-primary" aria-hidden="true" />
                     </div>
-
-                    {/* Infos */}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className="truncate text-sm font-medium">{dossier.titre}</p>
-                        <span className="shrink-0 text-xs text-muted-foreground">
+                        <span className="shrink-0 font-mono text-xs text-muted-foreground">
                           {dossier.reference}
                         </span>
                       </div>
@@ -223,8 +228,6 @@ export default function CabinetDashboardPage() {
                         <span>{formaterDateCourte(dossier.dateOuverture)}</span>
                       </div>
                     </div>
-
-                    {/* Badge statut */}
                     <Badge
                       variant={couleurStatutDossier(dossier.statut)}
                       className="shrink-0 text-xs"
@@ -238,9 +241,9 @@ export default function CabinetDashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Colonne droite — 1/3 */}
+        {/* ── Colonne droite — 1/3 ──────────────────────────────── */}
         <div className="space-y-4">
-          {/* Infos plan */}
+          {/* Plan actuel */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Plan actuel</CardTitle>
@@ -248,9 +251,14 @@ export default function CabinetDashboardPage() {
             <CardContent className="space-y-4">
               {isLoading ? (
                 <div className="space-y-3">
-                  <Skeleton className="h-5 w-24" />
-                  <Skeleton className="h-2 w-full" />
-                  <Skeleton className="h-4 w-32" />
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+                  <Skeleton className="h-2 w-full rounded-full" />
+                  <Skeleton className="h-3 w-32" />
+                  <Skeleton className="h-2 w-full rounded-full" />
+                  <Skeleton className="h-3 w-40" />
                 </div>
               ) : (
                 <>
@@ -261,72 +269,41 @@ export default function CabinetDashboardPage() {
                     <Badge variant="outline">{cabinet?.statut ?? '—'}</Badge>
                   </div>
 
-                  {/* Barre progression dossiers */}
-                  <div>
-                    <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-                      <span>Dossiers utilisés</span>
-                      <span>
-                        {stats?.totalDossiers ?? 0} /{' '}
-                        {cabinet?.limites.maxDossiers === 99999
-                          ? '∞'
-                          : (cabinet?.limites.maxDossiers ?? '—')}
-                      </span>
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          pourcentageDossiers >= 90
-                            ? 'bg-destructive'
-                            : pourcentageDossiers >= 70
-                              ? 'bg-yellow-500'
-                              : 'bg-primary'
-                        }`}
-                        style={{ width: `${pourcentageDossiers}%` }}
-                      />
-                    </div>
-                  </div>
+                  {/* Barre dossiers */}
+                  <BarreProgression
+                    label="Dossiers utilisés"
+                    valeur={stats?.totalDossiers ?? 0}
+                    max={cabinet?.limites.maxDossiers}
+                    pourcentage={pourcentageDossiers}
+                    // seuil d'alerte : tokens destructive / suspendu / primary
+                    couleur={
+                      pourcentageDossiers >= 90
+                        ? 'bg-destructive'
+                        : pourcentageDossiers >= 70
+                          ? 'bg-status-suspendu'
+                          : 'bg-primary'
+                    }
+                  />
 
-                  {/* Barre progression utilisateurs */}
-                  <div>
-                    <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-                      <span>Utilisateurs</span>
-                      <span>
-                        {stats?.totalUtilisateurs ?? 0} /{' '}
-                        {cabinet?.limites.maxUtilisateurs === 99999
-                          ? '∞'
-                          : (cabinet?.limites.maxUtilisateurs ?? '—')}
-                      </span>
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-primary transition-all"
-                        style={{
-                          width: `${
-                            cabinet?.limites.maxUtilisateurs &&
-                            cabinet.limites.maxUtilisateurs !== 99999
-                              ? Math.min(
-                                  ((stats?.totalUtilisateurs ?? 0) /
-                                    cabinet.limites.maxUtilisateurs) *
-                                    100,
-                                  100
-                                )
-                              : 0
-                          }%`,
-                        }}
-                      />
-                    </div>
-                  </div>
+                  {/* Barre utilisateurs */}
+                  <BarreProgression
+                    label="Utilisateurs"
+                    valeur={stats?.totalUtilisateurs ?? 0}
+                    max={cabinet?.limites.maxUtilisateurs}
+                    pourcentage={pourcentageUtilisateurs}
+                    couleur="bg-primary"
+                  />
 
                   <Separator />
 
-                  <div className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     Stockage max :{' '}
                     <span className="font-medium text-foreground">
                       {cabinet?.limites.maxDocuments === 99999
                         ? 'Illimité'
                         : `${cabinet?.limites.maxDocuments ?? '—'} documents`}
                     </span>
-                  </div>
+                  </p>
                 </>
               )}
             </CardContent>
@@ -359,6 +336,39 @@ export default function CabinetDashboardPage() {
             </CardContent>
           </Card>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── BarreProgression ─────────────────────────────────────────────────────────
+interface BarreProgressionProps {
+  label: string;
+  valeur: number;
+  max?: number;
+  pourcentage: number;
+  couleur: string; // classe Tailwind bg-*
+}
+
+function BarreProgression({ label, valeur, max, pourcentage, couleur }: BarreProgressionProps) {
+  const maxAffiche = !max || max === 99999 ? '∞' : max;
+  return (
+    <div>
+      <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+        <span>{label}</span>
+        <span className="tabular-nums">
+          {valeur} / {maxAffiche}
+        </span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+        <div
+          className={cn('h-full rounded-full transition-all', couleur)}
+          style={{ width: `${pourcentage}%` }}
+          role="progressbar"
+          aria-valuenow={pourcentage}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        />
       </div>
     </div>
   );

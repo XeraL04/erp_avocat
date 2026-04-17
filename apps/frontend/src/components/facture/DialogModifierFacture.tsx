@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AxiosError } from 'axios';
+
 import {
   Dialog,
   DialogContent,
@@ -26,17 +27,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+
 import { modifierFacture, type Facture, type StatutFacture } from '@/api/facture.api';
 import { couleurStatutFacture, libelleStatutFacture, formaterMontantDA } from '@/lib/utils';
 import { extraireMessageErreur } from '@/api/auth.api';
 
-// Transitions autorisées (unidirectionnel)
+// ─── Transitions autorisées (unidirectionnel) ─────────────────────────────────
 const TRANSITIONS: Record<StatutFacture, StatutFacture[]> = {
   brouillon: ['emise'],
   emise: ['payee'],
   payee: [],
 };
 
+// ─── Schéma ───────────────────────────────────────────────────────────────────
 const schema = z
   .object({
     montant: z
@@ -48,16 +51,18 @@ const schema = z
   .refine((d) => d.montant !== undefined || d.statut !== undefined, {
     message: 'Modifiez au moins un champ',
   });
-
 type FormModifier = z.infer<typeof schema>;
 
+// ─── Props ────────────────────────────────────────────────────────────────────
 interface Props {
   facture: Facture;
   onFermer: () => void;
 }
 
+// ─── Composant ────────────────────────────────────────────────────────────────
 export function DialogModifierFacture({ facture, onFermer }: Props) {
   const queryClient = useQueryClient();
+  const uid = useId();
   const prochainsStatuts = TRANSITIONS[facture.statut];
   const peutModifierMontant = facture.statut === 'brouillon';
 
@@ -73,6 +78,7 @@ export function DialogModifierFacture({ facture, onFermer }: Props) {
     reset({ montant: facture.montant, statut: undefined });
   }, [facture, reset]);
 
+  // ── Mutation ───────────────────────────────────────────────────────────────
   const { mutate, isPending } = useMutation({
     mutationFn: (d: FormModifier) =>
       modifierFacture(facture.id, {
@@ -88,8 +94,9 @@ export function DialogModifierFacture({ facture, onFermer }: Props) {
   });
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onFermer()}>
-      <DialogContent className="max-w-md">
+    // Guard !isPending : empêche la fermeture accidentelle pendant une mutation
+    <Dialog open onOpenChange={(o) => !o && !isPending && onFermer()}>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             Modifier la facture
@@ -100,10 +107,15 @@ export function DialogModifierFacture({ facture, onFermer }: Props) {
           <DialogDescription className="font-mono">{facture.numero}</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit((d) => mutate(d))} className="space-y-4">
-          {/* Montant */}
+        <form
+          id={`${uid}-form`}
+          onSubmit={handleSubmit((d) => mutate(d))}
+          className="space-y-4"
+          noValidate
+        >
+          {/* ── Montant ──────────────────────────────────────── */}
           <div className="space-y-1.5">
-            <Label htmlFor="montant" className="flex items-center gap-2">
+            <Label htmlFor={`${uid}-montant`} className="flex items-center gap-2">
               Montant (DA)
               {!peutModifierMontant && (
                 <span className="text-xs font-normal text-muted-foreground">
@@ -112,34 +124,39 @@ export function DialogModifierFacture({ facture, onFermer }: Props) {
               )}
             </Label>
             <Input
-              id="montant"
+              id={`${uid}-montant`}
               type="number"
               min="0"
               step="500"
-              disabled={!peutModifierMontant}
+              disabled={!peutModifierMontant || isPending}
               {...register('montant', { valueAsNumber: true })}
             />
             {!peutModifierMontant && (
               <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                <AlertCircle className="h-3 w-3" />
+                {/* Icône décorative — aria-hidden */}
+                <AlertCircle className="h-3 w-3 shrink-0" aria-hidden="true" />
                 Montant actuel : {formaterMontantDA(facture.montant)}
               </p>
             )}
-            {errors.montant && <p className="text-xs text-destructive">{errors.montant.message}</p>}
+            {errors.montant && (
+              <p className="text-xs text-destructive" role="alert">
+                {errors.montant.message}
+              </p>
+            )}
           </div>
 
-          {/* Changement de statut */}
+          {/* ── Changement de statut ──────────────────────────── */}
           {prochainsStatuts.length > 0 && (
             <>
               <Separator />
               <div className="space-y-1.5">
-                <Label>Changer le statut</Label>
+                <Label htmlFor={`${uid}-statut`}>Changer le statut</Label>
                 <Controller
                   name="statut"
                   control={control}
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
+                    <Select value={field.value} onValueChange={field.onChange} disabled={isPending}>
+                      <SelectTrigger id={`${uid}-statut`}>
                         <SelectValue placeholder="Conserver le statut actuel" />
                       </SelectTrigger>
                       <SelectContent>
@@ -161,6 +178,7 @@ export function DialogModifierFacture({ facture, onFermer }: Props) {
             </>
           )}
 
+          {/* ── Facture réglée ───────────────────────────────── */}
           {facture.statut === 'payee' && (
             <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
               Cette facture est entièrement réglée. Aucune modification possible.
@@ -171,9 +189,13 @@ export function DialogModifierFacture({ facture, onFermer }: Props) {
             <Button type="button" variant="outline" onClick={onFermer} disabled={isPending}>
               Annuler
             </Button>
-            <Button type="submit" disabled={isPending || facture.statut === 'payee'}>
-              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isPending ? 'Enregistrement...' : 'Enregistrer'}
+            <Button
+              type="submit"
+              form={`${uid}-form`}
+              disabled={isPending || facture.statut === 'payee'}
+            >
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+              {isPending ? 'Enregistrement…' : 'Enregistrer'}
             </Button>
           </DialogFooter>
         </form>

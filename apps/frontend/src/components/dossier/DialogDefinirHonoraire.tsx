@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -25,11 +25,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-// Honoraire vient de @/types, pas de honoraire.api
 import type { Honoraire } from '@/types';
 import { definirHonoraire, modifierHonoraire } from '@/api/honoraire.api';
 
-// schéma aligné sur le backend (forfait|echelonne, description — pas taux_horaire/pourcentage/notes)
+// ─── Schéma ───────────────────────────────────────────────────────────────────
 const schema = z.object({
   type: z.enum(['forfait', 'echelonne']),
   montantTotal: z.coerce.number().min(1, 'Montant requis'),
@@ -38,6 +37,7 @@ const schema = z.object({
 
 type FormHonoraire = z.infer<typeof schema>;
 
+// ─── Composant ────────────────────────────────────────────────────────────────
 interface Props {
   dossierId: string;
   honoraire?: Honoraire | null;
@@ -46,7 +46,8 @@ interface Props {
 
 export default function DialogDefinirHonoraire({ dossierId, honoraire, onFermer }: Props) {
   const queryClient = useQueryClient();
-  const estModification = !!honoraire;
+  const uid = useId();
+  const estModif = !!honoraire;
 
   const {
     register,
@@ -75,13 +76,11 @@ export default function DialogDefinirHonoraire({ dossierId, honoraire, onFermer 
 
   const { mutate, isPending } = useMutation({
     mutationFn: (donnees: FormHonoraire) =>
-      estModification
-        ? modifierHonoraire(dossierId, donnees)
-        : definirHonoraire(dossierId, donnees),
+      estModif ? modifierHonoraire(dossierId, donnees) : definirHonoraire(dossierId, donnees),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'honoraire', dossierId] });
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'paiements', dossierId] });
-      toast.success(estModification ? 'Honoraire modifié' : 'Honoraire défini avec succès');
+      toast.success(estModif ? 'Honoraire modifié' : 'Honoraire défini avec succès');
       onFermer();
     },
     onError: () => toast.error("Erreur lors de l'enregistrement"),
@@ -89,23 +88,21 @@ export default function DialogDefinirHonoraire({ dossierId, honoraire, onFermer 
 
   return (
     <Dialog open onOpenChange={(o) => !o && !isPending && onFermer()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>
-            {estModification ? "Modifier l'honoraire" : "Définir l'honoraire"}
-          </DialogTitle>
+          <DialogTitle>{estModif ? "Modifier l'honoraire" : "Définir l'honoraire"}</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit((d) => mutate(d))} className="space-y-4">
-          {/* ✅ FIX 3 : valeurs Select backend exactes (forfait|echelonne) */}
+        <form onSubmit={handleSubmit((d) => mutate(d))} className="space-y-4" noValidate>
+          {/* ── Type d'honoraire ───────────────────────────────── */}
           <div className="space-y-1.5">
-            <Label>Type d'honoraire *</Label>
+            <Label htmlFor={`${uid}-type`}>Type d'honoraire *</Label>
             <Controller
               name="type"
               control={control}
               render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger>
+                <Select value={field.value} onValueChange={field.onChange} disabled={isPending}>
+                  <SelectTrigger id={`${uid}-type`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -117,29 +114,39 @@ export default function DialogDefinirHonoraire({ dossierId, honoraire, onFermer 
             />
           </div>
 
+          {/* ── Montant total ──────────────────────────────────── */}
           <div className="space-y-1.5">
-            <Label htmlFor="montantTotal">Montant total (DA) *</Label>
+            <Label htmlFor={`${uid}-montant`}>Montant total (DA) *</Label>
             <Input
-              id="montantTotal"
+              id={`${uid}-montant`}
               type="number"
               min="1"
-              placeholder="ex: 50000"
-              {...register('montantTotal')}
+              placeholder="ex : 50 000"
+              disabled={isPending}
+              aria-invalid={!!errors.montantTotal}
+              aria-describedby={errors.montantTotal ? `${uid}-montant-error` : undefined}
               onWheel={(e) => (e.target as HTMLInputElement).blur()}
+              {...register('montantTotal')}
             />
             {errors.montantTotal && (
-              <p className="text-xs text-destructive">{errors.montantTotal.message}</p>
+              <p id={`${uid}-montant-error`} className="text-xs text-destructive" role="alert">
+                {errors.montantTotal.message}
+              </p>
             )}
           </div>
 
+          {/* ── Description ────────────────────────────────────── */}
           <div className="space-y-1.5">
-            <Label htmlFor="description">
-              Description <span className="text-muted-foreground">(optionnel)</span>
+            <Label htmlFor={`${uid}-desc`}>
+              Description{' '}
+              <span className="text-xs font-normal text-muted-foreground">(optionnel)</span>
             </Label>
             <Textarea
-              id="description"
+              id={`${uid}-desc`}
               rows={2}
-              placeholder="Accord verbal, conditions particulières..."
+              placeholder="Accord verbal, conditions particulières…"
+              className="resize-none"
+              disabled={isPending}
               {...register('description')}
             />
           </div>
@@ -149,8 +156,8 @@ export default function DialogDefinirHonoraire({ dossierId, honoraire, onFermer 
               Annuler
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isPending ? 'Enregistrement...' : estModification ? 'Modifier' : 'Définir'}
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+              {isPending ? 'Enregistrement en cours…' : estModif ? 'Modifier' : 'Définir'}
             </Button>
           </DialogFooter>
         </form>

@@ -16,7 +16,6 @@ import {
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -36,6 +35,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 
 import {
   listerUtilisateurs,
@@ -43,6 +43,7 @@ import {
   supprimerUtilisateur,
   type Utilisateur,
 } from '@/api/utilisateur.api';
+import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth.store';
 import DialogCreerAssistant from '@/components/admin/DialogCreerAssistant';
 import DialogModifierAssistant from '@/components/admin/DialogModifierAssistant';
@@ -61,7 +62,7 @@ export default function UtilisateursPage() {
     queryFn: listerUtilisateurs,
   });
 
-  // ── Mutation statut ────────────────────────────────────────────────────────
+  // ── Mutations ──────────────────────────────────────────────────────────────
   const { mutate: basculerStatut, isPending: changementStatut } = useMutation({
     mutationFn: ({ id, actif }: { id: string; actif: boolean }) =>
       changerStatutUtilisateur(id, actif),
@@ -72,7 +73,6 @@ export default function UtilisateursPage() {
     onError: () => toast.error('Erreur lors du changement de statut'),
   });
 
-  // ── Mutation suppression ───────────────────────────────────────────────────
   const { mutate: supprimer, isPending: suppressionEnCours } = useMutation({
     mutationFn: () => supprimerUtilisateur(userASupprimer!._id),
     onSuccess: () => {
@@ -85,7 +85,7 @@ export default function UtilisateursPage() {
 
   return (
     <div className="space-y-6">
-      {/* En-tête */}
+      {/* ── En-tête ─────────────────────────────────────────────── */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Équipe</h2>
@@ -102,57 +102,77 @@ export default function UtilisateursPage() {
         </Button>
       </div>
 
-      {/* Compte admin (moi) — non modifiable ici */}
+      {/* ── Compte admin (moi) — non modifiable ─────────────────── */}
       {moi && (
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="flex items-center gap-4 p-4">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-              <ShieldCheck className="h-5 w-5 text-primary" />
+              <ShieldCheck className="h-5 w-5 text-primary" aria-hidden="true" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium">{moi.nom}</p>
               <p className="truncate text-sm text-muted-foreground">{moi.email}</p>
             </div>
-            <Badge className="shrink-0 bg-primary/10 text-primary hover:bg-primary/10">
+            {/* Badge admin — token primary, pas de classe hover inutile */}
+            <span className="shrink-0 inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
               Administrateur
-            </Badge>
+            </span>
           </CardContent>
         </Card>
       )}
 
-      {/* Liste assistants */}
-      {isLoading ? (
-        <div className="space-y-2">
-          {[...Array(3)].map((_, i) => (
-            <Skeleton key={i} className="h-18 w-full rounded-lg" />
-          ))}
-        </div>
-      ) : utilisateurs.length === 0 ? (
+      {/* ── Skeleton ────────────────────────────────────────────── */}
+      {isLoading && (
         <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-              <Users className="h-7 w-7 opacity-40" />
+          <CardContent className="p-0">
+            <div className="divide-y">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="flex items-center gap-4 px-4 py-3 sm:px-6 sm:py-4">
+                  {/* Avatar */}
+                  <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
+                  {/* Infos */}
+                  <div className="flex-1 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-36" />
+                      <Skeleton className="h-5 w-14 rounded-full" />
+                    </div>
+                    <Skeleton className="h-3 w-52" />
+                  </div>
+                  {/* Menu */}
+                  <Skeleton className="h-8 w-8 shrink-0 rounded-md" />
+                </div>
+              ))}
             </div>
-            <div>
-              <p className="font-medium">Aucun assistant</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Ajoutez un assistant pour qu'il puisse accéder au cabinet.
-              </p>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => setDialogCreer(true)}>
-              <Plus className="mr-1.5 h-4 w-4" />
-              Ajouter un assistant
-            </Button>
           </CardContent>
         </Card>
-      ) : (
+      )}
+
+      {/* ── Empty state ─────────────────────────────────────────── */}
+      {!isLoading && utilisateurs.length === 0 && (
+        <EmptyState
+          icone={Users}
+          titre="Aucun assistant"
+          description="Ajoutez un assistant pour qu'il puisse accéder au cabinet."
+          action={{
+            label: 'Ajouter un assistant',
+            onClick: () => setDialogCreer(true),
+            icone: Plus,
+          }}
+        />
+      )}
+
+      {/* ── Liste assistants ─────────────────────────────────────── */}
+      {!isLoading && utilisateurs.length > 0 && (
         <Card>
           <CardContent className="p-0">
             <div className="divide-y">
               {utilisateurs.map((u) => (
                 <div key={u._id} className="flex items-center gap-4 px-4 py-3 sm:px-6 sm:py-4">
                   {/* Avatar initiales */}
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
+                  <div
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground"
+                    aria-hidden="true"
+                  >
                     {u.nom.charAt(0).toUpperCase()}
                   </div>
 
@@ -160,17 +180,26 @@ export default function UtilisateursPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="truncate text-sm font-medium">{u.nom}</span>
-                      <Badge
-                        variant="secondary"
-                        className={
+
+                      {/* Badge statut — tokens sémantiques, plus de dark: manuel */}
+                      <span
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
                           u.actif
-                            ? 'bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400'
-                            : 'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400'
-                        }
+                            ? 'bg-status-actif-bg text-status-actif'
+                            : 'bg-destructive/10 text-destructive'
+                        )}
                       >
+                        <span
+                          className={cn(
+                            'h-1.5 w-1.5 rounded-full',
+                            u.actif ? 'bg-status-actif' : 'bg-destructive'
+                          )}
+                        />
                         {u.actif ? 'Actif' : 'Désactivé'}
-                      </Badge>
+                      </span>
                     </div>
+
                     <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <span>{u.email}</span>
                       <span>·</span>
@@ -180,11 +209,16 @@ export default function UtilisateursPage() {
                     </div>
                   </div>
 
-                  {/* Actions */}
+                  {/* Actions dropdown */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-                        <MoreHorizontal className="h-4 w-4" />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        aria-label={`Actions pour ${u.nom}`}
+                      >
+                        <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
@@ -225,7 +259,7 @@ export default function UtilisateursPage() {
         </Card>
       )}
 
-      {/* Dialogs */}
+      {/* ── Dialogs ──────────────────────────────────────────────── */}
       {dialogCreer && (
         <DialogCreerAssistant
           onFermer={() => setDialogCreer(false)}
@@ -247,7 +281,7 @@ export default function UtilisateursPage() {
         />
       )}
 
-      {/* Confirmation suppression */}
+      {/* ── Confirmation suppression ─────────────────────────────── */}
       <AlertDialog open={!!userASupprimer} onOpenChange={(o) => !o && setUserASupprimer(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

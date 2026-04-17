@@ -1,4 +1,3 @@
-// apps/frontend/src/pages/cabinet/AgendaPage.tsx
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -21,9 +20,9 @@ import {
   CalendarX,
   FolderOpen,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -60,8 +59,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { toast } from 'sonner';
-import { useAuthStore } from '@/stores/auth.store';
+import { EmptyState } from '@/components/ui/empty-state';
 
 import {
   listerTousEvenements,
@@ -71,8 +69,10 @@ import {
   type Evenement,
   type TypeEvenement,
 } from '@/api/evenement.api';
+import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/stores/auth.store';
 
-// ─── Schéma Zod ──────────────────────────────────────────────────────────────
+// ─── Schéma ───────────────────────────────────────────────────────────────────
 const schema = z.object({
   titre: z.string().trim().min(2, 'Le titre doit contenir au moins 2 caractères'),
   type: z.enum(['audience', 'rdv', 'rappel'], { required_error: 'Le type est obligatoire' }),
@@ -82,25 +82,40 @@ const schema = z.object({
 });
 type FormValues = z.infer<typeof schema>;
 
-// ─── Config types ─────────────────────────────────────────────────────────────
-const TYPE_CONFIG: Record<
-  TypeEvenement,
-  { label: string; icone: React.ElementType; classe: string }
-> = {
+// ─── Config types sémantique (tokens CSS au lieu de classes hardcodées) ───────
+interface TypeConfig {
+  label: string;
+  icone: React.ElementType;
+  text: string;
+  bg: string;
+  border: string;
+  dot: string;
+}
+
+const TYPE_CONFIG: Record<TypeEvenement, TypeConfig> = {
   audience: {
     label: 'Audience',
     icone: Scale,
-    classe: 'bg-blue-600 hover:bg-blue-700 text-white',
+    text: 'text-mode-virement',
+    bg: 'bg-mode-virement-bg',
+    border: 'border-mode-virement/30',
+    dot: 'bg-mode-virement',
   },
   rdv: {
     label: 'Rendez-vous',
     icone: Users,
-    classe: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+    text: 'text-status-actif',
+    bg: 'bg-status-actif-bg',
+    border: 'border-status-actif/30',
+    dot: 'bg-status-actif',
   },
   rappel: {
     label: 'Rappel',
     icone: Bell,
-    classe: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+    text: 'text-status-suspendu',
+    bg: 'bg-status-suspendu-bg',
+    border: 'border-status-suspendu-border',
+    dot: 'bg-status-suspendu',
   },
 };
 
@@ -142,15 +157,11 @@ function appliquerFiltres(
   type: FiltreType
 ): Evenement[] {
   let liste = type !== 'tous' ? evenements.filter((e) => e.type === type) : [...evenements];
-
-  if (periode === 'a_venir') {
+  if (periode === 'a_venir')
     liste = liste.filter((e) => isFuture(parseISO(e.dateHeure)) || isToday(parseISO(e.dateHeure)));
-  } else if (periode === 'aujourd_hui') {
-    liste = liste.filter((e) => isToday(parseISO(e.dateHeure)));
-  } else if (periode === 'cette_semaine') {
+  else if (periode === 'aujourd_hui') liste = liste.filter((e) => isToday(parseISO(e.dateHeure)));
+  else if (periode === 'cette_semaine')
     liste = liste.filter((e) => isThisWeek(parseISO(e.dateHeure), { locale: fr }));
-  }
-
   return liste.sort((a, b) => parseISO(a.dateHeure).getTime() - parseISO(b.dateHeure).getTime());
 }
 
@@ -167,7 +178,7 @@ export default function AgendaPage() {
   const [evenementEdite, setEvenementEdite] = useState<Evenement | null>(null);
   const [idASupprimer, setIdASupprimer] = useState<string | null>(null);
 
-  // ── Query ─────────────────────────────────────────────────────────────────
+  // ── Query ──────────────────────────────────────────────────────────────────
   const { data, isLoading } = useQuery({
     queryKey: ['evenements', 'global'],
     queryFn: () => listerTousEvenements({ limit: 500 }),
@@ -177,8 +188,9 @@ export default function AgendaPage() {
   const evenements = appliquerFiltres(tousEvenements, filtrePeriode, filtreType);
   const groupes = grouperParJour(evenements);
   const nbAujourdhui = tousEvenements.filter((e) => isToday(parseISO(e.dateHeure))).length;
+  const filtresActifs = filtrePeriode !== 'a_venir' || filtreType !== 'tous';
 
-  // ── Formulaire ────────────────────────────────────────────────────────────
+  // ── Formulaire ─────────────────────────────────────────────────────────────
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { titre: '', type: 'audience', dateHeure: '', lieu: '', notes: '' },
@@ -208,7 +220,7 @@ export default function AgendaPage() {
     form.reset();
   };
 
-  // ── Mutations ─────────────────────────────────────────────────────────────
+  // ── Mutations ──────────────────────────────────────────────────────────────
   const invalidate = () => qc.invalidateQueries({ queryKey: ['evenements'] });
 
   const mutCreer = useMutation({
@@ -219,7 +231,6 @@ export default function AgendaPage() {
         dateHeure: datetimeLocalToISO(v.dateHeure),
         lieu: v.lieu || undefined,
         notes: v.notes || undefined,
-        // dossierId absent → événement non lié à un dossier spécifique
       }),
     onSuccess: () => {
       invalidate();
@@ -258,10 +269,10 @@ export default function AgendaPage() {
   const onSubmit = (v: FormValues) => (evenementEdite ? mutModifier.mutate(v) : mutCreer.mutate(v));
   const isPending = mutCreer.isPending || mutModifier.isPending;
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* En-tête */}
+      {/* ── En-tête ─────────────────────────────────────────────── */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Agenda</h2>
@@ -269,7 +280,12 @@ export default function AgendaPage() {
             <CalendarClock className="h-4 w-4" />
             {tousEvenements.length} événement{tousEvenements.length > 1 ? 's' : ''}
             {nbAujourdhui > 0 && (
-              <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+              <span
+                className={cn(
+                  'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold',
+                  'bg-mode-virement-bg text-mode-virement'
+                )}
+              >
                 {nbAujourdhui} aujourd'hui
               </span>
             )}
@@ -283,7 +299,7 @@ export default function AgendaPage() {
         )}
       </div>
 
-      {/* Filtres */}
+      {/* ── Filtres ─────────────────────────────────────────────── */}
       <div className="flex flex-col gap-3 sm:flex-row">
         <Select value={filtrePeriode} onValueChange={(v) => setFiltrePeriode(v as FiltrePeriode)}>
           <SelectTrigger className="w-full sm:w-44">
@@ -296,7 +312,6 @@ export default function AgendaPage() {
             <SelectItem value="tous">Tout l'historique</SelectItem>
           </SelectContent>
         </Select>
-
         <Select value={filtreType} onValueChange={(v) => setFiltreType(v as FiltreType)}>
           <SelectTrigger className="w-full sm:w-44">
             <SelectValue />
@@ -310,37 +325,56 @@ export default function AgendaPage() {
         </Select>
       </div>
 
-      {/* Skeleton */}
+      {/* ── Skeleton ────────────────────────────────────────────── */}
       {isLoading && (
-        <div className="space-y-3">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-20 w-full rounded-lg" />
+        <div className="space-y-5">
+          {[...Array(2)].map((_, g) => (
+            <div key={g}>
+              {/* Séparateur jour */}
+              <div className="mb-2 flex items-center gap-2">
+                <Skeleton className="h-3 w-24" />
+                <div className="flex-1 border-t" />
+                <Skeleton className="h-3 w-10" />
+              </div>
+              {/* Cartes */}
+              <div className="space-y-2">
+                {[...Array(g === 0 ? 3 : 2)].map((_, i) => (
+                  <div key={i} className="flex items-start gap-3 rounded-lg border p-3">
+                    <Skeleton className="mt-0.5 h-4 w-4 shrink-0 rounded" />
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-4 w-48" />
+                        <Skeleton className="h-5 w-20 rounded-full" />
+                      </div>
+                      <Skeleton className="h-3 w-32" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
 
-      {/* Empty state */}
+      {/* ── Empty state ─────────────────────────────────────────── */}
       {!isLoading && evenements.length === 0 && (
-        <div className="flex flex-col items-center gap-3 py-16 text-center text-muted-foreground">
-          <CalendarX className="h-12 w-12 opacity-30" />
-          <p className="font-medium">
-            {filtrePeriode === 'a_venir' ? 'Aucun événement à venir' : 'Aucun événement'}
-          </p>
-          <p className="text-sm">
-            {filtrePeriode === 'a_venir'
-              ? 'Planifiez vos audiences et rendez-vous depuis les dossiers ou ici'
-              : 'Modifiez les filtres pour afficher plus de résultats'}
-          </p>
-          {peutModifier && filtrePeriode === 'a_venir' && (
-            <Button variant="outline" size="sm" onClick={ouvrirCreation}>
-              <Plus className="mr-1.5 h-4 w-4" />
-              Planifier un événement
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          icone={CalendarX}
+          titre={filtrePeriode === 'a_venir' ? 'Aucun événement à venir' : 'Aucun événement'}
+          description={
+            filtrePeriode === 'a_venir'
+              ? 'Planifiez vos audiences et rendez-vous depuis les dossiers ou ici.'
+              : 'Modifiez les filtres pour afficher plus de résultats.'
+          }
+          action={
+            peutModifier && !filtresActifs
+              ? { label: 'Planifier un événement', onClick: ouvrirCreation, icone: Plus }
+              : undefined
+          }
+        />
       )}
 
-      {/* Liste groupée par jour */}
+      {/* ── Liste groupée par jour ───────────────────────────────── */}
       {!isLoading && evenements.length > 0 && (
         <div className="space-y-5">
           {[...groupes.entries()].map(([cle, items]) => (
@@ -367,19 +401,33 @@ export default function AgendaPage() {
                   return (
                     <div
                       key={evt.id}
-                      className={`flex items-start gap-3 rounded-lg border p-3 transition-colors
-                        ${passe ? 'bg-muted/30 opacity-60' : 'bg-card hover:bg-accent/30'}`}
+                      className={cn(
+                        'flex items-start gap-3 rounded-lg border p-3 transition-colors',
+                        passe ? 'bg-muted/30 opacity-60' : 'bg-card hover:bg-accent/30'
+                      )}
                     >
                       {/* Icône type */}
                       <div className="mt-0.5 shrink-0">
-                        <Icone className="h-4 w-4 text-muted-foreground" />
+                        <Icone className={cn('h-4 w-4', cfg.text)} aria-hidden="true" />
                       </div>
 
                       {/* Contenu */}
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-sm font-medium leading-tight">{evt.titre}</span>
-                          <Badge className={`px-1.5 py-0 text-xs ${cfg.classe}`}>{cfg.label}</Badge>
+
+                          {/* Badge type sémantique */}
+                          <span
+                            className={cn(
+                              'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium',
+                              cfg.text,
+                              cfg.bg,
+                              cfg.border
+                            )}
+                          >
+                            <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
+                            {cfg.label}
+                          </span>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
@@ -442,7 +490,7 @@ export default function AgendaPage() {
         </div>
       )}
 
-      {/* ── Dialog Créer / Modifier ─────────────────────────────────────────── */}
+      {/* ── Dialog Créer / Modifier ──────────────────────────────── */}
       <Dialog open={dialogOuvert} onOpenChange={(o) => !o && fermerDialog()}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -493,7 +541,6 @@ export default function AgendaPage() {
                     </FormItem>
                   )}
                 />
-
                 <FormField
                   control={form.control}
                   name="dateHeure"
@@ -556,7 +603,7 @@ export default function AgendaPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Alert suppression ─────────────────────────────────────────────── */}
+      {/* ── Alert suppression ───────────────────────────────────── */}
       <AlertDialog open={!!idASupprimer} onOpenChange={(o) => !o && setIdASupprimer(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

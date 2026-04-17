@@ -1,12 +1,13 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import type { StatutTenant, PlanTenant, StatutDossier, TypeDossier } from '@/types';
+import type { StatutTenant, PlanTenant, StatutDossier, TypeDossier, StatutFacture } from '@/types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Format date → "24 mars 2026"
+// ─── Dates ────────────────────────────────────────────────────────────────────
+
 export function formaterDate(date: string | Date): string {
   return new Intl.DateTimeFormat('fr-DZ', {
     day: 'numeric',
@@ -15,7 +16,6 @@ export function formaterDate(date: string | Date): string {
   }).format(new Date(date));
 }
 
-// Format date courte → "24/03/2026"
 export function formaterDateCourte(date: string | Date): string {
   return new Intl.DateTimeFormat('fr-DZ', {
     day: '2-digit',
@@ -24,20 +24,76 @@ export function formaterDateCourte(date: string | Date): string {
   }).format(new Date(date));
 }
 
-// Couleur badge statut tenant
-export function couleurStatutTenant(
-  statut: StatutTenant
-): 'default' | 'secondary' | 'destructive' | 'outline' {
-  const map: Record<StatutTenant, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-    actif: 'default',
-    essai: 'secondary',
-    suspendu: 'destructive',
-    expire: 'outline',
-  };
-  return map[statut] ?? 'outline';
+export function formaterDateHeure(date: string | Date): string {
+  return new Intl.DateTimeFormat('fr-DZ', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(date));
 }
 
-// Couleur badge statut dossier
+// ─── Montants ─────────────────────────────────────────────────────────────────
+
+// Évite Intl.NumberFormat('fr-DZ') → espace fine U+202F incompatible avec pdf-lib
+export function formaterMontantDA(montant: number): string {
+  const entiere = Math.floor(montant)
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
+  const centimes = (montant % 1).toFixed(2).slice(1);
+  return `${entiere}${centimes} DA`;
+}
+
+// Version courte sans centimes pour les KPIs
+export function formaterMontantCourt(montant: number): string {
+  if (montant >= 1_000_000) {
+    return `${(montant / 1_000_000).toFixed(1).replace('.', ',')} M DA`;
+  }
+  if (montant >= 1_000) {
+    return `${(montant / 1_000).toFixed(1).replace('.', ',')} K DA`;
+  }
+  return `${montant} DA`;
+}
+
+// ─── Statuts Dossier ──────────────────────────────────────────────────────────
+
+export interface StatutStyle {
+  text: string; // classe Tailwind couleur texte
+  bg: string; // classe Tailwind couleur fond
+  border: string; // classe Tailwind couleur bordure
+  dot: string; // classe pour le petit indicateur rond
+  label: string; // libellé français
+}
+
+export function styleStatutDossier(statut: StatutDossier): StatutStyle {
+  const map: Record<StatutDossier, StatutStyle> = {
+    en_cours: {
+      text: 'text-status-encours',
+      bg: 'bg-status-encours-bg',
+      border: 'border-status-encours-border',
+      dot: 'bg-status-encours',
+      label: 'En cours',
+    },
+    suspendu: {
+      text: 'text-status-suspendu',
+      bg: 'bg-status-suspendu-bg',
+      border: 'border-status-suspendu-border',
+      dot: 'bg-status-suspendu',
+      label: 'Suspendu',
+    },
+    cloture: {
+      text: 'text-status-cloture',
+      bg: 'bg-status-cloture-bg',
+      border: 'border-status-cloture-border',
+      dot: 'bg-status-cloture',
+      label: 'Clôturé',
+    },
+  };
+  return map[statut] ?? map.cloture;
+}
+
+// Garde la compatibilité avec le code existant qui attend une variante shadcn
 export function couleurStatutDossier(
   statut: StatutDossier
 ): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -49,17 +105,12 @@ export function couleurStatutDossier(
   return map[statut] ?? 'outline';
 }
 
-// Libellé lisible statut dossier
 export function libelleStatutDossier(statut: StatutDossier): string {
-  const map: Record<StatutDossier, string> = {
-    en_cours: 'En cours',
-    suspendu: 'Suspendu',
-    cloture: 'Clôturé',
-  };
-  return map[statut] ?? statut;
+  return styleStatutDossier(statut).label;
 }
 
-// Libellé type dossier
+// ─── Types Dossier ────────────────────────────────────────────────────────────
+
 export function libelleTypeDossier(type: TypeDossier): string {
   const map: Record<TypeDossier, string> = {
     civil: 'Civil',
@@ -71,44 +122,192 @@ export function libelleTypeDossier(type: TypeDossier): string {
   return map[type] ?? type;
 }
 
-// Libellé plan
-export function libellePlan(plan: PlanTenant): string {
-  const map: Record<PlanTenant, string> = {
-    starter: 'Starter',
-    pro: 'Pro',
-    premium: 'Premium',
-  };
-  return map[plan] ?? plan;
+// ─── Statuts Tenant ───────────────────────────────────────────────────────────
+
+export interface TenantStatutStyle {
+  text: string;
+  bg: string;
+  dot: string;
+  label: string;
+  // variante shadcn pour les badges existants
+  variant: 'default' | 'secondary' | 'destructive' | 'outline';
 }
 
-// ─── À ajouter dans lib/utils.ts ──────────────────────────────────────────────
-
-// import type { StatutFacture } from '@/api/facture.api';
-import type { StatutFacture } from '@/types';
-
-export function couleurStatutFacture(statut: StatutFacture): 'secondary' | 'default' | 'outline' {
-  const map: Record<StatutFacture, 'secondary' | 'default' | 'outline'> = {
-    brouillon: 'secondary',
-    emise: 'default',
-    payee: 'outline',
+export function styleStatutTenant(statut: StatutTenant): TenantStatutStyle {
+  const map: Record<StatutTenant, TenantStatutStyle> = {
+    actif: {
+      text: 'text-status-actif',
+      bg: 'bg-status-actif-bg',
+      dot: 'bg-status-actif',
+      label: 'Actif',
+      variant: 'default',
+    },
+    essai: {
+      text: 'text-status-essai',
+      bg: 'bg-status-essai-bg',
+      dot: 'bg-status-essai',
+      label: 'Essai',
+      variant: 'secondary',
+    },
+    suspendu: {
+      text: 'text-destructive',
+      bg: 'bg-destructive/10',
+      dot: 'bg-destructive',
+      label: 'Suspendu',
+      variant: 'destructive',
+    },
+    expire: {
+      text: 'text-status-expire',
+      bg: 'bg-status-expire-bg',
+      dot: 'bg-status-expire',
+      label: 'Expiré',
+      variant: 'outline',
+    },
   };
-  return map[statut] ?? 'secondary';
+  return map[statut] ?? map.expire;
+}
+
+// Garde la compatibilité avec le code existant
+export function couleurStatutTenant(
+  statut: StatutTenant
+): 'default' | 'secondary' | 'destructive' | 'outline' {
+  return styleStatutTenant(statut).variant;
+}
+
+// ─── Plans ────────────────────────────────────────────────────────────────────
+
+export interface PlanStyle {
+  text: string;
+  bg: string;
+  label: string;
+}
+
+export function stylePlan(plan: PlanTenant): PlanStyle {
+  const map: Record<PlanTenant, PlanStyle> = {
+    starter: {
+      text: 'text-plan-starter',
+      bg: 'bg-plan-starter-bg',
+      label: 'Starter',
+    },
+    pro: {
+      text: 'text-plan-pro',
+      bg: 'bg-plan-pro-bg',
+      label: 'Pro',
+    },
+    premium: {
+      text: 'text-plan-premium',
+      bg: 'bg-plan-premium-bg',
+      label: 'Premium',
+    },
+  };
+  return map[plan] ?? map.starter;
+}
+
+export function libellePlan(plan: PlanTenant): string {
+  return stylePlan(plan).label;
+}
+
+// ─── Statuts Facture ──────────────────────────────────────────────────────────
+
+export interface FactureStatutStyle {
+  text: string;
+  bg: string;
+  label: string;
+  border: string;
+  dot: string;
+  variant: 'default' | 'secondary' | 'outline';
+}
+
+export function styleStatutFacture(statut: StatutFacture): FactureStatutStyle {
+  switch (statut) {
+    case 'brouillon':
+      return {
+        label: 'Brouillon',
+        text: 'text-muted-foreground',
+        bg: 'bg-muted/60',
+        border: 'border-border',
+        dot: 'bg-muted-foreground',
+        variant: 'secondary',
+      };
+    case 'emise':
+      return {
+        label: 'Émise',
+        text: 'text-status-encours',
+        bg: 'bg-status-encours-bg',
+        border: 'border-status-encours-border',
+        dot: 'bg-status-encours',
+        variant: 'default',
+      };
+    case 'payee':
+      return {
+        label: 'Payée',
+        text: 'text-status-actif',
+        bg: 'bg-status-actif-bg',
+        border: 'border-status-actif/30',
+        dot: 'bg-status-actif',
+        variant: 'outline',
+      };
+    default:
+      return {
+        label: statut,
+        text: 'text-muted-foreground',
+        bg: 'bg-muted/60',
+        border: 'border-border',
+        dot: 'bg-muted-foreground',
+        variant: 'secondary',
+      };
+  }
+}
+
+// Garde la compatibilité avec le code existant
+export function couleurStatutFacture(statut: StatutFacture): 'secondary' | 'default' | 'outline' {
+  return styleStatutFacture(statut).variant;
 }
 
 export function libelleStatutFacture(statut: StatutFacture): string {
-  const map: Record<StatutFacture, string> = {
-    brouillon: 'Brouillon',
-    emise: 'Émise',
-    payee: 'Payée',
-  };
-  return map[statut] ?? statut;
+  return styleStatutFacture(statut).label;
 }
 
-// Évite Intl.NumberFormat('fr-DZ') → espace fine U+202F incompatible avec pdf-lib
-export function formaterMontantDA(montant: number): string {
-  const partie = Math.floor(montant)
-    .toString()
-    .replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  const centimes = (montant % 1).toFixed(2).slice(1);
-  return `${partie}${centimes} DA`;
+// ─── Modes de paiement ────────────────────────────────────────────────────────
+
+export function libelleModeReglement(mode: string): string {
+  const map: Record<string, string> = {
+    especes: 'Espèces',
+    virement: 'Virement',
+    cheque: 'Chèque',
+    autre: 'Autre',
+  };
+  return map[mode] ?? mode;
+}
+
+export function styleModeReglement(mode: string): { text: string; bg: string } {
+  const map: Record<string, { text: string; bg: string }> = {
+    especes: { text: 'text-mode-especes', bg: 'bg-mode-especes-bg' },
+    virement: { text: 'text-mode-virement', bg: 'bg-mode-virement-bg' },
+    cheque: { text: 'text-mode-cheque', bg: 'bg-mode-cheque-bg' },
+    autre: { text: 'text-muted-foreground', bg: 'bg-muted' },
+  };
+  return map[mode] ?? { text: 'text-muted-foreground', bg: 'bg-muted' };
+}
+
+// ─── Noms clients ─────────────────────────────────────────────────────────────
+
+export function nomAffiche(client: {
+  type: 'physique' | 'morale';
+  nom?: string;
+  prenom?: string;
+  raisonSociale?: string;
+}): string {
+  if (client.type === 'morale') return client.raisonSociale ?? '—';
+  return [client.prenom, client.nom].filter(Boolean).join(' ') || '—';
+}
+
+// ─── Initiales avatar ─────────────────────────────────────────────────────────
+
+export function initialesAvatar(nom: string): string {
+  return nom
+    .split(' ')
+    .slice(0, 2)
+    .map((m) => m[0]?.toUpperCase() ?? '')
+    .join('');
 }

@@ -18,7 +18,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -43,26 +42,26 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { EmptyState } from '@/components/ui/empty-state';
+import { SkeletonTable } from '@/components/ui/skeleton-table';
 
 import { listerClients, supprimerClient } from '@/api/client.api';
-import { nomAffiche } from '@/types';
+import { nomAffiche } from '@/lib/utils';
 import type { Client, TypeClient } from '@/types';
-import DialogCreerClient from '../../components/admin/DialogCreerClient';
-import DialogModifierClient from '../../components/admin/DialogModifierClient';
+import DialogCreerClient from '@/components/admin/DialogCreerClient';
+import DialogModifierClient from '@/components/admin/DialogModifierClient';
 
 export default function ClientsPage() {
   const queryClient = useQueryClient();
-
   const navigate = useNavigate();
 
-  // ─── États filtres ────────────────────────────────────────────────
+  // ─── Filtres ──────────────────────────────────────────────────────
   const [recherche, setRecherche] = useState('');
   const [filtreType, setFiltreType] = useState<TypeClient | 'tous'>('tous');
   const [page, setPage] = useState(1);
-
   const [rechercheDebounced] = useDebounce(recherche, 300);
 
-  // ─── États dialogs ────────────────────────────────────────────────
+  // ─── Dialogs ──────────────────────────────────────────────────────
   const [dialogCreer, setDialogCreer] = useState(false);
   const [clientAModifier, setClientAModifier] = useState<Client | null>(null);
   const [clientASupprimer, setClientASupprimer] = useState<Client | null>(null);
@@ -81,6 +80,7 @@ export default function ClientsPage() {
 
   const clients = data?.data ?? [];
   const meta = data?.meta;
+  const filtresActifs = !!(recherche || filtreType !== 'tous');
 
   // ─── Suppression ──────────────────────────────────────────────────
   const { mutate: supprimer, isPending: suppression } = useMutation({
@@ -101,7 +101,7 @@ export default function ClientsPage() {
 
   return (
     <div className="space-y-6">
-      {/* ── En-tête ──────────────────────────────────────────────── */}
+      {/* ── En-tête ─────────────────────────────────────────────── */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Clients</h2>
@@ -117,7 +117,7 @@ export default function ClientsPage() {
         </Button>
       </div>
 
-      {/* ── Filtres ───────────────────────────────────────────────── */}
+      {/* ── Filtres ─────────────────────────────────────────────── */}
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -148,53 +148,39 @@ export default function ClientsPage() {
           </SelectContent>
         </Select>
 
-        {(recherche || filtreType !== 'tous') && (
+        {filtresActifs && (
           <Button variant="ghost" onClick={reinitialiserFiltres}>
             Réinitialiser
           </Button>
         )}
       </div>
 
-      {/* ── Tableau ───────────────────────────────────────────────── */}
+      {/* ── Liste ───────────────────────────────────────────────── */}
       <Card>
         <CardContent className="p-0">
-          {isLoading ? (
-            <div className="divide-y">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-4 p-4">
-                  <Skeleton className="h-10 w-10 rounded-full" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-48" />
-                    <Skeleton className="h-3 w-32" />
-                  </div>
-                  <Skeleton className="h-5 w-20 rounded-full" />
-                  <Skeleton className="h-8 w-8 rounded" />
-                </div>
-              ))}
-            </div>
-          ) : clients.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <Users className="h-12 w-12 text-muted-foreground/30" />
-              <div>
-                <p className="font-medium">
-                  {recherche || filtreType !== 'tous'
-                    ? 'Aucun client trouvé'
-                    : 'Aucun client pour le moment'}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {recherche || filtreType !== 'tous'
-                    ? 'Modifiez vos critères de recherche'
-                    : 'Ajoutez votre premier client pour commencer'}
-                </p>
-              </div>
-              {!recherche && filtreType === 'tous' && (
-                <Button size="sm" onClick={() => setDialogCreer(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nouveau client
-                </Button>
-              )}
-            </div>
-          ) : (
+          {/* Skeleton */}
+          {isLoading && <SkeletonTable />}
+
+          {/* Empty state */}
+          {!isLoading && clients.length === 0 && (
+            <EmptyState
+              icone={Users}
+              titre={filtresActifs ? 'Aucun client trouvé' : 'Aucun client pour le moment'}
+              description={
+                filtresActifs
+                  ? 'Aucun client ne correspond à vos critères. Modifiez ou réinitialisez les filtres.'
+                  : 'Ajoutez votre premier client pour commencer à gérer votre clientèle.'
+              }
+              action={
+                !filtresActifs
+                  ? { label: 'Nouveau client', onClick: () => setDialogCreer(true), icone: Plus }
+                  : undefined
+              }
+            />
+          )}
+
+          {/* Liste */}
+          {!isLoading && clients.length > 0 && (
             <div className="divide-y">
               {clients.map((client) => (
                 <div
@@ -236,7 +222,6 @@ export default function ClientsPage() {
                   {/* Actions */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      {/* ✅ stopPropagation : empêche le clic sur "⋯" de naviguer vers le détail */}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -303,22 +288,20 @@ export default function ClientsPage() {
         )}
       </Card>
 
-      {/* ── Dialogs ───────────────────────────────────────────────── */}
+      {/* ── Dialogs ─────────────────────────────────────────────── */}
       <DialogCreerClient ouvert={dialogCreer} onFermer={() => setDialogCreer(false)} />
 
       {clientAModifier && (
         <DialogModifierClient client={clientAModifier} onFermer={() => setClientAModifier(null)} />
       )}
 
-      {/* Confirmation suppression */}
       <AlertDialog open={!!clientASupprimer} onOpenChange={(o) => !o && setClientASupprimer(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Archiver ce client ?</AlertDialogTitle>
             <AlertDialogDescription>
               <strong>{clientASupprimer && nomAffiche(clientASupprimer)}</strong> sera archivé. Ses
-              dossiers restent accessibles mais il n'apparaîtra plus dans la liste des clients
-              actifs.
+              dossiers restent accessibles mais il n'apparaîtra plus dans la liste active.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

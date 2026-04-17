@@ -13,12 +13,9 @@ interface SidebarNavProps {
   onNavigate?: () => void;
 }
 
-/**
- * Navigation verticale avec indicateur de route active.
- */
 export default function SidebarNav({ items, onNavigate }: SidebarNavProps) {
   return (
-    <nav className="flex flex-col gap-1 px-2">
+    <nav className="flex flex-col gap-0.5 px-3" aria-label="Navigation principale">
       {items.map(({ label, href, icone: Icone }) => (
         <NavLink
           key={href}
@@ -26,15 +23,29 @@ export default function SidebarNav({ items, onNavigate }: SidebarNavProps) {
           onClick={onNavigate}
           className={({ isActive }) =>
             cn(
-              'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+              'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium',
+              'transition-colors duration-150',
               isActive
                 ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm'
-                : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
             )
           }
         >
-          <Icone className="h-4 w-4 shrink-0" />
-          {label}
+          {({ isActive }) => (
+            <>
+              <Icone
+                className={cn(
+                  'h-4 w-4 shrink-0 transition-colors duration-150',
+                  isActive ? 'opacity-100' : 'opacity-70'
+                )}
+                aria-hidden="true"
+              />
+              <span className="truncate">{label}</span>
+              {isActive && (
+                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-sidebar-primary-foreground/60 shrink-0" />
+              )}
+            </>
+          )}
         </NavLink>
       ))}
     </nav>

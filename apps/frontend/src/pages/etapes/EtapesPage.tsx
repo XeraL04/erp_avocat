@@ -36,12 +36,10 @@ import {
   FileText,
   ListChecks,
   WifiOff,
-  //   Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -79,6 +77,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { EmptyState } from '@/components/ui/empty-state';
 
 import {
   listerToutesEtapes,
@@ -87,14 +86,12 @@ import {
   type EtapeAvecDossier,
   type StatutEtape,
 } from '@/api/etape.api';
+import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth.store';
 
-// ─── Types & helpers ──────────────────────────────────────────────────────────
-
+// ─── Types ────────────────────────────────────────────────────────────────────
 type PeriodeFiltreType = 'tout' | 'retard' | 'semaine' | 'semaine_prochaine' | 'mois_prochain';
-
 type EtapeClassification = 'retard' | 'nextweek' | 'nextmonth' | 'after' | 'done' | string;
-
 type StatutFiltreType = 'tout' | 'enattente' | 'termine';
 
 interface Groupe {
@@ -106,38 +103,27 @@ interface Groupe {
   ouvertParDefaut: boolean;
 }
 
+// ─── Classification ───────────────────────────────────────────────────────────
 function classifierEtape(etape: EtapeAvecDossier): EtapeClassification {
   if (etape.statut === 'termine') return 'done';
-
   const now = new Date();
   const d = parseISO(etape.date);
-
   if (isPast(startOfDay(d)) && !isToday(d)) return 'retard';
-
-  // Semaine courante → clé par jour "week_YYYY-MM-DD"
   const debutSemaine = startOfWeek(now, { locale: fr });
   const finSemaine = endOfWeek(now, { locale: fr });
-  if (isWithinInterval(d, { start: debutSemaine, end: finSemaine })) {
+  if (isWithinInterval(d, { start: debutSemaine, end: finSemaine }))
     return `week_${format(d, 'yyyy-MM-dd')}`;
-  }
-
-  // Semaine prochaine
   const debutSP = startOfWeek(addWeeks(now, 1), { locale: fr });
   const finSP = endOfWeek(addWeeks(now, 1), { locale: fr });
   if (isWithinInterval(d, { start: debutSP, end: finSP })) return 'nextweek';
-
-  // Mois prochain
   const debutMP = startOfMonth(addMonths(now, 1));
   const finMP = endOfMonth(addMonths(now, 1));
   if (isWithinInterval(d, { start: debutMP, end: finMP })) return 'nextmonth';
-
   return 'after';
 }
 
 function construireGroupes(etapes: EtapeAvecDossier[]): Groupe[] {
   const now = new Date();
-
-  // Initialiser un bucket pour chaque jour de la semaine courante
   const joursSemaine = new Map<string, EtapeAvecDossier[]>();
   eachDayOfInterval({
     start: startOfWeek(now, { locale: fr }),
@@ -157,15 +143,11 @@ function construireGroupes(etapes: EtapeAvecDossier[]): Groupe[] {
     else if (cls === 'nextweek') nextweek.push(e);
     else if (cls === 'nextmonth') nextmonth.push(e);
     else if (cls === 'after') after.push(e);
-    else if (cls.startsWith('week_')) {
-      const key = cls.replace('week_', '');
-      joursSemaine.get(key)?.push(e);
-    }
+    else if (cls.startsWith('week_')) joursSemaine.get(cls.replace('week_', ''))?.push(e);
   }
 
   const groupes: Groupe[] = [];
 
-  // Groupe retard
   if (retard.length)
     groupes.push({
       id: 'retard',
@@ -176,7 +158,6 @@ function construireGroupes(etapes: EtapeAvecDossier[]): Groupe[] {
       ouvertParDefaut: true,
     });
 
-  // Groupes jour par jour pour la semaine courante
   for (const [dateKey, etapesDuJour] of joursSemaine) {
     if (!etapesDuJour.length) continue;
     const date = parseISO(dateKey);
@@ -185,7 +166,6 @@ function construireGroupes(etapes: EtapeAvecDossier[]): Groupe[] {
       : isTomorrow(date)
         ? 'Demain'
         : format(date, 'EEEE d MMMM', { locale: fr });
-
     groupes.push({
       id: `jour_${dateKey}`,
       label,
@@ -196,7 +176,6 @@ function construireGroupes(etapes: EtapeAvecDossier[]): Groupe[] {
     });
   }
 
-  // Semaine prochaine
   if (nextweek.length)
     groupes.push({
       id: 'semaine_prochaine',
@@ -207,18 +186,16 @@ function construireGroupes(etapes: EtapeAvecDossier[]): Groupe[] {
       ouvertParDefaut: true,
     });
 
-  // Mois prochain
   if (nextmonth.length)
     groupes.push({
       id: 'mois_prochain',
-      label: `${format(addMonths(now, 1), 'MMMM yyyy', { locale: fr })}`,
+      label: format(addMonths(now, 1), 'MMMM yyyy', { locale: fr }),
       emoji: '📅',
       variante: 'upcoming',
       etapes: nextmonth,
       ouvertParDefaut: false,
     });
 
-  // Au-delà
   if (after.length)
     groupes.push({
       id: 'after',
@@ -229,7 +206,6 @@ function construireGroupes(etapes: EtapeAvecDossier[]): Groupe[] {
       ouvertParDefaut: false,
     });
 
-  // Terminées
   if (done.length)
     groupes.push({
       id: 'done',
@@ -253,13 +229,11 @@ function formaterDateRelative(iso: string): string {
 function isoToDateInput(iso: string): string {
   return iso.slice(0, 10);
 }
-
 function dateInputToISO(d: string): string {
   return `${d}T00:00:00.000Z`;
 }
 
-// ─── Schéma form édition ──────────────────────────────────────────────────────
-
+// ─── Schéma édition ───────────────────────────────────────────────────────────
 const schemaModif = z.object({
   nom: z.string().trim().min(2, 'Minimum 2 caractères'),
   date: z.string().min(1, 'Date obligatoire'),
@@ -269,7 +243,6 @@ const schemaModif = z.object({
 type FormModif = z.infer<typeof schemaModif>;
 
 // ─── Composant principal ──────────────────────────────────────────────────────
-
 export default function EtapesPage() {
   const qc = useQueryClient();
   const utilisateur = useAuthStore((s) => s.utilisateur);
@@ -282,7 +255,7 @@ export default function EtapesPage() {
   const [etapeEditee, setEtapeEditee] = useState<EtapeAvecDossier | null>(null);
   const [idASupprimer, setIdASupprimer] = useState<string | null>(null);
 
-  // ── Query ─────────────────────────────────────────────────────────────────
+  // ── Query ──────────────────────────────────────────────────────────────────
   const {
     data: toutesEtapes = [],
     isLoading,
@@ -295,7 +268,6 @@ export default function EtapesPage() {
       }),
   });
 
-  // Filtre période côté client
   const etapesFiltrees = toutesEtapes.filter((e) => {
     if (filtrePeriode === 'tout') return true;
     const cls = classifierEtape(e);
@@ -306,47 +278,31 @@ export default function EtapesPage() {
     return true;
   });
 
-  // Stats KPI — ajouter nbSemaine
-  const nbSemaine = toutesEtapes.filter((e) => classifierEtape(e).startsWith('week_')).length;
-
   const groupes = construireGroupes(etapesFiltrees);
-
-  // ── Stats ─────────────────────────────────────────────────────────────────
+  const nbSemaine = toutesEtapes.filter((e) => classifierEtape(e).startsWith('week_')).length;
   const nbRetard = toutesEtapes.filter(
     (e) =>
       e.statut === 'enattente' && isPast(startOfDay(parseISO(e.date))) && !isToday(parseISO(e.date))
   ).length;
-  // ← Supprimer cette ligne
-  // const nbToday = toutesEtapes.filter(
-  //   (e) => isToday(parseISO(e.date)) && e.statut === 'enattente'
-  // ).length;
   const nbTotal = toutesEtapes.length;
   const nbTerminees = toutesEtapes.filter((e) => e.statut === 'termine').length;
+  const filtresActifs = filtrePeriode !== 'tout' || filtreStatut !== 'tout';
 
-  // ── Toggle groupe ─────────────────────────────────────────────────────────
-  const toggleGroupe = (id: string, defaut: boolean) => {
-    setGroupesOuverts((prev) => ({
-      ...prev,
-      [id]: id in prev ? !prev[id] : !defaut,
-    }));
-  };
+  const toggleGroupe = (id: string, defaut: boolean) =>
+    setGroupesOuverts((prev) => ({ ...prev, [id]: id in prev ? !prev[id] : !defaut }));
 
   const estOuvert = (id: string, defaut: boolean) =>
     id in groupesOuverts ? groupesOuverts[id] : defaut;
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['etapes'] });
 
-  // ── Mutation bascule statut ───────────────────────────────────────────────
   const mutBasculer = useMutation({
     mutationFn: (etape: EtapeAvecDossier) =>
-      modifierEtape(etape.id, {
-        statut: etape.statut === 'termine' ? 'enattente' : 'termine',
-      }),
+      modifierEtape(etape.id, { statut: etape.statut === 'termine' ? 'enattente' : 'termine' }),
     onSuccess: () => invalidate(),
     onError: () => toast.error('Impossible de changer le statut'),
   });
 
-  // ── Mutation suppression ──────────────────────────────────────────────────
   const mutSupprimer = useMutation({
     mutationFn: (id: string) => supprimerEtape(id),
     onSuccess: () => {
@@ -357,10 +313,9 @@ export default function EtapesPage() {
     onError: () => toast.error('Impossible de supprimer'),
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* En-tête */}
+      {/* ── En-tête ─────────────────────────────────────────────── */}
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Programme</h2>
         <p className="text-sm text-muted-foreground">
@@ -368,8 +323,9 @@ export default function EtapesPage() {
         </p>
       </div>
 
-      {/* Cartes KPI */}
+      {/* ── KPI Cards ───────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {/* En retard — destructive */}
         <KpiCard
           label="En retard"
           value={nbRetard}
@@ -381,17 +337,19 @@ export default function EtapesPage() {
             setFiltreStatut('enattente');
           }}
         />
+        {/* Cette semaine — status-suspendu (orange token) */}
         <KpiCard
           label="Cette semaine"
           value={nbSemaine}
           icone={<Calendar className="h-4 w-4" />}
-          couleur={nbSemaine > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground'}
-          bgCouleur={nbSemaine > 0 ? 'bg-orange-100 dark:bg-orange-950/30' : 'bg-muted'}
+          couleur={nbSemaine > 0 ? 'text-status-suspendu' : 'text-muted-foreground'}
+          bgCouleur={nbSemaine > 0 ? 'bg-status-suspendu-bg' : 'bg-muted'}
           onClick={() => {
             setFiltrePeriode('semaine');
             setFiltreStatut('enattente');
           }}
         />
+        {/* Total — primary */}
         <KpiCard
           label="Total"
           value={nbTotal}
@@ -403,12 +361,13 @@ export default function EtapesPage() {
             setFiltreStatut('tout');
           }}
         />
+        {/* Terminées — status-actif (vert token) */}
         <KpiCard
           label="Terminées"
           value={nbTerminees}
           icone={<CheckCircle2 className="h-4 w-4" />}
-          couleur="text-green-600 dark:text-green-400"
-          bgCouleur="bg-green-100 dark:bg-green-950/30"
+          couleur="text-status-actif"
+          bgCouleur="bg-status-actif-bg"
           onClick={() => {
             setFiltrePeriode('tout');
             setFiltreStatut('termine');
@@ -416,7 +375,7 @@ export default function EtapesPage() {
         />
       </div>
 
-      {/* Filtres */}
+      {/* ── Filtres ─────────────────────────────────────────────── */}
       <div className="flex flex-wrap gap-2">
         <Select
           value={filtrePeriode}
@@ -445,7 +404,7 @@ export default function EtapesPage() {
           </SelectContent>
         </Select>
 
-        {(filtrePeriode !== 'tout' || filtreStatut !== 'tout') && (
+        {filtresActifs && (
           <Button
             variant="ghost"
             size="sm"
@@ -459,7 +418,7 @@ export default function EtapesPage() {
         )}
       </div>
 
-      {/* Erreur */}
+      {/* ── Erreur réseau ───────────────────────────────────────── */}
       {isError && (
         <Card>
           <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
@@ -477,44 +436,67 @@ export default function EtapesPage() {
         </Card>
       )}
 
-      {/* Skeleton */}
+      {/* ── Skeleton ────────────────────────────────────────────── */}
       {isLoading && (
         <div className="space-y-4">
           {[...Array(3)].map((_, i) => (
             <div key={i} className="space-y-2">
-              <Skeleton className="h-8 w-40 rounded-md" />
-              <Skeleton className="h-20 w-full rounded-lg" />
-              <Skeleton className="h-20 w-full rounded-lg" />
+              {/* Titre du groupe */}
+              <div className="flex items-center gap-2 px-1">
+                <Skeleton className="h-4 w-4 rounded" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-5 w-7 rounded-full" />
+              </div>
+              {/* Cartes étapes */}
+              <div className="relative ml-3 space-y-2">
+                <div className="absolute bottom-2 left-2 top-2 w-px bg-border" />
+                {[...Array(i === 0 ? 3 : 2)].map((_, j) => (
+                  <div key={j} className="flex gap-3">
+                    <Skeleton className="mt-3 h-5 w-5 shrink-0 rounded-full" />
+                    <div className="mb-1 flex-1 rounded-lg border p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-4 w-48" />
+                          <div className="flex gap-3">
+                            <Skeleton className="h-3 w-24" />
+                            <Skeleton className="h-3 w-32" />
+                          </div>
+                        </div>
+                        <div className="flex gap-1">
+                          <Skeleton className="h-7 w-7 rounded" />
+                          <Skeleton className="h-7 w-7 rounded" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Empty state global */}
+      {/* ── Empty state ─────────────────────────────────────────── */}
       {!isLoading && !isError && groupes.length === 0 && (
-        <div className="flex flex-col items-center gap-3 py-20 text-center text-muted-foreground">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-            <CalendarClock className="h-8 w-8 opacity-40" />
-          </div>
-          <div>
-            <p className="font-medium text-foreground">Aucune étape trouvée</p>
-            <p className="mt-1 text-sm">
-              {filtrePeriode !== 'tout' || filtreStatut !== 'tout'
-                ? 'Modifiez les filtres pour voir plus de résultats'
-                : 'Les étapes procédurales sont créées depuis les dossiers'}
-            </p>
-          </div>
-        </div>
+        <EmptyState
+          icone={CalendarClock}
+          titre="Aucune étape trouvée"
+          description={
+            filtresActifs
+              ? 'Modifiez les filtres pour voir plus de résultats.'
+              : 'Les étapes procédurales sont créées depuis les dossiers.'
+          }
+        />
       )}
 
-      {/* Groupes */}
+      {/* ── Groupes ─────────────────────────────────────────────── */}
       {!isLoading && !isError && groupes.length > 0 && (
         <div className="space-y-6">
           {groupes.map((groupe) => {
             const ouvert = estOuvert(groupe.id, groupe.ouvertParDefaut);
             return (
               <div key={groupe.id} className="space-y-2">
-                {/* Titre du groupe */}
+                {/* Titre groupe */}
                 <button
                   type="button"
                   onClick={() => toggleGroupe(groupe.id, groupe.ouvertParDefaut)}
@@ -528,24 +510,26 @@ export default function EtapesPage() {
                   <span className="font-semibold">
                     {groupe.emoji} {groupe.label}
                   </span>
-                  <Badge
-                    variant="secondary"
-                    className={`ml-1 tabular-nums ${
+
+                  {/* Badge compteur avec tokens sémantiques */}
+                  <span
+                    className={cn(
+                      'ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium tabular-nums',
                       groupe.variante === 'retard'
                         ? 'bg-destructive/10 text-destructive'
                         : groupe.variante === 'today'
-                          ? 'bg-orange-100 text-orange-700 dark:bg-orange-950/30 dark:text-orange-400'
-                          : ''
-                    }`}
+                          ? 'bg-status-suspendu-bg text-status-suspendu'
+                          : 'bg-muted text-muted-foreground'
+                    )}
                   >
                     {groupe.etapes.length}
-                  </Badge>
+                  </span>
                 </button>
 
-                {/* Étapes du groupe */}
+                {/* Étapes */}
                 {ouvert && (
                   <div className="relative ml-3">
-                    <div className="absolute left-2 top-2 bottom-2 w-px bg-border" />
+                    <div className="absolute bottom-2 left-2 top-2 w-px bg-border" />
                     <div className="space-y-2">
                       {groupe.etapes.map((etape) => (
                         <CarteEtape
@@ -569,7 +553,7 @@ export default function EtapesPage() {
         </div>
       )}
 
-      {/* Dialog édition */}
+      {/* ── Dialog édition ──────────────────────────────────────── */}
       {etapeEditee && (
         <DialogEditerEtape
           etape={etapeEditee}
@@ -581,7 +565,7 @@ export default function EtapesPage() {
         />
       )}
 
-      {/* Confirmation suppression */}
+      {/* ── Confirmation suppression ─────────────────────────────── */}
       <AlertDialog open={!!idASupprimer} onOpenChange={(o) => !o && setIdASupprimer(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -605,8 +589,7 @@ export default function EtapesPage() {
   );
 }
 
-// ─── Carte KPI ────────────────────────────────────────────────────────────────
-
+// ─── KpiCard ──────────────────────────────────────────────────────────────────
 interface KpiCardProps {
   label: string;
   value: number;
@@ -624,20 +607,23 @@ function KpiCard({ label, value, icone, couleur, bgCouleur, onClick }: KpiCardPr
       className="flex items-center gap-3 rounded-lg border bg-card p-4 text-left transition-all hover:shadow-md active:scale-95"
     >
       <div
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${bgCouleur} ${couleur}`}
+        className={cn(
+          'flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+          bgCouleur,
+          couleur
+        )}
       >
         {icone}
       </div>
       <div className="min-w-0">
-        <p className={`text-xl font-bold tabular-nums ${couleur}`}>{value}</p>
+        <p className={cn('text-xl font-bold tabular-nums', couleur)}>{value}</p>
         <p className="truncate text-xs text-muted-foreground">{label}</p>
       </div>
     </button>
   );
 }
 
-// ─── Carte étape ──────────────────────────────────────────────────────────────
-
+// ─── CarteEtape ───────────────────────────────────────────────────────────────
 interface CarteEtapeProps {
   etape: EtapeAvecDossier;
   variante: Groupe['variante'];
@@ -661,6 +647,7 @@ function CarteEtape({
 }: CarteEtapeProps) {
   const estTerminee = etape.statut === 'termine';
   const estEnRetard = variante === 'retard';
+  const estAujourd = variante === 'today';
 
   return (
     <div className="relative flex gap-3">
@@ -669,15 +656,15 @@ function CarteEtape({
         type="button"
         onClick={onBasculer}
         disabled={!peutModifier || basculeEnCours}
-        className={`relative z-10 mt-3 shrink-0 rounded-full transition-colors
-          ${peutModifier ? 'cursor-pointer' : 'cursor-default'}
-          ${
-            estTerminee
-              ? 'text-primary hover:text-primary/70'
-              : estEnRetard
-                ? 'text-destructive hover:text-destructive/70'
-                : 'text-muted-foreground hover:text-foreground'
-          }`}
+        className={cn(
+          'relative z-10 mt-3 shrink-0 rounded-full transition-colors',
+          peutModifier ? 'cursor-pointer' : 'cursor-default',
+          estTerminee
+            ? 'text-primary hover:text-primary/70'
+            : estEnRetard
+              ? 'text-destructive hover:text-destructive/70'
+              : 'text-muted-foreground hover:text-foreground'
+        )}
         title={
           peutModifier ? (estTerminee ? 'Marquer en attente' : 'Marquer comme terminée') : undefined
         }
@@ -685,51 +672,49 @@ function CarteEtape({
         {estTerminee ? (
           <CheckCircle2 className="h-5 w-5 fill-primary/10" />
         ) : (
-          <Circle className={`h-5 w-5 ${estEnRetard ? 'text-destructive/70' : ''}`} />
+          <Circle className={cn('h-5 w-5', estEnRetard && 'text-destructive/70')} />
         )}
       </button>
 
       {/* Carte */}
       <div
-        className={`mb-1 flex-1 rounded-lg border p-3 transition-colors ${
-          estTerminee
-            ? 'bg-muted/20 opacity-60'
-            : estEnRetard
-              ? 'border-destructive/30 bg-destructive/5'
-              : variante === 'today'
-                ? 'border-orange-300/50 bg-orange-50/50 dark:border-orange-800/30 dark:bg-orange-950/10'
-                : 'bg-card'
-        }`}
+        className={cn(
+          'mb-1 flex-1 rounded-lg border p-3 transition-colors',
+          estTerminee && 'bg-muted/20 opacity-60',
+          estEnRetard && !estTerminee && 'border-destructive/30 bg-destructive/5',
+          // ← token CSS au lieu de border-orange-300/50 dark:border-orange-800/30
+          estAujourd && !estTerminee && 'border-status-suspendu/30 bg-status-suspendu-bg/40',
+          !estTerminee && !estEnRetard && !estAujourd && 'bg-card'
+        )}
       >
         <div className="flex items-start justify-between gap-2">
-          {/* Infos */}
           <div className="min-w-0 space-y-1">
-            {/* Nom + badges */}
+            {/* Nom + badge retard */}
             <div className="flex flex-wrap items-center gap-2">
               <span
-                className={`text-sm font-medium leading-snug ${
-                  estTerminee ? 'line-through text-muted-foreground' : ''
-                }`}
+                className={cn(
+                  'text-sm font-medium leading-snug',
+                  estTerminee && 'line-through text-muted-foreground'
+                )}
               >
                 {etape.nom}
               </span>
               {estEnRetard && (
-                <Badge className="bg-destructive/10 px-1.5 py-0 text-xs text-destructive hover:bg-destructive/20">
+                <span className="inline-flex items-center rounded-full bg-destructive/10 px-1.5 py-0 text-xs text-destructive">
                   En retard
-                </Badge>
+                </span>
               )}
             </div>
 
-            {/* Méta : date + dossier + notes */}
+            {/* Méta */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
               <span
-                className={`font-medium capitalize ${
-                  estEnRetard
-                    ? 'text-destructive'
-                    : variante === 'today'
-                      ? 'text-orange-600 dark:text-orange-400'
-                      : ''
-                }`}
+                className={cn(
+                  'font-medium capitalize',
+                  estEnRetard && 'text-destructive',
+                  // ← token CSS au lieu de text-orange-600 dark:text-orange-400
+                  estAujourd && !estEnRetard && 'text-status-suspendu'
+                )}
               >
                 {formaterDateRelative(etape.date)}
               </span>
@@ -742,7 +727,7 @@ function CarteEtape({
                 >
                   <FolderOpen className="h-3 w-3 shrink-0" />
                   <span className="font-mono">{etape.dossier.reference}</span>
-                  <span className="hidden sm:inline truncate max-w-40">
+                  <span className="hidden max-w-40 truncate sm:inline">
                     · {etape.dossier.titre}
                   </span>
                 </Link>
@@ -788,8 +773,7 @@ function CarteEtape({
   );
 }
 
-// ─── Dialog édition ───────────────────────────────────────────────────────────
-
+// ─── DialogEditerEtape ────────────────────────────────────────────────────────
 interface DialogEditerEtapeProps {
   etape: EtapeAvecDossier;
   onFermer: () => void;
@@ -862,7 +846,6 @@ function DialogEditerEtape({ etape, onFermer, onSuccess }: DialogEditerEtapeProp
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="statut"

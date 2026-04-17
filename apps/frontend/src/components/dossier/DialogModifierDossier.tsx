@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -28,6 +28,7 @@ import {
 import { modifierDossier } from '@/api/dossier.api';
 import type { Dossier } from '@/api/dossier.api';
 
+// ─── Schéma ───────────────────────────────────────────────────────────────────
 const schemaModifierDossier = z
   .object({
     titre: z.string().min(2, 'Minimum 2 caractères').max(200).optional(),
@@ -41,6 +42,7 @@ const schemaModifierDossier = z
 
 type FormModifierDossier = z.infer<typeof schemaModifierDossier>;
 
+// ─── Composant ────────────────────────────────────────────────────────────────
 interface Props {
   dossier: Dossier;
   onFermer: () => void;
@@ -48,6 +50,7 @@ interface Props {
 
 export default function DialogModifierDossier({ dossier, onFermer }: Props) {
   const queryClient = useQueryClient();
+  const uid = useId();
 
   const {
     register,
@@ -91,27 +94,40 @@ export default function DialogModifierDossier({ dossier, onFermer }: Props) {
 
   return (
     <Dialog open onOpenChange={(o) => !o && !isPending && onFermer()}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Modifier le dossier</DialogTitle>
+          {/* Référence en mono sous le titre */}
           <p className="font-mono text-sm text-muted-foreground">{dossier.reference}</p>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit((data) => mutate(data))} className="space-y-4">
+        <form onSubmit={handleSubmit((data) => mutate(data))} className="space-y-4" noValidate>
+          {/* ── Titre ─────────────────────────────────────────── */}
           <div className="space-y-1.5">
-            <Label htmlFor="titre">Titre</Label>
-            <Input id="titre" {...register('titre')} />
-            {errors.titre && <p className="text-xs text-destructive">{errors.titre.message}</p>}
+            <Label htmlFor={`${uid}-titre`}>Titre</Label>
+            <Input
+              id={`${uid}-titre`}
+              disabled={isPending}
+              aria-invalid={!!errors.titre}
+              aria-describedby={errors.titre ? `${uid}-titre-error` : undefined}
+              {...register('titre')}
+            />
+            {errors.titre && (
+              <p id={`${uid}-titre-error`} className="text-xs text-destructive" role="alert">
+                {errors.titre.message}
+              </p>
+            )}
           </div>
 
+          {/* ── Type d'affaire ─────────────────────────────────── */}
           <div className="space-y-1.5">
-            <Label>Type d'affaire</Label>
+            <Label htmlFor={`${uid}-type`}>Type d'affaire</Label>
             <Controller
               name="type"
               control={control}
               render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger>
+                <Select value={field.value} onValueChange={field.onChange} disabled={isPending}>
+                  <SelectTrigger id={`${uid}-type`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -126,23 +142,48 @@ export default function DialogModifierDossier({ dossier, onFermer }: Props) {
             />
           </div>
 
+          {/* ── Date d'ouverture ───────────────────────────────── */}
           <div className="space-y-1.5">
-            <Label htmlFor="dateOuverture">Date d'ouverture</Label>
-            <Input id="dateOuverture" type="date" {...register('dateOuverture')} />
+            <Label htmlFor={`${uid}-date`}>Date d'ouverture</Label>
+            <Input
+              id={`${uid}-date`}
+              type="date"
+              disabled={isPending}
+              {...register('dateOuverture')}
+            />
           </div>
 
+          {/* ── Description ────────────────────────────────────── */}
           <div className="space-y-1.5">
-            <Label htmlFor="description">Description</Label>
-            <Textarea id="description" rows={3} {...register('description')} />
+            <Label htmlFor={`${uid}-desc`}>Description</Label>
+            <Textarea
+              id={`${uid}-desc`}
+              rows={3}
+              className="resize-none"
+              disabled={isPending}
+              {...register('description')}
+            />
+            {errors.description && (
+              <p className="text-xs text-destructive" role="alert">
+                {errors.description.message}
+              </p>
+            )}
           </div>
+
+          {/* Erreur globale (refine) */}
+          {errors.root && (
+            <p className="text-xs text-destructive" role="alert">
+              {errors.root.message}
+            </p>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onFermer} disabled={isPending}>
               Annuler
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isPending ? 'Enregistrement...' : 'Enregistrer'}
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+              {isPending ? 'Enregistrement en cours…' : 'Enregistrer'}
             </Button>
           </DialogFooter>
         </form>

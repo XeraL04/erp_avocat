@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -36,10 +36,6 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-// import {
-//   Select, SelectContent, SelectItem,
-//   SelectTrigger, SelectValue,
-// } from '@/components/ui/select';
 
 import {
   listerFacturesDossier,
@@ -53,7 +49,6 @@ import { useAuthStore } from '@/stores/auth.store';
 import { formaterDate } from '@/lib/utils';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
 const da = (n: number) => n.toLocaleString('fr-DZ') + ' DA';
 
 function dateLocaleVersISO(dateLocale: string): string {
@@ -80,55 +75,58 @@ function extraireMessageErreur(err: unknown, fallback: string): string {
 }
 
 // ─── Config badges statut ─────────────────────────────────────────────────────
-
+// Tokens CSS uniquement — plus de couleurs Tailwind hardcodées
 const configStatut: Record<
   StatutFacture,
-  { label: string; variant: 'secondary' | 'default' | 'outline' | 'destructive'; className: string }
+  { label: string; variant: 'secondary' | 'default' | 'outline'; className: string }
 > = {
-  brouillon: { label: 'Brouillon', variant: 'secondary', className: '' },
+  brouillon: {
+    label: 'Brouillon',
+    variant: 'secondary',
+    className: '',
+  },
   emise: {
     label: 'Émise',
-    variant: 'default',
-    className: 'bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/30 dark:text-blue-400',
+    variant: 'outline',
+    // token primary (teal) — cohérent dark/light
+    className:
+      'border-[var(--color-primary)]/40 text-[var(--color-primary)] bg-[var(--color-primary)]/8',
   },
   payee: {
     label: 'Payée',
     variant: 'outline',
-    className: 'border-green-500 text-green-700 dark:text-green-400',
+    // token success (vert) — cohérent dark/light
+    className:
+      'border-[var(--color-success)]/40 text-[var(--color-success)] bg-[var(--color-success)]/8',
   },
 };
 
-// Transitions de statut autorisées par le backend
+// Transitions autorisées par le backend
 const prochainsStatuts: Partial<Record<StatutFacture, StatutFacture>> = {
   brouillon: 'emise',
   emise: 'payee',
 };
-
 const libelleTransition: Record<string, string> = {
   emise: 'Marquer comme émise',
   payee: 'Marquer comme payée',
 };
 
-// ─── Schéma formulaire création ───────────────────────────────────────────────
-
+// ─── Schéma ───────────────────────────────────────────────────────────────────
 const schemaCreer = z.object({
   montant: z
     .number({ invalid_type_error: 'Montant requis' })
     .positive('Le montant doit être positif'),
   dateEmission: z.string().min(1, 'Date requise'),
 });
-
 type FormValues = z.infer<typeof schemaCreer>;
 
 // ─── Props ────────────────────────────────────────────────────────────────────
-
 interface Props {
   dossierId: string;
-  clientId: string; // nécessaire pour POST /cabinet/factures
+  clientId: string;
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
-
 export default function TabFactures({ dossierId, clientId }: Props) {
   const queryClient = useQueryClient();
   const utilisateur = useAuthStore((s) => s.utilisateur);
@@ -136,9 +134,9 @@ export default function TabFactures({ dossierId, clientId }: Props) {
 
   const [dialogCreer, setDialogCreer] = useState(false);
   const [factureASupprimer, setFactureASupprimer] = useState<Facture | null>(null);
-  const [telechargementEnCours, setTelecharge] = useState<string | null>(null); // id facture
+  const [telechargementEnCours, setTelecharge] = useState<string | null>(null);
 
-  // ─── Query ───────────────────────────────────────────────────────────────
+  // ── Query ──────────────────────────────────────────────────────────────────
   const {
     data: factures = [] as Facture[],
     isLoading,
@@ -149,7 +147,7 @@ export default function TabFactures({ dossierId, clientId }: Props) {
     throwOnError: false,
   });
 
-  // ─── Mutation : changer statut ────────────────────────────────────────────
+  // ── Mutation : changer statut ──────────────────────────────────────────────
   const { mutate: changerStatut, isPending: changementEnCours } = useMutation({
     mutationFn: ({ id, statut }: { id: string; statut: StatutFacture }) =>
       modifierFacture(id, { statut }),
@@ -161,7 +159,7 @@ export default function TabFactures({ dossierId, clientId }: Props) {
       toast.error(extraireMessageErreur(err, 'Erreur lors de la mise à jour')),
   });
 
-  // ─── Mutation : supprimer ─────────────────────────────────────────────────
+  // ── Mutation : supprimer ───────────────────────────────────────────────────
   const { mutate: effacer, isPending: suppressionEnCours } = useMutation({
     mutationFn: () => supprimerFacture(factureASupprimer!.id),
     onSuccess: () => {
@@ -173,7 +171,7 @@ export default function TabFactures({ dossierId, clientId }: Props) {
       toast.error(extraireMessageErreur(err, 'Erreur lors de la suppression')),
   });
 
-  // ─── Téléchargement PDF ───────────────────────────────────────────────────
+  // ── Téléchargement PDF ─────────────────────────────────────────────────────
   async function handleTelechargement(facture: Facture) {
     setTelecharge(facture.id);
     try {
@@ -186,24 +184,45 @@ export default function TabFactures({ dossierId, clientId }: Props) {
     }
   }
 
-  // ─── Chargement ───────────────────────────────────────────────────────────
+  // ── État : chargement ──────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="space-y-3">
-        <Skeleton className="h-16 w-full rounded-lg" />
-        <Skeleton className="h-16 w-full rounded-lg" />
-        <Skeleton className="h-16 w-full rounded-lg" />
-      </div>
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-8 w-36 rounded-md" />
+          </div>
+        </CardHeader>
+        <CardContent className="divide-y p-0">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-6 py-4">
+              <Skeleton className="h-9 w-9 rounded-lg" />
+              <div className="flex-1 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                </div>
+                <Skeleton className="h-3 w-40" />
+              </div>
+              <div className="flex gap-1">
+                <Skeleton className="h-8 w-8 rounded-md" />
+                <Skeleton className="h-8 w-8 rounded-md" />
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
     );
   }
 
-  // ─── Erreur réseau ────────────────────────────────────────────────────────
+  // ── État : erreur réseau ───────────────────────────────────────────────────
   if (isError) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
-            <WifiOff className="h-7 w-7 text-destructive" />
+            <WifiOff className="h-7 w-7 text-destructive" aria-hidden="true" />
           </div>
           <div>
             <p className="font-medium">Impossible de charger les factures</p>
@@ -224,7 +243,7 @@ export default function TabFactures({ dossierId, clientId }: Props) {
     );
   }
 
-  // ─── Rendu principal ──────────────────────────────────────────────────────
+  // ── Rendu principal ────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
       <Card>
@@ -234,7 +253,7 @@ export default function TabFactures({ dossierId, clientId }: Props) {
               Factures{factures.length > 0 && ` (${factures.length})`}
             </CardTitle>
             <Button size="sm" onClick={() => setDialogCreer(true)}>
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
               Nouvelle facture
             </Button>
           </div>
@@ -242,9 +261,10 @@ export default function TabFactures({ dossierId, clientId }: Props) {
 
         <CardContent className="p-0">
           {factures.length === 0 ? (
+            /* État vide */
             <div className="flex flex-col items-center gap-3 py-14 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                <FileText className="h-6 w-6 text-muted-foreground" />
+                <FileText className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
               </div>
               <div>
                 <p className="font-medium">Aucune facture</p>
@@ -253,7 +273,7 @@ export default function TabFactures({ dossierId, clientId }: Props) {
                 </p>
               </div>
               <Button variant="outline" size="sm" onClick={() => setDialogCreer(true)}>
-                <Plus className="mr-2 h-4 w-4" />
+                <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
                 Créer la première facture
               </Button>
             </div>
@@ -262,6 +282,7 @@ export default function TabFactures({ dossierId, clientId }: Props) {
               {factures.map((facture) => {
                 const cfg = configStatut[facture.statut];
                 const prochainStatut = prochainsStatuts[facture.statut];
+                const dlEnCours = telechargementEnCours === facture.id;
 
                 return (
                   <div
@@ -270,7 +291,7 @@ export default function TabFactures({ dossierId, clientId }: Props) {
                   >
                     {/* Icône */}
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <FileText className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                     </div>
 
                     {/* Infos */}
@@ -285,7 +306,7 @@ export default function TabFactures({ dossierId, clientId }: Props) {
                         <span className="font-medium tabular-nums text-foreground">
                           {da(facture.montant)}
                         </span>
-                        <span>·</span>
+                        <span aria-hidden="true">·</span>
                         <span>{formaterDate(facture.dateEmission)}</span>
                       </div>
                     </div>
@@ -302,7 +323,7 @@ export default function TabFactures({ dossierId, clientId }: Props) {
                           onClick={() => changerStatut({ id: facture.id, statut: prochainStatut })}
                         >
                           {libelleTransition[prochainStatut]}
-                          <ChevronRight className="h-3.5 w-3.5" />
+                          <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
                         </Button>
                       )}
 
@@ -311,27 +332,31 @@ export default function TabFactures({ dossierId, clientId }: Props) {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
-                        disabled={telechargementEnCours === facture.id}
+                        disabled={dlEnCours}
                         onClick={() => handleTelechargement(facture)}
-                        title="Télécharger le PDF"
+                        aria-label={
+                          dlEnCours
+                            ? `Téléchargement de ${facture.numero} en cours`
+                            : `Télécharger ${facture.numero} en PDF`
+                        }
                       >
-                        {telechargementEnCours === facture.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                        {dlEnCours ? (
+                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                         ) : (
-                          <Download className="h-4 w-4" />
+                          <Download className="h-4 w-4" aria-hidden="true" />
                         )}
                       </Button>
 
-                      {/* Supprimer (brouillon + admin uniquement) */}
+                      {/* Supprimer — brouillon + admin uniquement */}
                       {facture.statut === 'brouillon' && estAdmin && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          className="h-8 w-8 text-destructive hover:bg-destructive/5 hover:text-destructive"
                           onClick={() => setFactureASupprimer(facture)}
-                          title="Supprimer"
+                          aria-label={`Supprimer la facture ${facture.numero}`}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
                         </Button>
                       )}
                     </div>
@@ -386,7 +411,6 @@ export default function TabFactures({ dossierId, clientId }: Props) {
 }
 
 // ─── Dialog : créer une facture ───────────────────────────────────────────────
-
 interface DialogCreerFactureProps {
   dossierId: string;
   clientId: string;
@@ -395,6 +419,8 @@ interface DialogCreerFactureProps {
 }
 
 function DialogCreerFacture({ dossierId, clientId, onFermer, onSuccess }: DialogCreerFactureProps) {
+  const uid = useId();
+
   const form = useForm<FormValues>({
     resolver: zodResolver(schemaCreer),
     defaultValues: {
@@ -420,7 +446,7 @@ function DialogCreerFacture({ dossierId, clientId, onFermer, onSuccess }: Dialog
   });
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onFermer()}>
+    <Dialog open onOpenChange={(o) => !o && !isPending && onFermer()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Nouvelle facture</DialogTitle>
@@ -431,7 +457,12 @@ function DialogCreerFacture({ dossierId, clientId, onFermer, onSuccess }: Dialog
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit((v) => creer(v))} className="space-y-4">
+          <form
+            id={`${uid}-form`}
+            onSubmit={form.handleSubmit((v) => creer(v))}
+            className="space-y-4"
+            noValidate
+          >
             {/* Montant */}
             <FormField
               control={form.control}
@@ -442,12 +473,13 @@ function DialogCreerFacture({ dossierId, clientId, onFermer, onSuccess }: Dialog
                   <FormControl>
                     <Input
                       type="number"
-                      placeholder="Ex : 150000"
-                      {...field}
+                      placeholder="Ex : 150 000"
+                      disabled={isPending}
                       value={field.value ?? ''}
                       onChange={(e) =>
                         field.onChange(e.target.value === '' ? undefined : Number(e.target.value))
                       }
+                      onWheel={(e) => (e.target as HTMLInputElement).blur()}
                     />
                   </FormControl>
                   <FormMessage />
@@ -463,7 +495,7 @@ function DialogCreerFacture({ dossierId, clientId, onFermer, onSuccess }: Dialog
                 <FormItem>
                   <FormLabel>Date d'émission</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} />
+                    <Input type="date" disabled={isPending} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -474,9 +506,9 @@ function DialogCreerFacture({ dossierId, clientId, onFermer, onSuccess }: Dialog
               <Button type="button" variant="outline" onClick={onFermer} disabled={isPending}>
                 Annuler
               </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Créer la facture
+              <Button type="submit" form={`${uid}-form`} disabled={isPending}>
+                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+                {isPending ? 'Création en cours…' : 'Créer la facture'}
               </Button>
             </div>
           </form>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,6 +14,7 @@ import {
   Loader2,
   ListChecks,
   FileText,
+  Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -65,37 +66,32 @@ import {
   type Etape,
 } from '@/api/etape.api';
 
-// ─── Schéma Zod ───────────────────────────────────────────────────────────────
-
+// ─── Schéma ───────────────────────────────────────────────────────────────────
 const schema = z.object({
   nom: z.string().trim().min(2, 'Le nom doit contenir au moins 2 caractères'),
   date: z.string().min(1, 'La date est obligatoire'),
   statut: z.enum(['termine', 'enattente']),
   notes: z.string().trim().optional(),
 });
-
 type FormValues = z.infer<typeof schema>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/** "2026-04-15T09:00:00.000Z" → "2026-04-15" pour <input type="date"> */
 function isoToDateInput(iso: string): string {
   return iso.slice(0, 10);
 }
-
-/** ✅ "2026-04-15" → "2026-04-15T00:00:00.000Z" (sans ambiguïté timezone) */
 function dateInputToISO(d: string): string {
   return `${d}T00:00:00.000Z`;
 }
 
-// ─── Composant principal ──────────────────────────────────────────────────────
-
+// ─── Composant ────────────────────────────────────────────────────────────────
 interface Props {
   dossierId: string;
 }
 
 export default function TabEtapes({ dossierId }: Props) {
   const qc = useQueryClient();
+  const uid = useId();
+
   const role = useAuthStore((s) => s.utilisateur?.role);
   const peutModifier = role === 'admin' || role === 'assistant';
   const peutSupprimer = role === 'admin';
@@ -110,7 +106,7 @@ export default function TabEtapes({ dossierId }: Props) {
     queryFn: () => listerEtapesDossier(dossierId),
   });
 
-  // ── Stats rapides ──────────────────────────────────────────────────────────
+  // ── Stats progression ──────────────────────────────────────────────────────
   const nbTerminees = etapes.filter((e) => e.statut === 'termine').length;
   const nbTotal = etapes.length;
   const progression = nbTotal > 0 ? Math.round((nbTerminees / nbTotal) * 100) : 0;
@@ -179,7 +175,6 @@ export default function TabEtapes({ dossierId }: Props) {
     onError: () => toast.error('Impossible de modifier'),
   });
 
-  /** Bascule rapide terminé ↔ en attente sans ouvrir le dialog */
   const mutBasculer = useMutation({
     mutationFn: (etape: Etape) =>
       modifierEtape(etape.id, {
@@ -199,30 +194,36 @@ export default function TabEtapes({ dossierId }: Props) {
   });
 
   const onSubmit = (v: FormValues) => (etapeEditee ? mutModifier.mutate(v) : mutCreer.mutate(v));
-
   const isPending = mutCreer.isPending || mutModifier.isPending;
 
-  // ─── Rendu ─────────────────────────────────────────────────────────────────
+  // ── Rendu ──────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      {/* En-tête + progression */}
+      {/* En-tête + barre de progression */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
-            <ListChecks className="h-4 w-4" />
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
+            <ListChecks className="h-4 w-4" aria-hidden="true" />
             <span>
               {nbTerminees}/{nbTotal} étape{nbTotal > 1 ? 's' : ''}
             </span>
           </div>
           {nbTotal > 0 && (
-            <div className="flex items-center gap-2 min-w-30">
-              <div className="h-1.5 flex-1 rounded-full bg-muted overflow-hidden">
+            <div
+              className="flex min-w-30 items-center gap-2"
+              role="progressbar"
+              aria-valuenow={progression}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Progression : ${progression}%`}
+            >
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full rounded-full bg-primary transition-all duration-500"
                   style={{ width: `${progression}%` }}
                 />
               </div>
-              <span className="text-xs text-muted-foreground tabular-nums w-8 shrink-0">
+              <span className="w-8 shrink-0 tabular-nums text-xs text-muted-foreground">
                 {progression}%
               </span>
             </div>
@@ -230,19 +231,33 @@ export default function TabEtapes({ dossierId }: Props) {
         </div>
         {peutModifier && (
           <Button size="sm" onClick={ouvrirCreation} className="shrink-0">
-            <Plus className="mr-1.5 h-4 w-4" />
+            <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />
             Ajouter
           </Button>
         )}
       </div>
 
-      {/* Skeleton */}
+      {/* Skeleton — miroir du layout réel */}
       {isLoading && (
-        <div className="space-y-3">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="flex gap-3">
-              <Skeleton className="h-5 w-5 rounded-full shrink-0 mt-0.5" />
-              <Skeleton className="h-16 flex-1 rounded-lg" />
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="relative flex gap-3">
+              <Skeleton className="relative z-10 mt-2 h-5 w-5 shrink-0 rounded-full" />
+              <div className="flex-1 rounded-lg border p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-36" />
+                      <Skeleton className="h-5 w-20 rounded-full" />
+                    </div>
+                    <Skeleton className="h-3 w-28" />
+                  </div>
+                  <div className="flex gap-1">
+                    <Skeleton className="h-7 w-7 rounded-md" />
+                    <Skeleton className="h-7 w-7 rounded-md" />
+                  </div>
+                </div>
+              </div>
             </div>
           ))}
         </div>
@@ -251,11 +266,11 @@ export default function TabEtapes({ dossierId }: Props) {
       {/* Empty state */}
       {!isLoading && etapes.length === 0 && (
         <div className="flex flex-col items-center gap-3 py-12 text-muted-foreground">
-          <ListChecks className="h-10 w-10 opacity-30" />
+          <ListChecks className="h-10 w-10 opacity-30" aria-hidden="true" />
           <p className="text-sm">Aucune étape procédurale</p>
           {peutModifier && (
             <Button variant="outline" size="sm" onClick={ouvrirCreation}>
-              <Plus className="mr-1.5 h-4 w-4" />
+              <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />
               Ajouter la première étape
             </Button>
           )}
@@ -265,72 +280,99 @@ export default function TabEtapes({ dossierId }: Props) {
       {/* Timeline */}
       {!isLoading && etapes.length > 0 && (
         <div className="relative">
-          <div className="absolute left-2.25 top-2 bottom-2 w-px bg-border" />
+          {/* Trait vertical */}
+          <div className="absolute bottom-2 left-2.25 top-2 w-px bg-border" aria-hidden="true" />
           <div className="space-y-2">
             {etapes.map((etape, index) => {
               const estTerminee = etape.statut === 'termine';
+              const labelBascule = peutModifier
+                ? estTerminee
+                  ? 'Marquer en attente'
+                  : 'Marquer comme terminée'
+                : undefined;
+
               return (
                 <div key={etape.id ?? index} className="relative flex gap-3">
+                  {/* Bouton bascule statut */}
                   <button
                     type="button"
                     onClick={() => peutModifier && mutBasculer.mutate(etape)}
                     disabled={!peutModifier || mutBasculer.isPending}
+                    aria-label={labelBascule ?? `Statut de l'étape : ${etape.nom}`}
+                    aria-pressed={estTerminee}
                     className={`relative z-10 mt-2 shrink-0 rounded-full transition-colors
+                      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+                      focus-visible:ring-offset-2
                       ${peutModifier ? 'cursor-pointer' : 'cursor-default'}
                       ${
                         estTerminee
-                          ? 'text-primary hover:text-primary/80'
+                          ? 'text-(--color-primary) hover:text-(--color-primary-hover)'
                           : 'text-muted-foreground hover:text-foreground'
                       }`}
-                    title={
-                      peutModifier
-                        ? estTerminee
-                          ? 'Marquer en attente'
-                          : 'Marquer comme terminée'
-                        : undefined
-                    }
                   >
                     {estTerminee ? (
-                      <CheckCircle2 className="h-5 w-5 fill-primary/10" />
+                      <CheckCircle2
+                        className="h-5 w-5 fill-(--color-primary)/10"
+                        aria-hidden="true"
+                      />
                     ) : (
-                      <Circle className="h-5 w-5" />
+                      <Circle className="h-5 w-5" aria-hidden="true" />
                     )}
                   </button>
 
+                  {/* Carte étape */}
                   <div
-                    className={`flex-1 rounded-lg border p-3 transition-colors
-                    ${estTerminee ? 'bg-muted/30 opacity-75' : 'bg-card'}`}
+                    className={`flex-1 rounded-lg border p-3 transition-colors ${
+                      estTerminee ? 'bg-muted/30 opacity-75' : 'bg-card'
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span
-                            className={`text-sm font-medium leading-tight
-                            ${estTerminee ? 'line-through text-muted-foreground' : ''}`}
+                            className={`text-sm font-medium leading-tight ${
+                              estTerminee ? 'line-through text-muted-foreground' : ''
+                            }`}
                           >
                             {etape.nom}
                           </span>
-                          <Badge
-                            variant={estTerminee ? 'default' : 'secondary'}
-                            className={`text-xs px-1.5 py-0 ${
-                              estTerminee
-                                ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                                : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'
-                            }`}
-                          >
-                            {estTerminee ? 'Terminée' : 'En attente'}
-                          </Badge>
+
+                          {/* Badge statut — tokens CSS uniquement */}
+                          {estTerminee ? (
+                            <Badge
+                              variant="outline"
+                              className="px-1.5 py-0 text-xs
+                                border-primary/40
+                                bg-primary/8
+                                text-(--color-primary)"
+                            >
+                              Terminée
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant="outline"
+                              className="px-1.5 py-0 text-xs
+                                border-(--color-warning)/40
+                                bg-(--color-warning)/8
+                                text-(--color-warning)"
+                            >
+                              En attente
+                            </Badge>
+                          )}
                         </div>
+
                         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                           <span>{format(parseISO(etape.date), 'd MMMM yyyy', { locale: fr })}</span>
                           {etape.notes && (
                             <span className="flex items-center gap-1">
-                              <FileText className="h-3 w-3 shrink-0" />
+                              <FileText className="h-3 w-3 shrink-0" aria-hidden="true" />
                               <span className="max-w-55 truncate">{etape.notes}</span>
                             </span>
                           )}
                         </div>
                       </div>
+
+                      {/* Actions */}
                       <div className="flex shrink-0 items-center gap-1">
                         {peutModifier && (
                           <Button
@@ -338,18 +380,20 @@ export default function TabEtapes({ dossierId }: Props) {
                             size="icon"
                             className="h-7 w-7"
                             onClick={() => ouvrirEdition(etape)}
+                            aria-label={`Modifier l'étape ${etape.nom}`}
                           >
-                            <Pencil className="h-3.5 w-3.5" />
+                            <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                           </Button>
                         )}
                         {peutSupprimer && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            className="h-7 w-7 text-destructive hover:bg-destructive/5 hover:text-destructive"
                             onClick={() => setIdASupprimer(etape.id)}
+                            aria-label={`Supprimer l'étape ${etape.nom}`}
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                           </Button>
                         )}
                       </div>
@@ -362,9 +406,9 @@ export default function TabEtapes({ dossierId }: Props) {
         </div>
       )}
 
-      {/* ── Dialog Créer / Modifier ── */}
-      <Dialog open={dialogOuvert} onOpenChange={(o) => !o && fermerDialog()}>
-        <DialogContent className="max-w-md">
+      {/* ── Dialog Créer / Modifier ──────────────────────────────── */}
+      <Dialog open={dialogOuvert} onOpenChange={(o) => !o && !isPending && fermerDialog()}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{etapeEditee ? "Modifier l'étape" : 'Nouvelle étape'}</DialogTitle>
             <DialogDescription className="sr-only">
@@ -373,7 +417,13 @@ export default function TabEtapes({ dossierId }: Props) {
           </DialogHeader>
 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form
+              id={`${uid}-form`}
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="space-y-4"
+              noValidate
+            >
+              {/* Nom */}
               <FormField
                 control={form.control}
                 name="nom"
@@ -381,13 +431,18 @@ export default function TabEtapes({ dossierId }: Props) {
                   <FormItem>
                     <FormLabel>Nom de l'étape *</FormLabel>
                     <FormControl>
-                      <Input placeholder="ex : Dépôt de la plainte" {...field} />
+                      <Input
+                        placeholder="ex : Dépôt de la plainte"
+                        disabled={isPending}
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
+              {/* Date + Statut */}
               <div className="grid grid-cols-2 gap-3">
                 <FormField
                   control={form.control}
@@ -396,7 +451,7 @@ export default function TabEtapes({ dossierId }: Props) {
                     <FormItem>
                       <FormLabel>Date *</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input type="date" disabled={isPending} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -409,15 +464,30 @@ export default function TabEtapes({ dossierId }: Props) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Statut *</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        disabled={isPending}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="enattente">⏳ En attente</SelectItem>
-                          <SelectItem value="termine">✅ Terminée</SelectItem>
+                          {/* Lucide à la place des emojis */}
+                          <SelectItem value="enattente">
+                            <span className="flex items-center gap-2">
+                              <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                              En attente
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="termine">
+                            <span className="flex items-center gap-2">
+                              <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              Terminée
+                            </span>
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -426,6 +496,7 @@ export default function TabEtapes({ dossierId }: Props) {
                 />
               </div>
 
+              {/* Notes */}
               <FormField
                 control={form.control}
                 name="notes"
@@ -434,9 +505,10 @@ export default function TabEtapes({ dossierId }: Props) {
                     <FormLabel>Notes</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Informations complémentaires..."
+                        placeholder="Informations complémentaires…"
                         className="resize-none"
                         rows={3}
+                        disabled={isPending}
                         {...field}
                       />
                     </FormControl>
@@ -449,9 +521,17 @@ export default function TabEtapes({ dossierId }: Props) {
                 <Button type="button" variant="outline" onClick={fermerDialog} disabled={isPending}>
                   Annuler
                 </Button>
-                <Button type="submit" disabled={isPending}>
-                  {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {etapeEditee ? 'Enregistrer' : 'Ajouter'}
+                <Button type="submit" form={`${uid}-form`} disabled={isPending}>
+                  {isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                  )}
+                  {isPending
+                    ? etapeEditee
+                      ? 'Enregistrement…'
+                      : 'Ajout en cours…'
+                    : etapeEditee
+                      ? 'Enregistrer'
+                      : 'Ajouter'}
                 </Button>
               </DialogFooter>
             </form>
@@ -459,7 +539,7 @@ export default function TabEtapes({ dossierId }: Props) {
         </DialogContent>
       </Dialog>
 
-      {/* ── Alert suppression ── */}
+      {/* ── Alert suppression ───────────────────────────────────── */}
       <AlertDialog open={!!idASupprimer} onOpenChange={(o) => !o && setIdASupprimer(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
