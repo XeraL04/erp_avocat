@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import type { StatutTenant, PlanTenant, StatutDossier, TypeDossier, StatutFacture } from '@/types';
+import type { StatutTenant, PlanTenant, StatutDossier, StatutFacture } from '@/types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -68,7 +68,7 @@ export interface StatutStyle {
 
 export function styleStatutDossier(statut: StatutDossier): StatutStyle {
   const map: Record<StatutDossier, StatutStyle> = {
-    en_cours: {
+    encours: {
       text: 'text-status-encours',
       bg: 'bg-status-encours-bg',
       border: 'border-status-encours-border',
@@ -98,7 +98,7 @@ export function couleurStatutDossier(
   statut: StatutDossier
 ): 'default' | 'secondary' | 'destructive' | 'outline' {
   const map: Record<StatutDossier, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-    en_cours: 'default',
+    encours: 'default',
     suspendu: 'secondary',
     cloture: 'outline',
   };
@@ -107,19 +107,6 @@ export function couleurStatutDossier(
 
 export function libelleStatutDossier(statut: StatutDossier): string {
   return styleStatutDossier(statut).label;
-}
-
-// ─── Types Dossier ────────────────────────────────────────────────────────────
-
-export function libelleTypeDossier(type: TypeDossier): string {
-  const map: Record<TypeDossier, string> = {
-    civil: 'Civil',
-    penal: 'Pénal',
-    commercial: 'Commercial',
-    administratif: 'Administratif',
-    autre: 'Autre',
-  };
-  return map[type] ?? type;
 }
 
 // ─── Statuts Tenant ───────────────────────────────────────────────────────────

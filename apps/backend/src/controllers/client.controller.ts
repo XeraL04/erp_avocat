@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
-import mongoose, { FilterQuery } from 'mongoose'; // ✅ FIX : importer FilterQuery
-import { Client, IClient } from '../models/client.model'; // ✅ FIX : importer IClient
-import { Dossier } from '../models/dossier.model';
+import mongoose, { FilterQuery } from 'mongoose';
+import { Client, IClient } from '../models/client.model';
+import Dossier from '../models/dossier.model';
 import { Paiement } from '../models/paiement.model';
-import { sendSuccess, sendError } from '../utils/api-response';
+import { sendSuccess } from '../utils/api-response';
 import { AppError } from '../middlewares/error-handler';
 import {
   creerClientSchema,
@@ -11,20 +11,16 @@ import {
   rechercheClientSchema,
 } from '../validations/client.validation';
 
-// ─── Helper : valider un ObjectId et trouver le client dans le tenant ──────────
 
-/**
- * Vérifie que l'ID est un ObjectId valide et que le client
- * appartient au tenant courant (non supprimé).
- * Lève une AppError sinon.
- */
+// ─── Helper ───────────────────────────────────────────────────────────────────
+
 const trouverClientDuTenant = async (clientId: string, tenantId: string) => {
   if (!mongoose.Types.ObjectId.isValid(clientId)) {
     throw new AppError('Identifiant client invalide', 'ID_INVALIDE', 400);
   }
 
   const client = await Client.findOne({
-    _id: clientId,
+    _id:       clientId,
     tenantId,
     isDeleted: false,
   });
@@ -35,6 +31,7 @@ const trouverClientDuTenant = async (clientId: string, tenantId: string) => {
 
   return client;
 };
+
 
 // ─── GET /api/cabinet/clients ─────────────────────────────────────────────────
 
@@ -54,16 +51,12 @@ export const listerClients = async (
     const { q, telephone, type, page, limit } = parsed.data;
     const skip = (page - 1) * limit;
 
-    // ✅ FIX : FilterQuery<IClient> au lieu de Record<string, unknown>
-    // Cela évite l'erreur "string | string[]" sur les opérateurs Mongoose ($text, $regex)
     const filtre: FilterQuery<IClient> = {
       tenantId,
       isDeleted: false,
     };
 
-    if (type) {
-      filtre.type = type;
-    }
+    if (type)      filtre.type = type;
 
     if (telephone) {
       const telNettoye = telephone.replace(/\s+/g, '');
@@ -76,9 +69,9 @@ export const listerClients = async (
       const qNettoye = q.trim();
       if (qNettoye.length < 3) {
         filtre.$or = [
-          { nom: { $regex: qNettoye, $options: 'i' } },
-          { prenom: { $regex: qNettoye, $options: 'i' } },
-          { raisonSociale: { $regex: qNettoye, $options: 'i' } },
+          { nom:               { $regex: qNettoye, $options: 'i' } },
+          { prenom:            { $regex: qNettoye, $options: 'i' } },
+          { raisonSociale:     { $regex: qNettoye, $options: 'i' } },
           { representantLegal: { $regex: qNettoye, $options: 'i' } },
         ];
       } else {
@@ -98,17 +91,13 @@ export const listerClients = async (
     ]);
 
     sendSuccess(res, clients, 200, {
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (error) {
     next(error);
   }
 };
+
 
 // ─── POST /api/cabinet/clients ────────────────────────────────────────────────
 
@@ -141,12 +130,12 @@ export const creerClient = async (
 
     const client = await Client.create({ ...parsed.data, tenantId });
 
-    // ✅ FIX : statusCode dans l'options object (plus d'ambiguïté avec le nombre brut)
     sendSuccess(res, client, 201);
   } catch (error) {
     next(error);
   }
 };
+
 
 // ─── GET /api/cabinet/clients/:id ─────────────────────────────────────────────
 
@@ -158,12 +147,13 @@ export const obtenirClient = async (
   try {
     const tenantId = req.utilisateur!.tenantId!;
     const clientId = req.params.id as string;
-    const client = await trouverClientDuTenant(clientId, tenantId);
+    const client   = await trouverClientDuTenant(clientId, tenantId);
     sendSuccess(res, client);
   } catch (error) {
     next(error);
   }
 };
+
 
 // ─── PUT /api/cabinet/clients/:id ─────────────────────────────────────────────
 
@@ -174,9 +164,8 @@ export const modifierClient = async (
 ): Promise<void> => {
   try {
     const tenantId = req.utilisateur!.tenantId!;
-
     const clientId = req.params.id as string;
-    const client = await trouverClientDuTenant(clientId, tenantId);
+    const client   = await trouverClientDuTenant(clientId, tenantId);
 
     const parsed = modifierClientSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -200,9 +189,7 @@ export const modifierClient = async (
       }
     }
 
-    // ✅ FIX : typage explicite pour éviter l'erreur sur la déstructuration de "type"
     const donneesMaj = { ...parsed.data } as Partial<IClient>;
-    // Le type est immuable — on le supprime des données de mise à jour
     delete (donneesMaj as Record<string, unknown>)['type'];
 
     const clientMaj = await Client.findByIdAndUpdate(
@@ -217,6 +204,7 @@ export const modifierClient = async (
   }
 };
 
+
 // ─── DELETE /api/cabinet/clients/:id ─────────────────────────────────────────
 
 export const supprimerClient = async (
@@ -227,7 +215,7 @@ export const supprimerClient = async (
   try {
     const tenantId = req.utilisateur!.tenantId!;
     const clientId = req.params.id as string;
-    const client = await trouverClientDuTenant(clientId, tenantId);
+    const client   = await trouverClientDuTenant(clientId, tenantId);
 
     await Client.findByIdAndUpdate(client._id, { isDeleted: true });
 
@@ -236,6 +224,7 @@ export const supprimerClient = async (
     next(error);
   }
 };
+
 
 // ─── GET /api/cabinet/clients/:id/dossiers ────────────────────────────────────
 
@@ -246,20 +235,18 @@ export const obtenirDossiersClient = async (
 ): Promise<void> => {
   try {
     const tenantId = req.utilisateur!.tenantId!;
-
     const clientId = req.params.id as string;
-    const client = await trouverClientDuTenant(clientId, tenantId);
+    const client   = await trouverClientDuTenant(clientId, tenantId);
 
     const dossiers = await Dossier.find({
       tenantId,
-      client: client._id,
+      clientId:  client._id,   // ← FIX : 'client' → 'clientId' (nouveau modèle)
       isDeleted: false,
     })
       .sort({ dateOuverture: -1 })
       .select('-__v')
       .lean();
 
-    // ✅ FIX : meta dans options object
     sendSuccess(res, dossiers, 200, {
       meta: { total: dossiers.length },
     });
@@ -267,6 +254,7 @@ export const obtenirDossiersClient = async (
     next(error);
   }
 };
+
 
 // ─── GET /api/cabinet/clients/:id/paiements ───────────────────────────────────
 
@@ -277,39 +265,37 @@ export const obtenirPaiementsClient = async (
 ): Promise<void> => {
   try {
     const tenantId = req.utilisateur!.tenantId!;
-
     const clientId = req.params.id as string;
-    const client = await trouverClientDuTenant(clientId, tenantId);
+    const client   = await trouverClientDuTenant(clientId, tenantId);
 
+    // Récupérer les IDs de dossiers via clientId (nouveau modèle)
     const dossiers = await Dossier.find({
       tenantId,
-      client: client._id,
+      clientId:  client._id,   // ← FIX : 'client' → 'clientId'
     })
       .select('_id')
       .lean();
 
-    // ✅ FIX : typage explicite des IDs pour éviter "string | string[]" dans $in
-    const dossierIds = dossiers.map((d) => d._id as mongoose.Types.ObjectId);
+    const dossierIds = dossiers.map(
+      (d: { _id: mongoose.Types.ObjectId }) => d._id   // ← FIX : typage explicite
+    );
 
     const paiements = await Paiement.find({
       tenantId,
       dossier: { $in: dossierIds },
     })
-      .populate('dossier', 'reference titre statut')
+      .populate('dossier',   'reference adversaire statut')  // ← FIX : titre supprimé
       .populate('honoraire', 'montantTotal type')
       .sort({ date: -1 })
       .select('-__v')
       .lean();
 
-    // Calcul côté backend — règle métier #4
-    const totalPaye = paiements.reduce((acc, paiement) => acc + paiement.montant, 0);
+    const totalPaye = paiements.reduce(
+      (acc: number, p: { montant: number }) => acc + p.montant, 0
+    );
 
     sendSuccess(res, paiements, 200, {
-      meta: {
-        total: paiements.length,
-        totalPaye,
-        devise: 'DA',
-      },
+      meta: { total: paiements.length, totalPaye, devise: 'DA' },
     });
   } catch (error) {
     next(error);

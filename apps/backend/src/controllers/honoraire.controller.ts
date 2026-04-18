@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import { Honoraire } from '../models/honoraire.model';
 import { Paiement } from '../models/paiement.model';
-import { Dossier } from '../models/dossier.model';
+import Dossier from '../models/dossier.model';
 import { AppError } from '../middlewares/error-handler';
 import { sendSuccess } from '../utils/api-response';
 import { creerHonoraireSchema, modifierHonoraireSchema } from '../validations/honoraire.validation';

@@ -311,10 +311,7 @@ export default function TabEtapes({ dossierId }: Props) {
                       }`}
                   >
                     {estTerminee ? (
-                      <CheckCircle2
-                        className="h-5 w-5 fill-(--color-primary)/10"
-                        aria-hidden="true"
-                      />
+                      <CheckCircle2 className="h-5 w-5 fill-primary/10" aria-hidden="true" />
                     ) : (
                       <Circle className="h-5 w-5" aria-hidden="true" />
                     )}

@@ -1,5 +1,13 @@
 import apiClient from './client';
-import type { ApiSuccess, Tenant, TypeDossier, StatutDossier, ClientNommable } from '@/types';
+import type {
+  ApiSuccess,
+  Tenant,
+  StatutDossier,
+  TypeAffaire, // ← remplace SectionDossier
+  SpecialiteDossier, // ← nouveau
+  InstitutionDossier,
+  ClientNommable,
+} from '@/types';
 
 export interface StatsCabinet {
   totalDossiers: number;
@@ -14,24 +22,19 @@ export interface ClientResume extends ClientNommable {
   telephone: string;
 }
 
-// Interface minimale du client retourné par le populate
-export interface ClientResume {
-  _id: string;
-  type: 'physique' | 'morale';
-  nom?: string;
-  prenom?: string;
-  raisonSociale?: string;
-  telephone: string;
-}
-
 export interface DossierResume {
   _id: string;
   reference: string;
-  titre: string;
-  statut: StatutDossier; // ← 'en_cours' | 'suspendu' | 'cloture' depuis types/index.ts
-  type: TypeDossier; // ← 'civil' | 'penal' | 'commercial' | 'administratif' | 'autre'
+  statut: StatutDossier;
   dateOuverture: string;
-  client: ClientResume | null;
+
+  clientId?: ClientResume | string | null;
+  adversaire?: string;
+  dossierNumero?: string;
+  typeAffaire?: TypeAffaire;
+  specialite?: SpecialiteDossier;
+  institution?: InstitutionDossier;
+  nomInstitution?: string;
 }
 
 export interface DashboardCabinetData {

@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, useId } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useState, useRef, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,81 +13,144 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
 
 import { creerDossier } from '@/api/dossier.api';
-import { listerClients } from '@/api/client.api';
-import { nomAffiche } from '@/types';
-import type { Client } from '@/types';
+import { listerClients, obtenirClient } from '@/api/client.api';
+import {
+  nomAffiche,
+  LABELS_QUALITE,
+  LABELS_TYPE_AFFAIRE,
+  // LABELS_SPECIALITE,
+  SPECIALITES_PAR_TYPE,
+  LABELS_INSTITUTION,
+  GROUPES_INSTITUTION,
+} from '@/types';
+import type {
+  Client,
+  QualitePartie,
+  TypeAffaire,
+  SpecialiteDossier,
+  InstitutionDossier,
+} from '@/types';
 
-// ─── Schéma ───────────────────────────────────────────────────────────────────
+import InputInstitution from '@/components/dossier/InputInstitution';
+
+// ─── Schéma Zod ───────────────────────────────────────────────────────────────
+
+const qualiteEnum = z.enum([
+  'demandeur',
+  'defendeur',
+  'demandeur_pourvoi',
+  'defendeur_pourvoi',
+  'demandeur_renvoi',
+  'defendeur_renvoi',
+]);
+
 const schemaCreerDossier = z.object({
-  titre: z.string().min(2, 'Minimum 2 caractères').max(200, 'Titre trop long'),
-  client: z.string().min(1, 'Le client est requis'),
-  type: z.enum(['civil', 'penal', 'commercial', 'administratif', 'autre'], {
-    errorMap: () => ({ message: 'Type requis' }),
-  }),
-  description: z.string().max(2000).optional(),
+  clientId: z.string().min(1, 'Le client est requis'),
+  qualiteClient: qualiteEnum,
+  adversaire: z.string().min(2, "Nom de l'adversaire requis (min 2 car.)").trim(),
+  qualiteAdversaire: qualiteEnum,
+  dossierNumero: z.string().optional(),
+  institution: z.string().optional(),
+  nomInstitution: z.string().optional(),
+  typeAffaire: z.string().optional(),
+  specialite: z.string().optional(),
   dateOuverture: z.string().optional(),
+  description: z.string().max(2000).optional(),
 });
 
 type FormCreerDossier = z.infer<typeof schemaCreerDossier>;
 
-// ─── Composant ────────────────────────────────────────────────────────────────
+// ─── Valeurs par défaut ───────────────────────────────────────────────────────
+
+const defaultValues: FormCreerDossier = {
+  clientId: '',
+  qualiteClient: 'demandeur',
+  adversaire: '',
+  qualiteAdversaire: 'defendeur',
+  dossierNumero: '',
+  institution: '',
+  nomInstitution: '',
+  typeAffaire: '',
+  specialite: '',
+  dateOuverture: new Date().toISOString().split('T')[0],
+  description: '',
+};
+
+// ─── Props ────────────────────────────────────────────────────────────────────
+
 interface Props {
   ouvert: boolean;
   onFermer: () => void;
+  clientPreselectionne?: string;
 }
 
-export default function DialogCreerDossier({ ouvert, onFermer }: Props) {
+// ─── Composant ────────────────────────────────────────────────────────────────
+
+export default function DialogCreerDossier({ ouvert, onFermer, clientPreselectionne }: Props) {
   const queryClient = useQueryClient();
-  const uid = useId(); // préfixe unique pour les ids ARIA
 
   const [rechercheClient, setRechercheClient] = useState('');
   const [rechercheClientDebounced] = useDebounce(rechercheClient, 300);
   const [clientSelectionne, setClientSelectionne] = useState<Client | null>(null);
   const [selectorOuvert, setSelectorOuvert] = useState(false);
   const selectorRef = useRef<HTMLDivElement>(null);
-  const listeRef = useRef<HTMLUListElement>(null);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    control,
-    setValue,
-    formState: { errors },
-  } = useForm<FormCreerDossier>({
+  const form = useForm<FormCreerDossier>({
     resolver: zodResolver(schemaCreerDossier),
-    defaultValues: {
-      type: 'civil',
-      dateOuverture: new Date().toISOString().split('T')[0],
-    },
+    defaultValues,
   });
 
-  // ── Clients ────────────────────────────────────────────────────────────────
-  const { data: clientsData, isLoading: chargementClients } = useQuery({
-    queryKey: ['cabinet', 'clients', 'selector', rechercheClientDebounced],
-    queryFn: () => listerClients({ q: rechercheClientDebounced || undefined, limit: 10 }),
-    enabled: selectorOuvert,
+  // ─── Pré-sélection client ─────────────────────────────────────────────────
+
+  const { data: clientPrecharge } = useQuery({
+    queryKey: ['cabinet', 'client', clientPreselectionne],
+    queryFn: () => obtenirClient(clientPreselectionne!),
+    enabled: !!clientPreselectionne && ouvert,
   });
 
-  const clients = clientsData?.data ?? [];
+  useEffect(() => {
+    if (clientPrecharge && ouvert) {
+      setClientSelectionne(clientPrecharge);
+      form.setValue('clientId', clientPrecharge._id, { shouldValidate: true });
+    }
+  }, [clientPrecharge, ouvert, form]);
 
-  // Fermer le sélecteur au clic extérieur
+  // Reset à la fermeture
+  useEffect(() => {
+    if (!ouvert) {
+      form.reset(defaultValues);
+      setClientSelectionne(null);
+      setRechercheClient('');
+      setSelectorOuvert(false);
+    }
+  }, [ouvert, form]);
+
+  // Fermeture dropdown au clic extérieur
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (selectorRef.current && !selectorRef.current.contains(e.target as Node))
@@ -97,256 +160,485 @@ export default function DialogCreerDossier({ ouvert, onFermer }: Props) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // ── Mutation ───────────────────────────────────────────────────────────────
+  // ─── Recherche clients ────────────────────────────────────────────────────
+
+  const { data: clientsData, isLoading: chargementClients } = useQuery({
+    queryKey: ['cabinet', 'clients', 'selector', rechercheClientDebounced],
+    queryFn: () => listerClients({ q: rechercheClientDebounced || undefined, limit: 10 }),
+    enabled: selectorOuvert,
+  });
+
+  const clients = clientsData?.data ?? [];
+
+  // ─── Mutation ─────────────────────────────────────────────────────────────
+
   const { mutate, isPending } = useMutation({
     mutationFn: creerDossier,
     onSuccess: (dossier) => {
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'dossiers'] });
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'dashboard'] });
       toast.success(`Dossier ${dossier.reference} créé avec succès`);
-      handleReset();
       onFermer();
     },
     onError: () => toast.error('Erreur lors de la création du dossier'),
   });
 
-  const handleReset = () => {
-    reset({ type: 'civil', dateOuverture: new Date().toISOString().split('T')[0] });
-    setClientSelectionne(null);
-    setRechercheClient('');
-    setSelectorOuvert(false);
-  };
-
   const handleFermer = () => {
     if (isPending) return;
-    handleReset();
     onFermer();
   };
 
   const selectionnerClient = (client: Client) => {
     setClientSelectionne(client);
-    setValue('client', client._id, { shouldValidate: true });
+    form.setValue('clientId', client._id, { shouldValidate: true });
     setRechercheClient('');
     setSelectorOuvert(false);
   };
 
-  const effacerClient = () => {
-    setClientSelectionne(null);
-    setValue('client', '', { shouldValidate: false });
+  const onSubmit = (data: FormCreerDossier) => {
+    mutate({
+      clientId: data.clientId,
+      qualiteClient: data.qualiteClient as QualitePartie,
+      adversaire: data.adversaire,
+      qualiteAdversaire: data.qualiteAdversaire as QualitePartie,
+      dossierNumero: data.dossierNumero || undefined,
+      institution: (data.institution || undefined) as InstitutionDossier | undefined,
+      nomInstitution: data.nomInstitution?.trim() || undefined,
+      typeAffaire: (data.typeAffaire || undefined) as TypeAffaire | undefined,
+      specialite: (data.specialite || undefined) as SpecialiteDossier | undefined,
+      dateOuverture: data.dateOuverture || undefined,
+      description: data.description || undefined,
+    });
   };
 
+  // Valeur typeAffaire observée pour filtrer les spécialités
+  const typeAffaireSelectionne = form.watch('typeAffaire');
+  const optionsSpecialite = typeAffaireSelectionne
+    ? (SPECIALITES_PAR_TYPE[typeAffaireSelectionne as TypeAffaire] ?? [])
+    : [];
+
   return (
-    <Dialog open={ouvert} onOpenChange={handleFermer}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
+    <Dialog
+      open={ouvert}
+      onOpenChange={(o) => {
+        if (!o) handleFermer();
+      }}
+    >
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        {/* ── Header fixe ── */}
+        <DialogHeader className="shrink-0 border-b px-6 py-4">
           <DialogTitle>Nouveau dossier</DialogTitle>
           <DialogDescription>
             La référence DOS-{new Date().getFullYear()}-NNN sera générée automatiquement.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit((data) => mutate(data))} className="space-y-4" noValidate>
-          {/* ── Titre ─────────────────────────────────────────── */}
-          <div className="space-y-1.5">
-            <Label htmlFor={`${uid}-titre`}>Titre du dossier *</Label>
-            <Input
-              id={`${uid}-titre`}
-              placeholder="Ex : Litige commercial Sarl El Baraka"
-              disabled={isPending}
-              aria-invalid={!!errors.titre}
-              aria-describedby={errors.titre ? `${uid}-titre-error` : undefined}
-              {...register('titre')}
-            />
-            {errors.titre && (
-              <p id={`${uid}-titre-error`} className="text-xs text-destructive" role="alert">
-                {errors.titre.message}
-              </p>
-            )}
-          </div>
-
-          {/* ── Sélecteur client (combobox) ────────────────────── */}
-          <div className="space-y-1.5">
-            <Label htmlFor={`${uid}-client-search`}>Client *</Label>
-
-            <div
-              ref={selectorRef}
-              className="relative"
-              role="combobox"
-              aria-expanded={selectorOuvert}
-              aria-haspopup="listbox"
-              aria-owns={`${uid}-client-list`}
+        {/* ── Body scrollable ── */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+          <Form {...form}>
+            <form
+              id="form-creer-dossier"
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="space-y-6"
             >
-              {clientSelectionne ? (
-                /* Client sélectionné — affichage */
-                <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{nomAffiche(clientSelectionne)}</p>
-                    <p className="text-xs text-muted-foreground">{clientSelectionne.telephone}</p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 shrink-0"
-                    onClick={effacerClient}
-                    aria-label="Retirer le client sélectionné"
-                  >
-                    <X className="h-3.5 w-3.5" aria-hidden="true" />
-                  </Button>
-                </div>
-              ) : (
-                /* Champ de recherche */
-                <div>
-                  <div className="relative">
-                    <Search
-                      className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                      aria-hidden="true"
-                    />
-                    <Input
-                      id={`${uid}-client-search`}
-                      placeholder="Rechercher un client…"
-                      className="pl-9"
-                      value={rechercheClient}
-                      disabled={isPending}
-                      aria-invalid={!!errors.client}
-                      aria-describedby={errors.client ? `${uid}-client-error` : undefined}
-                      aria-autocomplete="list"
-                      aria-controls={`${uid}-client-list`}
-                      onChange={(e) => {
-                        setRechercheClient(e.target.value);
-                        setSelectorOuvert(true);
-                      }}
-                      onFocus={() => setSelectorOuvert(true)}
-                    />
-                  </div>
+              {/* ── Parties ──────────────────────────────────────────────── */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  Parties
+                </h3>
 
-                  {/* Dropdown résultats */}
-                  {selectorOuvert && (
-                    <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
-                      {chargementClients ? (
-                        <div className="space-y-1.5 p-2">
-                          {Array.from({ length: 3 }).map((_, i) => (
-                            <Skeleton key={i} className="h-10 w-full" />
-                          ))}
-                        </div>
-                      ) : clients.length === 0 ? (
-                        <p className="p-4 text-center text-sm text-muted-foreground">
-                          {rechercheClient
-                            ? 'Aucun client trouvé'
-                            : 'Tapez pour rechercher un client'}
-                        </p>
-                      ) : (
-                        <ul
-                          id={`${uid}-client-list`}
-                          ref={listeRef}
-                          role="listbox"
-                          aria-label="Clients"
-                          className="max-h-52 overflow-y-auto py-1"
-                        >
-                          {clients.map((client) => (
-                            <li
-                              key={client._id}
-                              role="option"
-                              aria-selected={false}
-                              className="cursor-pointer px-3 py-2 transition-colors hover:bg-accent"
-                              onMouseDown={(e) => {
-                                e.preventDefault(); // évite onBlur avant onClick
-                                selectionnerClient(client);
+                {/* Sélecteur client */}
+                <FormField
+                  control={form.control}
+                  name="clientId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Pour le compte de / En faveur de *</FormLabel>
+                      <div ref={selectorRef} className="relative">
+                        {clientSelectionne ? (
+                          <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">
+                                {nomAffiche(clientSelectionne)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {clientSelectionne.telephone}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 shrink-0"
+                              aria-label="Désélectionner le client"
+                              onClick={() => {
+                                setClientSelectionne(null);
+                                field.onChange('');
                               }}
                             >
-                              <p className="text-sm font-medium">{nomAffiche(client)}</p>
-                              <p className="text-xs text-muted-foreground">{client.telephone}</p>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
+                              <X className="h-3.5 w-3.5" aria-hidden="true" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <Search
+                              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                              aria-hidden="true"
+                            />
+                            <Input
+                              placeholder="Rechercher un client…"
+                              className="pl-9"
+                              value={rechercheClient}
+                              onChange={(e) => {
+                                setRechercheClient(e.target.value);
+                                setSelectorOuvert(true);
+                              }}
+                              onFocus={() => setSelectorOuvert(true)}
+                            />
+                          </div>
+                        )}
+
+                        {selectorOuvert && !clientSelectionne && (
+                          <div
+                            className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md"
+                            role="listbox"
+                            aria-label="Résultats de recherche de clients"
+                          >
+                            {chargementClients ? (
+                              <div className="space-y-1.5 p-2">
+                                {Array.from({ length: 3 }).map((_, i) => (
+                                  <Skeleton key={i} className="h-10 w-full" />
+                                ))}
+                              </div>
+                            ) : clients.length === 0 ? (
+                              <p className="p-4 text-center text-sm text-muted-foreground">
+                                {rechercheClient
+                                  ? 'Aucun client trouvé'
+                                  : 'Tapez pour rechercher un client'}
+                              </p>
+                            ) : (
+                              <ul className="max-h-52 overflow-y-auto py-1">
+                                {clients.map((client) => (
+                                  <li
+                                    key={client._id}
+                                    role="option"
+                                    aria-selected={false}
+                                    className="cursor-pointer px-3 py-2 transition-colors hover:bg-accent"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      selectionnerClient(client);
+                                    }}
+                                  >
+                                    <p className="text-sm font-medium">{nomAffiche(client)}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {client.telephone}
+                                    </p>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
                   )}
+                />
+
+                {/* Qualité du client */}
+                <FormField
+                  control={form.control}
+                  name="qualiteClient"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Qualité du client *</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {(Object.entries(LABELS_QUALITE) as [QualitePartie, string][]).map(
+                            ([val, label]) => (
+                              <SelectItem key={val} value={val}>
+                                {label}
+                              </SelectItem>
+                            )
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <Separator />
+
+                {/* Adversaire */}
+                <FormField
+                  control={form.control}
+                  name="adversaire"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contre (adversaire) *</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Nom complet de l'adversaire ou raison sociale"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Qualité de l'adversaire */}
+                <FormField
+                  control={form.control}
+                  name="qualiteAdversaire"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Qualité de l'adversaire *</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {(Object.entries(LABELS_QUALITE) as [QualitePartie, string][]).map(
+                            ([val, label]) => (
+                              <SelectItem key={val} value={val}>
+                                {label}
+                              </SelectItem>
+                            )
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* ── Identification judiciaire ─────────────────────────────── */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  Identification judiciaire
+                </h3>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {/* N° dossier */}
+                  <FormField
+                    control={form.control}
+                    name="dossierNumero"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          Dossier n°{' '}
+                          <span className="font-normal text-muted-foreground">(opt.)</span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ex : 2024/1234" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Date d'ouverture */}
+                  <FormField
+                    control={form.control}
+                    name="dateOuverture"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          Date d'ouverture{' '}
+                          <span className="font-normal text-muted-foreground">(opt.)</span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Institution */}
+                  <FormField
+                    control={form.control}
+                    name="institution"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          Institution{' '}
+                          <span className="font-normal text-muted-foreground">(opt.)</span>
+                        </FormLabel>
+                        <Select
+                          value={field.value ?? ''}
+                          onValueChange={(v) => field.onChange(v === '_none' ? '' : v)}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sélectionner l'institution" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="_none">— Aucune —</SelectItem>
+                            {GROUPES_INSTITUTION.map((groupe) => (
+                              <SelectGroup key={groupe.label}>
+                                <SelectLabel>{groupe.label}</SelectLabel>
+                                {groupe.options.map((val) => (
+                                  <SelectItem key={val} value={val}>
+                                    {LABELS_INSTITUTION[val]}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Nom de l'institution */}
+                  <FormField
+                    control={form.control}
+                    name="nomInstitution"
+                    render={({ field }) => (
+                      <FormItem className="sm:col-span-2">
+                        <FormLabel>
+                          Quelle institution{' '}
+                          <span className="font-normal text-muted-foreground">(opt.)</span>
+                        </FormLabel>
+                        <FormControl>
+                          <InputInstitution value={field.value ?? ''} onChange={field.onChange} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Type d'affaire */}
+                  <FormField
+                    control={form.control}
+                    name="typeAffaire"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          Type d'affaire{' '}
+                          <span className="font-normal text-muted-foreground">(opt.)</span>
+                        </FormLabel>
+                        <Select
+                          value={field.value ?? ''}
+                          onValueChange={(v) => {
+                            field.onChange(v === '_none' ? '' : v);
+                            // Réinitialise la spécialité quand le type change
+                            form.setValue('specialite', '');
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sélectionner le type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="_none">— Aucun —</SelectItem>
+                            {(Object.entries(LABELS_TYPE_AFFAIRE) as [TypeAffaire, string][]).map(
+                              ([val, label]) => (
+                                <SelectItem key={val} value={val}>
+                                  {label}
+                                </SelectItem>
+                              )
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Spécialité — dépend du type d'affaire */}
+                  <FormField
+                    control={form.control}
+                    name="specialite"
+                    render={({ field }) => (
+                      <FormItem className="sm:col-span-2">
+                        <FormLabel>
+                          Spécialité{' '}
+                          <span className="font-normal text-muted-foreground">(opt.)</span>
+                        </FormLabel>
+                        <Select
+                          value={field.value ?? ''}
+                          onValueChange={(v) => field.onChange(v === '_none' ? '' : v)}
+                          disabled={!typeAffaireSelectionne || typeAffaireSelectionne === ''}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue
+                                placeholder={
+                                  typeAffaireSelectionne
+                                    ? 'Sélectionner la spécialité'
+                                    : "Choisir d'abord un type d'affaire"
+                                }
+                              />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="_none">— Aucune —</SelectItem>
+                            {optionsSpecialite.map(({ valeur, label }) => (
+                              <SelectItem key={valeur} value={valeur}>
+                                {label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
-              )}
-            </div>
+              </div>
 
-            {/* Champ caché portant la valeur pour RHF */}
-            <input type="hidden" {...register('client')} />
-            {errors.client && (
-              <p id={`${uid}-client-error`} className="text-xs text-destructive" role="alert">
-                {errors.client.message}
-              </p>
-            )}
-          </div>
+              {/* ── Description ──────────────────────────────────────────── */}
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Description <span className="font-normal text-muted-foreground">(opt.)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        rows={3}
+                        placeholder="Contexte de l'affaire, faits importants…"
+                        className="resize-none"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </form>
+          </Form>
+        </div>
 
-          {/* ── Type d'affaire ─────────────────────────────────── */}
-          <div className="space-y-1.5">
-            <Label htmlFor={`${uid}-type`}>Type d'affaire *</Label>
-            <Controller
-              name="type"
-              control={control}
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange} disabled={isPending}>
-                  <SelectTrigger id={`${uid}-type`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="civil">Civil</SelectItem>
-                    <SelectItem value="penal">Pénal</SelectItem>
-                    <SelectItem value="commercial">Commercial</SelectItem>
-                    <SelectItem value="administratif">Administratif</SelectItem>
-                    <SelectItem value="autre">Autre</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            />
-            {errors.type && (
-              <p className="text-xs text-destructive" role="alert">
-                {errors.type.message}
-              </p>
-            )}
-          </div>
-
-          {/* ── Date d'ouverture ───────────────────────────────── */}
-          <div className="space-y-1.5">
-            <Label htmlFor={`${uid}-date`}>Date d'ouverture</Label>
-            <Input
-              id={`${uid}-date`}
-              type="date"
-              disabled={isPending}
-              {...register('dateOuverture')}
-            />
-          </div>
-
-          {/* ── Description ────────────────────────────────────── */}
-          <div className="space-y-1.5">
-            <Label htmlFor={`${uid}-desc`}>
-              Description{' '}
-              <span className="text-xs font-normal text-muted-foreground">(optionnel)</span>
-            </Label>
-            <Textarea
-              id={`${uid}-desc`}
-              rows={3}
-              placeholder="Contexte de l'affaire, faits importants, accord avec le client…"
-              className="resize-none"
-              disabled={isPending}
-              aria-invalid={!!errors.description}
-              aria-describedby={errors.description ? `${uid}-desc-error` : undefined}
-              {...register('description')}
-            />
-            {errors.description && (
-              <p id={`${uid}-desc-error`} className="text-xs text-destructive" role="alert">
-                {errors.description.message}
-              </p>
-            )}
-          </div>
-
-          <DialogFooter>
+        {/* ── Footer fixe ── */}
+        <div className="shrink-0 border-t px-6 py-4">
+          <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={handleFermer} disabled={isPending}>
               Annuler
             </Button>
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" form="form-creer-dossier" disabled={isPending}>
               {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
-              {isPending ? 'Création en cours…' : 'Créer le dossier'}
+              {isPending ? 'Création…' : 'Créer le dossier'}
             </Button>
-          </DialogFooter>
-        </form>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { Evenement } from '../models/evenement.model';
-import { Dossier } from '../models/dossier.model';
+import Dossier from '../models/dossier.model';
 import { AppError } from '../middlewares/error-handler';
 import { sendSuccess } from '../utils/api-response';
 import { creerEvenementSchema, modifierEvenementSchema } from '../validations/evenement.validation';

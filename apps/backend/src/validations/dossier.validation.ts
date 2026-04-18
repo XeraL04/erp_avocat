@@ -1,66 +1,108 @@
 import { z } from 'zod';
 
-// ─── Création de dossier ───────────────────────────────────────────────────────
+
+export const qualitePartieEnum = z.enum([
+  'demandeur',
+  'defendeur',
+  'demandeur_pourvoi',
+  'defendeur_pourvoi',
+  'demandeur_renvoi',
+  'defendeur_renvoi',
+]);
+
+export const institutionEnum = z.enum([
+  'tribunal',
+  'cour',
+  'cour_supreme',
+  'tribunal_administratif',
+  'cour_appel_administrative',
+  'conseil_etat',
+]);
+
+export const typeAffaireEnum = z.enum([
+  'civil',
+  'penal',
+  'administratif',
+]);
+
+export const specialiteEnum = z.enum([
+  // civil
+  'civil',
+  'foncier',
+  'affaires_familiales',
+  'sociale',
+  'commerciale',
+  'refere',
+  // pénal
+  'contraventions',
+  'delits',
+  'crimes',
+  // administratif
+  'ordinaire',
+  'refere_administratif',
+]);
+
+
+// ─── Report ───────────────────────────────────────────────────────────────────
+
+export const reportSchema = z.object({
+  date:     z.string({ required_error: 'La date du report est obligatoire' }),
+  raison:   z
+    .string({ required_error: 'La raison est obligatoire' })
+    .min(2, 'La raison doit contenir au moins 2 caractères')
+    .trim(),
+  jugement: z.string().trim().optional(),
+});
+
+
+// ─── Créer dossier ────────────────────────────────────────────────────────────
+
 export const creerDossierSchema = z.object({
-  titre: z
-    .string()
-    .min(2, 'Le titre doit contenir au moins 2 caractères')
-    .max(200, 'Titre trop long'),
+  clientId: z
+    .string({ required_error: "L'identifiant du client est obligatoire" })
+    .min(1),
+  qualiteClient:     qualitePartieEnum,
+  adversaire: z
+    .string({ required_error: "Le nom de l'adversaire est obligatoire" })
+    .min(2, "Le nom de l'adversaire doit contenir au moins 2 caractères")
+    .trim(),
+  qualiteAdversaire: qualitePartieEnum,
 
-  // ObjectId MongoDB du client — validé en DB dans le contrôleur
-  client: z.string().min(1, 'Le client est requis'),
+  dossierNumero:  z.string().trim().optional(),
+  institution:    institutionEnum.optional(),
+  nomInstitution: z.string().trim().max(200).optional(),
+  typeAffaire:    typeAffaireEnum.optional(),
+  specialite:     specialiteEnum.optional(),
 
-  type: z.enum(['civil', 'penal', 'commercial', 'administratif', 'autre'], {
-    errorMap: () => ({
-      message: 'Type invalide : civil | penal | commercial | administratif | autre',
-    }),
-  }),
+  dateOuverture: z.string().optional(),
+  description:   z.string().trim().optional(),
 
-  description: z.string().max(2000, 'Description trop longue').optional(),
-
-  // Si absent, le contrôleur utilisera new Date()
-  dateOuverture: z.coerce.date().optional(),
+  reports: z.array(reportSchema).optional(),
 });
 
-// ─── Modification de dossier (référence et client immuables) ───────────────────
-export const modifierDossierSchema = z
-  .object({
-    titre: z.string().min(2).max(200).optional(),
-    type: z.enum(['civil', 'penal', 'commercial', 'administratif', 'autre']).optional(),
-    description: z.string().max(2000).nullable().optional(),
-    dateOuverture: z.coerce.date().optional(),
-    dateCloture: z.coerce.date().nullable().optional(),
-  })
-  .refine((data) => Object.values(data).some((v) => v !== undefined), {
-    message: 'Au moins un champ doit être fourni pour la modification',
-  });
 
-// ─── Changement de statut ──────────────────────────────────────────────────────
-export const changerStatutSchema = z.object({
-  statut: z.enum(['en_cours', 'suspendu', 'cloture'], {
-    errorMap: () => ({ message: 'Statut invalide : en_cours | suspendu | cloture' }),
-  }),
-  // Optionnel : forcer une date de clôture précise (sinon = now)
-  dateCloture: z.coerce.date().optional(),
+// ─── Modifier dossier ─────────────────────────────────────────────────────────
+
+export const modifierDossierSchema = z.object({
+  qualiteClient:     qualitePartieEnum.optional(),
+  adversaire:        z.string().trim().min(2).optional(),
+  qualiteAdversaire: qualitePartieEnum.optional(),
+  dossierNumero:     z.string().trim().optional(),
+  institution:       institutionEnum.optional(),
+  nomInstitution:    z.string().trim().max(200).nullable().optional(),
+  typeAffaire:       typeAffaireEnum.optional(),
+  specialite:        specialiteEnum.optional(),
+  dateOuverture:     z.string().optional(),
+  dateCloture:       z.string().nullable().optional(),
+  description:       z.string().trim().nullable().optional(),
+  reports:           z.array(reportSchema).optional(),
 });
 
-// ─── Recherche et pagination ───────────────────────────────────────────────────
-export const rechercheDossierSchema = z.object({
-  // Recherche textuelle sur titre + reference via index $text MongoDB
-  q: z.string().max(200).optional(),
 
-  // Filtres
-  statut: z.enum(['en_cours', 'suspendu', 'cloture']).optional(),
-  type: z.enum(['civil', 'penal', 'commercial', 'administratif', 'autre']).optional(),
-  client: z.string().optional(), // clientId pour filtrer par client
+// ─── Ajouter / Modifier un report ─────────────────────────────────────────────
 
-  // Pagination
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-});
+export const ajouterReportSchema = reportSchema;
 
-// ─── Types inférés ─────────────────────────────────────────────────────────────
-export type CreerDossierInput = z.infer<typeof creerDossierSchema>;
+export type CreerDossierInput    = z.infer<typeof creerDossierSchema>;
 export type ModifierDossierInput = z.infer<typeof modifierDossierSchema>;
-export type ChangerStatutInput = z.infer<typeof changerStatutSchema>;
-export type RechercheDossierInput = z.infer<typeof rechercheDossierSchema>;
+export type ReportInput          = z.infer<typeof reportSchema>;

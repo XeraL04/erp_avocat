@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import type { StatutTenant, PlanTenant, StatutDossier, TypeDossier } from '@/types';
+import type { StatutTenant, PlanTenant, StatutDossier } from '@/types';
 
 // ─── shadcn — requis par tous les composants UI ───────────────────────────────
 export function cn(...inputs: ClassValue[]) {
@@ -56,7 +56,7 @@ export function couleurStatutDossier(
   statut: StatutDossier
 ): 'default' | 'secondary' | 'outline' | 'destructive' {
   const map: Record<StatutDossier, 'default' | 'secondary' | 'outline' | 'destructive'> = {
-    en_cours: 'default',
+    encours: 'default',
     suspendu: 'secondary',
     cloture: 'outline',
   };
@@ -65,20 +65,9 @@ export function couleurStatutDossier(
 
 export function libelleStatutDossier(statut: StatutDossier): string {
   const map: Record<StatutDossier, string> = {
-    en_cours: 'En cours',
+    encours: 'En cours',
     suspendu: 'Suspendu',
     cloture: 'Clôturé',
   };
   return map[statut] ?? statut;
-}
-
-export function libelleTypeDossier(type: TypeDossier): string {
-  const map: Record<TypeDossier, string> = {
-    civil: 'Civil',
-    penal: 'Pénal',
-    commercial: 'Commercial',
-    administratif: 'Administratif',
-    autre: 'Autre',
-  };
-  return map[type] ?? type;
 }

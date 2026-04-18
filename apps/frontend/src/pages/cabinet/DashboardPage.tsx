@@ -13,20 +13,18 @@ import type { DashboardCabinetData, StatsCabinet } from '@/api/cabinet.api';
 import {
   couleurStatutDossier,
   libelleStatutDossier,
-  libelleTypeDossier,
   libellePlan,
   formaterDateCourte,
 } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth.store';
-import { nomAffiche } from '@/types';
+import { nomAffiche, LABELS_SPECIALITE, LABELS_TYPE_AFFAIRE, LABELS_INSTITUTION } from '@/types';
 import { cn } from '@/lib/utils';
 
-// ─── Config cartes stats — tokens CSS ────────────────────────────────────────
+// ─── Config cartes stats ──────────────────────────────────────────────────────
 interface CarteStat {
   cle: keyof StatsCabinet;
   label: string;
   icone: React.ElementType;
-  // tokens sémantiques du projet, adaptatifs dark/light
   couleurIcone: string;
   couleurBg: string;
   description: string;
@@ -37,7 +35,7 @@ const carteStats: CarteStat[] = [
     cle: 'totalDossiers',
     label: 'Total dossiers',
     icone: FolderOpen,
-    couleurIcone: 'text-mode-virement', // bleu token
+    couleurIcone: 'text-mode-virement',
     couleurBg: 'bg-mode-virement-bg',
     description: 'Dossiers créés',
   },
@@ -45,7 +43,7 @@ const carteStats: CarteStat[] = [
     cle: 'dossiersEnCours',
     label: 'En cours',
     icone: Clock,
-    couleurIcone: 'text-status-actif', // vert token
+    couleurIcone: 'text-status-actif',
     couleurBg: 'bg-status-actif-bg',
     description: 'Dossiers actifs',
   },
@@ -53,7 +51,7 @@ const carteStats: CarteStat[] = [
     cle: 'dossiersSuspendus',
     label: 'Suspendus',
     icone: PauseCircle,
-    couleurIcone: 'text-status-suspendu', // orange token
+    couleurIcone: 'text-status-suspendu',
     couleurBg: 'bg-status-suspendu-bg',
     description: 'En attente',
   },
@@ -69,7 +67,7 @@ const carteStats: CarteStat[] = [
     cle: 'totalUtilisateurs',
     label: 'Utilisateurs',
     icone: Users,
-    couleurIcone: 'text-primary', // primary token
+    couleurIcone: 'text-primary',
     couleurBg: 'bg-primary/10',
     description: 'Membres actifs',
   },
@@ -169,7 +167,6 @@ export default function CabinetDashboardPage() {
           </CardHeader>
           <CardContent className="p-0">
             {isLoading ? (
-              /* Skeleton fidèle au layout réel */
               <div className="divide-y">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="flex items-center gap-3 p-4">
@@ -186,7 +183,6 @@ export default function CabinetDashboardPage() {
                 ))}
               </div>
             ) : derniersDossiers.length === 0 ? (
-              /* Empty state inline (pas de Card wrapping car on est déjà dans une Card) */
               <div className="flex flex-col items-center gap-3 py-12 text-center">
                 <FolderOpen className="h-10 w-10 text-muted-foreground/40" />
                 <div>
@@ -213,21 +209,48 @@ export default function CabinetDashboardPage() {
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                       <FolderOpen className="h-4 w-4 text-primary" aria-hidden="true" />
                     </div>
+
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="truncate text-sm font-medium">{dossier.titre}</p>
+                        <p className="truncate text-sm font-medium">{dossier.reference}</p>
                         <span className="shrink-0 font-mono text-xs text-muted-foreground">
-                          {dossier.reference}
+                          {typeof dossier.clientId === 'object' && dossier.clientId !== null
+                            ? nomAffiche(dossier.clientId)
+                            : '—'}{' '}
+                          <span className="font-normal text-muted-foreground">c/</span>{' '}
+                          {dossier.adversaire ?? '—'}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>{dossier.client ? nomAffiche(dossier.client) : '—'}</span>
-                        <span>·</span>
-                        <span>{libelleTypeDossier(dossier.type)}</span>
-                        <span>·</span>
+
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        {dossier.typeAffaire && (
+                          <>
+                            <span>{LABELS_TYPE_AFFAIRE[dossier.typeAffaire]}</span>
+                            <span>·</span>
+                          </>
+                        )}
+                        {dossier.specialite && (
+                          <>
+                            <span>{LABELS_SPECIALITE[dossier.specialite]}</span>
+                            <span>·</span>
+                          </>
+                        )}
+                        {dossier.institution && (
+                          <>
+                            <span>{LABELS_INSTITUTION[dossier.institution]}</span>
+                            <span>·</span>
+                          </>
+                        )}
+                        {dossier.dossierNumero && (
+                          <>
+                            <span className="font-mono">N° {dossier.dossierNumero}</span>
+                            <span>·</span>
+                          </>
+                        )}
                         <span>{formaterDateCourte(dossier.dateOuverture)}</span>
                       </div>
                     </div>
+
                     <Badge
                       variant={couleurStatutDossier(dossier.statut)}
                       className="shrink-0 text-xs"
@@ -269,13 +292,11 @@ export default function CabinetDashboardPage() {
                     <Badge variant="outline">{cabinet?.statut ?? '—'}</Badge>
                   </div>
 
-                  {/* Barre dossiers */}
                   <BarreProgression
                     label="Dossiers utilisés"
                     valeur={stats?.totalDossiers ?? 0}
                     max={cabinet?.limites.maxDossiers}
                     pourcentage={pourcentageDossiers}
-                    // seuil d'alerte : tokens destructive / suspendu / primary
                     couleur={
                       pourcentageDossiers >= 90
                         ? 'bg-destructive'
@@ -285,7 +306,6 @@ export default function CabinetDashboardPage() {
                     }
                   />
 
-                  {/* Barre utilisateurs */}
                   <BarreProgression
                     label="Utilisateurs"
                     valeur={stats?.totalUtilisateurs ?? 0}
@@ -347,7 +367,7 @@ interface BarreProgressionProps {
   valeur: number;
   max?: number;
   pourcentage: number;
-  couleur: string; // classe Tailwind bg-*
+  couleur: string;
 }
 
 function BarreProgression({ label, valeur, max, pourcentage, couleur }: BarreProgressionProps) {

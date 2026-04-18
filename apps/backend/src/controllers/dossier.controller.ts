@@ -1,85 +1,54 @@
 import { Request, Response, NextFunction } from 'express';
-import mongoose, { FilterQuery } from 'mongoose';
-import { Dossier, IDossier } from '../models/dossier.model';
-import { Client } from '../models/client.model';
-import { Honoraire } from '../models/honoraire.model';
-import { Paiement } from '../models/paiement.model';
-import { Evenement } from '../models/evenement.model';
-import { Etape } from '../models/etape.model';
-import { DocumentModel as DocumentFichier } from '../models/document.model';
-import { sendSuccess } from '../utils/api-response';
+import Dossier from '../models/dossier.model';
+import InstitutionPersonnalisee from '../models/institutionPersonnalisee.model'; // ← NOUVEAU
 import { AppError } from '../middlewares/error-handler';
+import { sendSuccess } from '../utils/api-response';
 import {
   creerDossierSchema,
   modifierDossierSchema,
-  changerStatutSchema,
-  rechercheDossierSchema,
+  ajouterReportSchema,
 } from '../validations/dossier.validation';
 
-// ─── Helper : génération de référence DOS-YYYY-NNN ────────────────────────────
 
-/**
- * Génère la prochaine référence unique pour un cabinet.
- * Format : DOS-2026-001, DOS-2026-042, DOS-2026-100...
- *
- * Stratégie : chercher le dernier numéro de l'année + incrémenter.
- * La contrainte unique { tenantId, reference } en DB empêche les doublons
- * en cas de très rare collision concurrente (erreur 11000 remontée au client).
- */
+// ─── Helper — sauvegarder l'institution personnalisée ─────────────────────────
+
+const sauvegarderInstitution = async (
+  tenantId: string,
+  nom: string | undefined
+): Promise<void> => {
+  if (!nom?.trim()) return;
+  await InstitutionPersonnalisee.findOneAndUpdate(
+    { tenantId, nom: nom.trim() },
+    { tenantId, nom: nom.trim() },
+    { upsert: true }
+  ).catch(() => {}); // silencieux — pas critique
+};
+
+
+// ─── Génération référence DOS-YYYY-NNN ────────────────────────────────────────
+
 const genererReference = async (tenantId: string): Promise<string> => {
-  const annee = new Date().getFullYear();
+  const annee   = new Date().getFullYear();
   const prefixe = `DOS-${annee}-`;
 
-  // Chercher le dossier avec la référence la plus haute de l'année pour ce cabinet
-  const dernierDossier = await Dossier.findOne({
-    tenantId,
-    reference: { $regex: `^${prefixe}` },
-  })
-    .sort({ reference: -1 })
-    .select('reference')
-    .lean();
+  const dernierDossier = await Dossier.findOne(
+    { tenantId, reference: { $regex: prefixe } },
+    {},
+    { sort: { reference: -1 } }
+  ).lean();
 
-  let numero = 1;
-
-  if (dernierDossier?.reference) {
-    // "DOS-2026-042" → ["DOS", "2026", "042"] → 42 → 43
+  let prochain = 1;
+  if (dernierDossier) {
     const parties = dernierDossier.reference.split('-');
-    const dernierNumero = parseInt(parties[2], 10);
-    if (!isNaN(dernierNumero)) {
-      numero = dernierNumero + 1;
-    }
+    prochain = parseInt(parties[2], 10) + 1;
   }
 
-  // Padding à 3 chiffres minimum : 1→"001", 42→"042", 100→"100"
-  return `${prefixe}${String(numero).padStart(3, '0')}`;
+  return `${prefixe}${String(prochain).padStart(3, '0')}`;
 };
 
-// ─── Helper : vérifier l'existence du dossier dans le tenant ──────────────────
-
-const trouverDossierDuTenant = async (dossierId: string, tenantId: string) => {
-  if (!mongoose.Types.ObjectId.isValid(dossierId)) {
-    throw new AppError('Identifiant dossier invalide', 'ID_INVALIDE', 400);
-  }
-
-  const dossier = await Dossier.findOne({
-    _id: dossierId,
-    tenantId,
-    isDeleted: false,
-  });
-
-  if (!dossier) {
-    throw new AppError('Dossier introuvable', 'DOSSIER_INTROUVABLE', 404);
-  }
-
-  return dossier;
-};
 
 // ─── GET /api/cabinet/dossiers ────────────────────────────────────────────────
 
-/**
- * Liste les dossiers avec filtres combinables : statut, type, client, recherche textuelle.
- * Popule le client pour afficher nom/téléphone dans la liste.
- */
 export const listerDossiers = async (
   req: Request,
   res: Response,
@@ -87,40 +56,32 @@ export const listerDossiers = async (
 ): Promise<void> => {
   try {
     const tenantId = req.utilisateur!.tenantId!;
+    const page     = parseInt(req.query.page  as string) || 1;
+    const limit    = parseInt(req.query.limit as string) || 20;
+    const skip     = (page - 1) * limit;
 
-    const parsed = rechercheDossierSchema.safeParse(req.query);
-    if (!parsed.success) {
-      throw new AppError(parsed.error.errors[0].message, 'VALIDATION_ERROR', 400);
-    }
+    const filtre: Record<string, unknown> = { tenantId, isDeleted: false };
 
-    const { q, statut, type, client, page, limit } = parsed.data;
-    const skip = (page - 1) * limit;
+    if (req.query.statut)      filtre.statut     = req.query.statut;
+    if (req.query.typeAffaire) filtre.typeAffaire = req.query.typeAffaire;
+    if (req.query.specialite)  filtre.specialite  = req.query.specialite;
+    if (req.query.institution) filtre.institution = req.query.institution;
+    if (req.query.clientId)    filtre.clientId    = req.query.clientId;
 
-    const filtre: FilterQuery<IDossier> = {
-      tenantId,
-      isDeleted: false,
-    };
-
-    if (statut) filtre.statut = statut;
-    if (type) filtre.type = type;
-
-    // Filtrer par client si un clientId valide est fourni
-    if (client && mongoose.Types.ObjectId.isValid(client)) {
-      filtre.client = new mongoose.Types.ObjectId(client);
-    }
-
-    // Recherche textuelle sur titre et reference (nécessite l'index $text sur le modèle)
-    if (q) {
-      const regex = new RegExp(q, 'i');
-      filtre.$or = [{ titre: regex }, { reference: regex }, { description: regex }];
+    if (req.query.q) {
+      const regex = new RegExp(req.query.q as string, 'i');
+      filtre.$or = [
+        { reference:      regex },
+        { adversaire:     regex },
+        { dossierNumero:  regex },
+        { nomInstitution: regex }, // ← inclus dans la recherche texte
+      ];
     }
 
     const [dossiers, total] = await Promise.all([
       Dossier.find(filtre)
+        .populate('clientId', 'nom prenom raisonSociale telephone type')
         .sort({ createdAt: -1 })
-        .select({ __v: 0 })
-        // Données client nécessaires pour l'affichage en liste
-        .populate('client', 'nom prenom raisonSociale telephone type')
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -128,361 +89,255 @@ export const listerDossiers = async (
     ]);
 
     sendSuccess(res, dossiers, 200, {
-      page,
-      limit,
-      total,
+      page, limit, total,
       totalPages: Math.ceil(total / limit),
     });
-  } catch (error) {
-    next(error);
-  }
+  } catch (err) { next(err); }
 };
+
 
 // ─── POST /api/cabinet/dossiers ───────────────────────────────────────────────
 
-/**
- * Crée un dossier avec référence auto DOS-YYYY-NNN.
- * Vérifie que le client appartient bien au cabinet avant création.
- */
 export const creerDossier = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    const tenantId = req.utilisateur!.tenantId!;
-
-    const parsed = creerDossierSchema.safeParse(req.body);
-    if (!parsed.success) {
-      throw new AppError(parsed.error.errors[0].message, 'VALIDATION_ERROR', 400);
-    }
-
-    // Valider le format de l'ID client avant la requête DB
-    if (!mongoose.Types.ObjectId.isValid(parsed.data.client)) {
-      throw new AppError('Identifiant client invalide', 'ID_INVALIDE', 400);
-    }
-
-    // Vérifier que le client appartient à ce cabinet (isolation multi-tenant)
-    const clientExistant = await Client.findOne({
-      _id: parsed.data.client,
-      tenantId,
-      isDeleted: false,
-    });
-
-    if (!clientExistant) {
-      throw new AppError('Client introuvable dans ce cabinet', 'CLIENT_INTROUVABLE', 404);
-    }
-
-    // Générer la référence unique — DOS-YYYY-NNN
+    const tenantId  = req.utilisateur!.tenantId!;
+    const donnees   = creerDossierSchema.parse(req.body);
     const reference = await genererReference(tenantId);
 
     const dossier = await Dossier.create({
-      ...parsed.data,
       tenantId,
       reference,
-      statut: 'en_cours',
-      dateOuverture: parsed.data.dateOuverture ?? new Date(),
+      clientId:          donnees.clientId,
+      qualiteClient:     donnees.qualiteClient,
+      adversaire:        donnees.adversaire,
+      qualiteAdversaire: donnees.qualiteAdversaire,
+      dossierNumero:     donnees.dossierNumero,
+      institution:       donnees.institution,
+      nomInstitution:    donnees.nomInstitution?.trim() || undefined, // ← NOUVEAU
+      typeAffaire:       donnees.typeAffaire,
+      specialite:        donnees.specialite,
+      dateOuverture:     donnees.dateOuverture ? new Date(donnees.dateOuverture) : new Date(),
+      description:       donnees.description,
+      reports:           donnees.reports ?? [],
     });
 
-    // Populer le client pour la réponse
-    await dossier.populate('client', 'nom prenom raisonSociale telephone type');
+    // Sauvegarder l'institution pour les suggestions futures
+    await sauvegarderInstitution(tenantId, donnees.nomInstitution); // ← NOUVEAU
 
-    sendSuccess(res, dossier, 201);
-  } catch (error) {
-    next(error);
-  }
+    const dossierPopule = await Dossier.findById(dossier.id)
+      .populate('clientId', 'nom prenom raisonSociale telephone type')
+      .lean();
+
+    sendSuccess(res, dossierPopule, 201);
+  } catch (err) { next(err); }
 };
 
-// ─── GET /api/cabinet/dossiers/:id ────────────────────────────────────────────
 
-/**
- * Retourne le détail complet d'un dossier avec toutes les infos du client.
- */
+// ─── GET /api/cabinet/dossiers/:id ───────────────────────────────────────────
+
 export const obtenirDossier = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
+    const { id }   = req.params;
     const tenantId = req.utilisateur!.tenantId!;
-    const dossierId = req.params.id as string;
 
-    if (!mongoose.Types.ObjectId.isValid(dossierId)) {
-      throw new AppError('Identifiant dossier invalide', 'ID_INVALIDE', 400);
-    }
+    const dossier = await Dossier.findOne({ _id: id, tenantId, isDeleted: false })
+      .populate('clientId', 'nom prenom raisonSociale telephone email adresse type')
+      .lean();
 
-    const dossier = await Dossier.findOne({
-      _id: dossierId,
-      tenantId,
-      isDeleted: false,
-    })
-      // Données client complètes pour la fiche dossier
-      .populate('client', 'nom prenom raisonSociale telephone type email adresse')
-      .select('-__v');
-
-    if (!dossier) {
-      throw new AppError('Dossier introuvable', 'DOSSIER_INTROUVABLE', 404);
-    }
-
+    if (!dossier) throw new AppError('Dossier introuvable', 'DOSSIER_INTROUVABLE', 404);
     sendSuccess(res, dossier);
-  } catch (error) {
-    next(error);
-  }
+  } catch (err) { next(err); }
 };
 
-// ─── PUT /api/cabinet/dossiers/:id ────────────────────────────────────────────
 
-/**
- * Modifie les champs d'un dossier.
- * La référence et le client sont immuables après création.
- * Pour changer le statut, utiliser PATCH /:id/statut.
- */
+// ─── PUT /api/cabinet/dossiers/:id ───────────────────────────────────────────
+
 export const modifierDossier = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
+    const { id }   = req.params;
     const tenantId = req.utilisateur!.tenantId!;
-    const dossierId = req.params.id as string;
+    const donnees  = modifierDossierSchema.parse(req.body);
 
-    const dossier = await trouverDossierDuTenant(dossierId, tenantId);
+    const dossier = await Dossier.findOne({ _id: id, tenantId, isDeleted: false });
+    if (!dossier) throw new AppError('Dossier introuvable', 'DOSSIER_INTROUVABLE', 404);
 
-    const parsed = modifierDossierSchema.safeParse(req.body);
-    if (!parsed.success) {
-      throw new AppError(parsed.error.errors[0].message, 'VALIDATION_ERROR', 400);
+    if (donnees.qualiteClient     !== undefined) dossier.qualiteClient     = donnees.qualiteClient;
+    if (donnees.adversaire        !== undefined) dossier.adversaire        = donnees.adversaire;
+    if (donnees.qualiteAdversaire !== undefined) dossier.qualiteAdversaire = donnees.qualiteAdversaire;
+    if (donnees.dossierNumero     !== undefined) dossier.dossierNumero     = donnees.dossierNumero;
+    if (donnees.institution       !== undefined) dossier.institution       = donnees.institution;
+    if (donnees.typeAffaire       !== undefined) dossier.typeAffaire       = donnees.typeAffaire;
+    if (donnees.specialite        !== undefined) dossier.specialite        = donnees.specialite;
+    if (donnees.description       !== undefined) dossier.description       = donnees.description ?? undefined;
+    if (donnees.dateOuverture     !== undefined) dossier.dateOuverture     = new Date(donnees.dateOuverture);
+    if (donnees.dateCloture       !== undefined) dossier.dateCloture       = donnees.dateCloture ? new Date(donnees.dateCloture) : undefined;
+
+    // ← NOUVEAU — nomInstitution
+    if (donnees.nomInstitution !== undefined) {
+      dossier.nomInstitution = donnees.nomInstitution?.trim() || undefined;
     }
 
-    const dossierMaj = await Dossier.findByIdAndUpdate(
-      dossier._id,
-      { $set: parsed.data },
-      { new: true, runValidators: true }
-    )
-      .populate('client', 'nom prenom raisonSociale telephone type')
-      .select('-__v');
-
-    sendSuccess(res, dossierMaj);
-  } catch (error) {
-    next(error);
-  }
-};
-
-// ─── PATCH /api/cabinet/dossiers/:id/statut ───────────────────────────────────
-
-/**
- * Change le statut d'un dossier.
- * Clôture → enregistre dateCloture automatiquement.
- * Réouverture → efface dateCloture avec $unset.
- * Réservé à l'admin (géré dans les routes).
- */
-export const changerStatutDossier = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const tenantId = req.utilisateur!.tenantId!;
-    const dossierId = req.params.id as string;
-
-    const dossier = await trouverDossierDuTenant(dossierId, tenantId);
-
-    const parsed = changerStatutSchema.safeParse(req.body);
-    if (!parsed.success) {
-      throw new AppError(parsed.error.errors[0].message, 'VALIDATION_ERROR', 400);
+    if (donnees.reports !== undefined) {
+      dossier.reports = donnees.reports.map((r) => ({
+        date:     new Date(r.date),
+        raison:   r.raison,
+        jugement: r.jugement,
+      })) as unknown as typeof dossier.reports;
     }
 
-    const { statut, dateCloture } = parsed.data;
+    await dossier.save();
 
-    // Mise à jour conditionnelle selon le nouveau statut
-    const updateQuery =
-      statut === 'cloture'
-        ? // Clôture : enregistrer la date (fournie ou maintenant)
-          { $set: { statut, dateCloture: dateCloture ?? new Date() } }
-        : // Réouverture / suspension : effacer la date de clôture
-          { $set: { statut }, $unset: { dateCloture: '' } };
+    // Sauvegarder l'institution pour les suggestions futures
+    await sauvegarderInstitution(tenantId, donnees.nomInstitution ?? undefined); // ← NOUVEAU
 
-    const dossierMaj = await Dossier.findByIdAndUpdate(dossier._id, updateQuery, {
-      new: true,
-    }).select('-__v');
+    const dossierPopule = await Dossier.findById(dossier.id)
+      .populate('clientId', 'nom prenom raisonSociale telephone type')
+      .lean();
 
-    const messages: Record<string, string> = {
-      en_cours: 'Dossier remis en cours',
-      suspendu: 'Dossier suspendu',
-      cloture: 'Dossier clôturé avec succès',
-    };
-
-    sendSuccess(res, dossierMaj);
-  } catch (error) {
-    next(error);
-  }
+    sendSuccess(res, dossierPopule);
+  } catch (err) { next(err); }
 };
 
-// ─── DELETE /api/cabinet/dossiers/:id ────────────────────────────────────────
 
-/**
- * Soft delete — isDeleted: true. Jamais de suppression physique (règle métier #5).
- * Réservé à l'admin.
- */
+// ─── DELETE /api/cabinet/dossiers/:id (soft delete) ──────────────────────────
+
 export const supprimerDossier = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
+    const { id }   = req.params;
     const tenantId = req.utilisateur!.tenantId!;
-    const dossierId = req.params.id as string;
 
-    const dossier = await trouverDossierDuTenant(dossierId, tenantId);
+    const dossier = await Dossier.findOne({ _id: id, tenantId });
+    if (!dossier) throw new AppError('Dossier introuvable', 'DOSSIER_INTROUVABLE', 404);
 
-    await Dossier.findByIdAndUpdate(dossier._id, { isDeleted: true });
-
-    sendSuccess(res, { message: 'Dossier archivé avec succès', id: dossier._id });
-  } catch (error) {
-    next(error);
-  }
+    dossier.isDeleted = true;
+    await dossier.save();
+    sendSuccess(res, { message: 'Dossier archivé avec succès' });
+  } catch (err) { next(err); }
 };
 
-// ─── GET /api/cabinet/dossiers/:id/honoraire ─────────────────────────────────
 
-/**
- * Retourne l'honoraire lié au dossier.
- * Retourne null si aucun honoraire n'a encore été défini (état valide).
- */
-export const obtenirHonoraireDossier = async (
+// ─── PATCH /api/cabinet/dossiers/:id/statut ───────────────────────────────────
+
+export const changerStatutDossier = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
+    const { id }   = req.params;
     const tenantId = req.utilisateur!.tenantId!;
-    const dossier = await trouverDossierDuTenant(req.params.id as string, tenantId);
+    const { statut, dateCloture } = req.body as { statut: string; dateCloture?: string };
 
-    const honoraire = await Honoraire.findOne({
-      tenantId,
-      dossier: dossier._id,
-    }).select('-__v');
+    const dossier = await Dossier.findOne({ _id: id, tenantId, isDeleted: false });
+    if (!dossier) throw new AppError('Dossier introuvable', 'DOSSIER_INTROUVABLE', 404);
 
-    // null est une réponse valide — le frontend affichera "Aucun honoraire défini"
-    sendSuccess(res, honoraire ?? null);
-  } catch (error) {
-    next(error);
-  }
+    dossier.statut = statut as typeof dossier.statut;
+    if (statut === 'cloture' && dateCloture) dossier.dateCloture = new Date(dateCloture);
+    await dossier.save();
+    sendSuccess(res, dossier);
+  } catch (err) { next(err); }
 };
 
-// ─── GET /api/cabinet/dossiers/:id/paiements ─────────────────────────────────
 
-/**
- * Retourne les paiements du dossier avec calculs financiers complets.
- * Calculs côté backend : total payé, reste à payer (règle métier #4).
- */
-export const obtenirPaiementsDossier = async (
+// ─── POST /api/cabinet/dossiers/:id/reports ───────────────────────────────────
+
+export const ajouterReport = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
+    const { id }   = req.params;
     const tenantId = req.utilisateur!.tenantId!;
-    const dossier = await trouverDossierDuTenant(req.params.id as string, tenantId);
+    const donnees  = ajouterReportSchema.parse(req.body);
 
-    const [paiements, honoraire] = await Promise.all([
-      Paiement.find({ tenantId, dossier: dossier._id })
-        .populate('honoraire', 'montantTotal type')
-        .sort({ date: -1 })
-        .select('-__v')
-        .lean(),
-      Honoraire.findOne({ tenantId, dossier: dossier._id }).select('montantTotal').lean(),
-    ]);
+    const dossier = await Dossier.findOne({ _id: id, tenantId, isDeleted: false });
+    if (!dossier) throw new AppError('Dossier introuvable', 'DOSSIER_INTROUVABLE', 404);
 
-    const montantTotal = honoraire?.montantTotal ?? 0;
-    const totalPaye = paiements.reduce((acc, p) => acc + p.montant, 0);
-    const resteAPayer = Math.max(0, montantTotal - totalPaye);
+    dossier.reports.push({
+      date:     new Date(donnees.date),
+      raison:   donnees.raison,
+      jugement: donnees.jugement,
+    } as typeof dossier.reports[0]);
 
-    sendSuccess(res, paiements, 200, {
-      total: paiements.length,
-      montantTotal,
-      totalPaye,
-      resteAPayer,
-      devise: 'DA',
-    });
-  } catch (error) {
-    next(error);
-  }
+    await dossier.save();
+    sendSuccess(res, dossier.reports, 201);
+  } catch (err) { next(err); }
 };
 
-// ─── GET /api/cabinet/dossiers/:id/evenements ────────────────────────────────
 
-/**
- * Retourne les événements (audiences, RDV, rappels) liés au dossier.
- * Triés chronologiquement (du plus proche au plus lointain).
- */
-export const obtenirEvenementsDossier = async (
+// ─── PUT /api/cabinet/dossiers/:id/reports/:reportId ─────────────────────────
+
+export const modifierReport = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    const tenantId = req.utilisateur!.tenantId!;
-    const dossier = await trouverDossierDuTenant(req.params.id as string, tenantId);
+    const { id, reportId } = req.params;
+    const tenantId         = req.utilisateur!.tenantId!;
+    const donnees          = ajouterReportSchema.parse(req.body);
 
-    const evenements = await Evenement.find({ tenantId, dossier: dossier._id })
-      .sort({ dateHeure: 1 })
-      .select('-__v')
+    const dossier = await Dossier.findOne({ _id: id, tenantId, isDeleted: false });
+    if (!dossier) throw new AppError('Dossier introuvable', 'DOSSIER_INTROUVABLE', 404);
+
+    const report = dossier.reports.find((r) => r._id?.toString() === reportId);
+    if (!report) throw new AppError('Report introuvable', 'REPORT_INTROUVABLE', 404);
+
+    report.date     = new Date(donnees.date);
+    report.raison   = donnees.raison;
+    report.jugement = donnees.jugement;
+
+    await dossier.save();
+
+    const dossierPopule = await Dossier.findById(dossier.id)
+      .populate('clientId', 'nom prenom raisonSociale telephone type')
       .lean();
 
-    sendSuccess(res, evenements, 200, { total: evenements.length });
-  } catch (error) {
-    next(error);
-  }
+    sendSuccess(res, dossierPopule);
+  } catch (err) { next(err); }
 };
 
-// ─── GET /api/cabinet/dossiers/:id/etapes ────────────────────────────────────
 
-/**
- * Retourne la timeline des étapes procédurales du dossier.
- * Triées chronologiquement pour un affichage en timeline.
- */
-export const obtenirEtapesDossier = async (
+// ─── DELETE /api/cabinet/dossiers/:id/reports/:reportId ──────────────────────
+
+export const supprimerReport = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    const tenantId = req.utilisateur!.tenantId!;
-    const dossier = await trouverDossierDuTenant(req.params.id as string, tenantId);
+    const { id, reportId } = req.params;
+    const tenantId         = req.utilisateur!.tenantId!;
 
-    const etapes = await Etape.find({ tenantId, dossier: dossier._id })
-      .sort({ date: 1 })
-      .select('-__v')
-      .lean();
+    const dossier = await Dossier.findOne({ _id: id, tenantId, isDeleted: false });
+    if (!dossier) throw new AppError('Dossier introuvable', 'DOSSIER_INTROUVABLE', 404);
 
-    sendSuccess(res, etapes, 200, { total: etapes.length });
-  } catch (error) {
-    next(error);
-  }
-};
+    const avant = dossier.reports.length;
+    dossier.reports = dossier.reports.filter(
+      (r) => r._id?.toString() !== reportId
+    ) as typeof dossier.reports;
 
-// ─── GET /api/cabinet/dossiers/:id/documents ─────────────────────────────────
+    if (dossier.reports.length === avant)
+      throw new AppError('Report introuvable', 'REPORT_INTROUVABLE', 404);
 
-/**
- * Retourne les documents (fichiers Cloudinary) liés au dossier.
- * Triés du plus récent au plus ancien.
- */
-export const obtenirDocumentsDossier = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const tenantId = req.utilisateur!.tenantId!;
-    const dossier = await trouverDossierDuTenant(req.params.id as string, tenantId);
-
-    const documents = await DocumentFichier.find({ tenantId, dossier: dossier._id })
-      .sort({ createdAt: -1 })
-      .select('-__v')
-      .lean();
-
-    sendSuccess(res, documents, 200, { total: documents.length });
-  } catch (error) {
-    next(error);
-  }
+    await dossier.save();
+    sendSuccess(res, { message: 'Report supprimé avec succès' });
+  } catch (err) { next(err); }
 };

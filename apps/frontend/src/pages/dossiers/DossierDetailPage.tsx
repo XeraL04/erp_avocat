@@ -16,6 +16,7 @@ import {
   PauseCircle,
   Play,
   Receipt,
+  CalendarClock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -43,18 +44,20 @@ import {
 } from '@/components/ui/alert-dialog';
 
 import type { ClientPopule, StatutDossier } from '@/types';
-import { nomAffiche } from '@/types';
+import {
+  nomAffiche,
+  LABELS_QUALITE,
+  LABELS_TYPE_AFFAIRE,
+  LABELS_SPECIALITE,
+  LABELS_INSTITUTION,
+} from '@/types';
 
 import { obtenirDossier, supprimerDossier, changerStatutDossier } from '@/api/dossier.api';
-import {
-  couleurStatutDossier,
-  libelleStatutDossier,
-  libelleTypeDossier,
-  formaterDate,
-} from '@/lib/utils';
+import { couleurStatutDossier, libelleStatutDossier, formaterDate } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth.store';
 
 import DialogModifierDossier from '@/components/dossier/DialogModifierDossier';
+import TabReports from '@/components/dossier/TabReports';
 import TabHonoraires from '@/components/dossier/TabHonoraires';
 import TabFactures from '@/components/dossier/TabFactures';
 import TabDocuments from '@/components/dossier/TabDocuments';
@@ -63,6 +66,7 @@ import TabEtapes from '@/components/dossier/TabEtapes';
 
 // ─── Config tabs ──────────────────────────────────────────────────────────────
 const TABS = [
+  { value: 'reports', label: 'Reports', icon: CalendarClock },
   { value: 'honoraires', label: 'Honoraires', icon: DollarSign },
   { value: 'factures', label: 'Factures', icon: Receipt },
   { value: 'documents', label: 'Documents', icon: FileText },
@@ -113,14 +117,14 @@ export default function DossierDetailPage() {
 
   // ── Dérivations ────────────────────────────────────────────────────────────
   const clientPopule =
-    typeof dossier?.client === 'object' ? (dossier.client as ClientPopule) : null;
+    typeof dossier?.clientId === 'object' ? (dossier.clientId as ClientPopule) : null;
 
   const clientId =
-    typeof dossier?.client === 'string'
-      ? dossier.client
-      : ((dossier?.client as ClientPopule)?._id ?? '');
+    typeof dossier?.clientId === 'string'
+      ? dossier.clientId
+      : ((dossier?.clientId as ClientPopule)?._id ?? '');
 
-  // ── États de chargement / erreur ───────────────────────────────────────────
+  // ── Chargement / erreur ────────────────────────────────────────────────────
   if (isLoading) return <DossierDetailSkeleton />;
 
   if (!dossier) {
@@ -136,6 +140,10 @@ export default function DossierDetailPage() {
     );
   }
 
+  const intituleDossier = clientPopule
+    ? `${nomAffiche(clientPopule)} c/ ${dossier.adversaire}`
+    : `c/ ${dossier.adversaire}`;
+
   return (
     <div className="space-y-6">
       {/* ── Fil d'Ariane ────────────────────────────────────────── */}
@@ -147,7 +155,7 @@ export default function DossierDetailPage() {
           Dossiers
         </Link>
         <span aria-hidden="true">/</span>
-        <span className="truncate font-medium text-foreground">{dossier.titre}</span>
+        <span className="truncate font-medium text-foreground">{intituleDossier}</span>
       </nav>
 
       {/* ── En-tête ─────────────────────────────────────────────── */}
@@ -158,19 +166,55 @@ export default function DossierDetailPage() {
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-bold tracking-tight">{dossier.titre}</h2>
+              <h2 className="text-xl font-bold tracking-tight">{dossier.reference}</h2>
+              {/* <h2 className="text-xl font-bold tracking-tight">{intituleDossier}</h2> */}
               <Badge variant={couleurStatutDossier(dossier.statut)}>
                 {libelleStatutDossier(dossier.statut)}
               </Badge>
             </div>
-            <div className="mt-1 flex items-center gap-2">
-              <span className="font-mono text-sm text-muted-foreground">{dossier.reference}</span>
-              <span className="text-muted-foreground" aria-hidden="true">
-                ·
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="font-mono text-sm text-muted-foreground">
+                {/* {dossier.reference} */}
+                {intituleDossier}
               </span>
-              <span className="text-sm text-muted-foreground">
-                {libelleTypeDossier(dossier.type)}
-              </span>
+              {dossier.dossierNumero && (
+                <>
+                  <span className="text-muted-foreground" aria-hidden="true">
+                    ·
+                  </span>
+                  <span className="text-sm text-muted-foreground">N° {dossier.dossierNumero}</span>
+                </>
+              )}
+              {dossier.typeAffaire && (
+                <>
+                  <span className="text-muted-foreground" aria-hidden="true">
+                    ·
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {LABELS_TYPE_AFFAIRE[dossier.typeAffaire]}
+                  </span>
+                </>
+              )}
+              {dossier.specialite && (
+                <>
+                  <span className="text-muted-foreground" aria-hidden="true">
+                    ·
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {LABELS_SPECIALITE[dossier.specialite]}
+                  </span>
+                </>
+              )}
+              {dossier.institution && (
+                <>
+                  <span className="text-muted-foreground" aria-hidden="true">
+                    ·
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {LABELS_INSTITUTION[dossier.institution]}
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -186,29 +230,21 @@ export default function DossierDetailPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {dossier.statut !== 'en_cours' && (
-                  <DropdownMenuItem onClick={() => changerStatut('en_cours')}>
-                    {/* token success — plus de text-green-600 hardcodé */}
-                    <Play className="mr-2 h-4 w-4 text-(--color-success)" aria-hidden="true" />
+                {dossier.statut !== 'encours' && (
+                  <DropdownMenuItem onClick={() => changerStatut('encours')}>
+                    <Play className="mr-2 h-4 w-4 text-(--color-success)" />
                     Remettre en cours
                   </DropdownMenuItem>
                 )}
                 {dossier.statut !== 'suspendu' && (
                   <DropdownMenuItem onClick={() => changerStatut('suspendu')}>
-                    {/* token warning/gold — plus de text-yellow-500 hardcodé */}
-                    <PauseCircle
-                      className="mr-2 h-4 w-4 text-(--color-warning)"
-                      aria-hidden="true"
-                    />
+                    <PauseCircle className="mr-2 h-4 w-4 text-(--color-warning)" />
                     Suspendre
                   </DropdownMenuItem>
                 )}
                 {dossier.statut !== 'cloture' && (
                   <DropdownMenuItem onClick={() => changerStatut('cloture')}>
-                    <CheckCircle
-                      className="mr-2 h-4 w-4 text-muted-foreground"
-                      aria-hidden="true"
-                    />
+                    <CheckCircle className="mr-2 h-4 w-4 text-muted-foreground" />
                     Clôturer
                   </DropdownMenuItem>
                 )}
@@ -222,7 +258,6 @@ export default function DossierDetailPage() {
           </Button>
 
           {estAdmin && (
-            // Bouton destructif — border token, cohérent avec ClientDetailPage
             <Button
               variant="outline"
               size="sm"
@@ -238,29 +273,46 @@ export default function DossierDetailPage() {
 
       {/* ── Infos permanentes ───────────────────────────────────── */}
       <div className="grid gap-4 sm:grid-cols-2">
-        {/* Client */}
+        {/* Parties */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Client</CardTitle>
+            <CardTitle className="text-base">Parties</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {clientPopule ? (
-              <>
-                <p className="font-medium">{nomAffiche(clientPopule)}</p>
-                <p className="text-sm text-muted-foreground">{clientPopule.telephone}</p>
-                {clientPopule.email && (
-                  <p className="text-sm text-muted-foreground">{clientPopule.email}</p>
-                )}
-                {clientPopule.adresse && (
-                  <p className="text-sm text-muted-foreground">{clientPopule.adresse}</p>
-                )}
-                <Button variant="outline" size="sm" className="mt-2" asChild>
-                  <Link to={`/cabinet/clients/${clientPopule._id}`}>Voir la fiche client</Link>
-                </Button>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">Client non disponible</p>
-            )}
+          <CardContent className="space-y-4">
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Pour le compte de
+              </p>
+              {clientPopule ? (
+                <div className="space-y-1">
+                  <p className="font-medium">{nomAffiche(clientPopule)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {LABELS_QUALITE[dossier.qualiteClient]}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{clientPopule.telephone}</p>
+                  {clientPopule.email && (
+                    <p className="text-sm text-muted-foreground">{clientPopule.email}</p>
+                  )}
+                  <Button variant="outline" size="sm" className="mt-1" asChild>
+                    <Link to={`/cabinet/clients/${clientPopule._id}`}>Voir la fiche client</Link>
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Client non disponible</p>
+              )}
+            </div>
+
+            <Separator />
+
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Contre
+              </p>
+              <p className="font-medium">{dossier.adversaire}</p>
+              <p className="text-xs text-muted-foreground">
+                {LABELS_QUALITE[dossier.qualiteAdversaire]}
+              </p>
+            </div>
           </CardContent>
         </Card>
 
@@ -271,23 +323,51 @@ export default function DossierDetailPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <InfoLigne label="Référence" valeur={dossier.reference} mono />
-            <Separator />
-            <InfoLigne label="Type" valeur={libelleTypeDossier(dossier.type)} />
+
+            {dossier.dossierNumero && (
+              <>
+                <Separator />
+                <InfoLigne label="N° dossier" valeur={dossier.dossierNumero} mono />
+              </>
+            )}
+            {dossier.institution && (
+              <>
+                <Separator />
+                <InfoLigne label="Institution" valeur={LABELS_INSTITUTION[dossier.institution]} />
+              </>
+            )}
+            {dossier.typeAffaire && (
+              <>
+                <Separator />
+                <InfoLigne
+                  label="Type d'affaire"
+                  valeur={LABELS_TYPE_AFFAIRE[dossier.typeAffaire]}
+                />
+              </>
+            )}
+            {dossier.specialite && (
+              <>
+                <Separator />
+                <InfoLigne label="Spécialité" valeur={LABELS_SPECIALITE[dossier.specialite]} />
+              </>
+            )}
             <Separator />
             <InfoLigne label="Ouvert le" valeur={formaterDate(dossier.dateOuverture)} />
+
             {dossier.dateCloture && (
               <>
                 <Separator />
                 <InfoLigne label="Clôturé le" valeur={formaterDate(dossier.dateCloture)} />
               </>
             )}
+
             <Separator />
             <InfoLigne label="Créé le" valeur={formaterDate(dossier.createdAt)} />
           </CardContent>
         </Card>
       </div>
 
-      {/* Description */}
+      {/* ── Description ─────────────────────────────────────────── */}
       {dossier.description && (
         <Card>
           <CardHeader className="pb-3">
@@ -301,8 +381,8 @@ export default function DossierDetailPage() {
         </Card>
       )}
 
-      {/* ── Tabs underline ──────────────────────────────────────── */}
-      <Tabs defaultValue="honoraires" className="flex flex-col space-y-0">
+      {/* ── Tabs ────────────────────────────────────────────────── */}
+      <Tabs defaultValue="reports" className="flex flex-col space-y-0">
         <div className="border-b">
           <TabsList className="flex h-auto w-full justify-start gap-0 overflow-x-auto rounded-none bg-transparent p-0">
             {TABS.map(({ value, label, icon: Icon }) => (
@@ -324,10 +404,26 @@ export default function DossierDetailPage() {
               >
                 <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span className="whitespace-nowrap">{label}</span>
+                {value === 'reports' && (dossier.reports?.length ?? 0) > 0 && (
+                  <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
+                    {dossier.reports.length}
+                  </span>
+                )}
               </TabsTrigger>
             ))}
           </TabsList>
         </div>
+
+        <TabsContent value="reports" className="mt-6 focus-visible:outline-none">
+          <TabReports
+            dossierId={dossier._id}
+            reports={dossier.reports ?? []}
+            estAdmin={estAdmin}
+            onMutationSuccess={() =>
+              queryClient.invalidateQueries({ queryKey: ['cabinet', 'dossier', id] })
+            }
+          />
+        </TabsContent>
 
         <TabsContent value="honoraires" className="mt-6 focus-visible:outline-none">
           <TabHonoraires dossierId={id!} />
@@ -356,7 +452,7 @@ export default function DossierDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Archiver ce dossier ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Le dossier <strong>{dossier.titre}</strong>{' '}
+              Le dossier <strong>{intituleDossier}</strong>{' '}
               <span className="font-mono text-xs">({dossier.reference})</span> sera archivé.
               Documents, paiements et événements liés restent conservés.
             </AlertDialogDescription>
@@ -378,6 +474,7 @@ export default function DossierDetailPage() {
 }
 
 // ─── Sous-composants ──────────────────────────────────────────────────────────
+
 function InfoLigne({
   label,
   valeur,
@@ -398,28 +495,24 @@ function InfoLigne({
 function DossierDetailSkeleton() {
   return (
     <div className="space-y-6">
-      {/* Fil d'Ariane */}
       <Skeleton className="h-4 w-48" />
-      {/* En-tête */}
       <div className="flex items-start gap-3">
         <Skeleton className="h-11 w-11 rounded-lg" />
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Skeleton className="h-6 w-56" />
+            <Skeleton className="h-6 w-64" />
             <Skeleton className="h-5 w-20 rounded-full" />
           </div>
-          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-4 w-48" />
         </div>
       </div>
-      {/* Cards infos */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Skeleton className="h-52" />
-        <Skeleton className="h-52" />
+        <Skeleton className="h-56" />
+        <Skeleton className="h-56" />
       </div>
-      {/* Tabs */}
       <div className="border-b">
         <div className="flex gap-0">
-          {Array.from({ length: 5 }).map((_, i) => (
+          {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-11 w-24 rounded-none" />
           ))}
         </div>

@@ -84,15 +84,12 @@ export interface Client {
   _id: string;
   tenantId: string;
   type: TypeClient;
-  // Personne physique
   nom?: string;
   prenom?: string;
   cin?: string;
-  // Personne morale
   raisonSociale?: string;
   representantLegal?: string;
   nifRc?: string;
-  // Communs
   telephone: string;
   telephoneSecondaire?: string;
   email?: string;
@@ -103,7 +100,6 @@ export interface Client {
   updatedAt: string;
 }
 
-// Interface minimale partagée — accepte Client ET ClientPopule dans nomAffiche()
 export interface ClientNommable {
   type: 'physique' | 'morale';
   nom?: string;
@@ -111,7 +107,6 @@ export interface ClientNommable {
   raisonSociale?: string;
 }
 
-// Sous-ensemble renvoyé par le populate Mongoose dans les réponses dossier
 export interface ClientPopule extends ClientNommable {
   _id: string;
   telephone: string;
@@ -119,7 +114,6 @@ export interface ClientPopule extends ClientNommable {
   adresse?: string;
 }
 
-// Retourne le nom affiché selon le type — accepte Client, ClientPopule ou tout ClientNommable
 export function nomAffiche(client: ClientNommable): string {
   if (client.type === 'physique') {
     return [client.prenom, client.nom].filter(Boolean).join(' ') || '—';
@@ -129,25 +123,180 @@ export function nomAffiche(client: ClientNommable): string {
 
 // ─── Module Dossiers ──────────────────────────────────────────────────────────
 
-export type TypeDossier = 'civil' | 'penal' | 'commercial' | 'administratif' | 'autre';
+// -- Enums --
 
-export type StatutDossier = 'en_cours' | 'suspendu' | 'cloture';
+export type QualitePartie =
+  | 'demandeur'
+  | 'defendeur'
+  | 'demandeur_pourvoi'
+  | 'defendeur_pourvoi'
+  | 'demandeur_renvoi'
+  | 'defendeur_renvoi';
+
+export type TypeAffaire = 'civil' | 'penal' | 'administratif'; // ← nouveau
+
+export type SpecialiteDossier = // ← remplace SectionDossier
+  // civil
+  | 'civil'
+  | 'foncier'
+  | 'affaires_familiales'
+  | 'sociale'
+  | 'commerciale'
+  | 'refere'
+  // pénal
+  | 'contraventions'
+  | 'delits'
+  | 'crimes'
+  // administratif
+  | 'ordinaire'
+  | 'refere_administratif';
+
+export type InstitutionDossier =
+  | 'tribunal'
+  | 'cour'
+  | 'cour_supreme'
+  | 'tribunal_administratif'
+  | 'cour_appel_administrative'
+  | 'conseil_etat';
+
+export type StatutDossier = 'encours' | 'suspendu' | 'cloture';
+
+// -- Labels lisibles --
+
+export const LABELS_QUALITE: Record<QualitePartie, string> = {
+  demandeur: 'Le Demandeur',
+  defendeur: 'Le Défendeur',
+  demandeur_pourvoi: "Le Demandeur au pourvoi / L'Appelant",
+  defendeur_pourvoi: "Le Défendeur au pourvoi / L'Intimé",
+  demandeur_renvoi: 'Demandeur au renvoi',
+  defendeur_renvoi: 'Défendeur au renvoi',
+};
+
+export const LABELS_TYPE_AFFAIRE: Record<TypeAffaire, string> = {
+  civil: 'Civil',
+  penal: 'Pénal',
+  administratif: 'Administratif',
+};
+
+export const SPECIALITES_PAR_TYPE: Record<
+  TypeAffaire,
+  { valeur: SpecialiteDossier; label: string }[]
+> = {
+  civil: [
+    { valeur: 'civil', label: 'Civil' },
+    { valeur: 'foncier', label: 'Foncier' },
+    { valeur: 'affaires_familiales', label: 'Affaires familiales' },
+    { valeur: 'sociale', label: 'Sociale' },
+    { valeur: 'commerciale', label: 'Commerciale' },
+    { valeur: 'refere', label: 'Référé' },
+  ],
+  penal: [
+    { valeur: 'contraventions', label: 'Contraventions' },
+    { valeur: 'delits', label: 'Délits' },
+    { valeur: 'crimes', label: 'Crimes' },
+  ],
+  administratif: [
+    { valeur: 'ordinaire', label: 'Ordinaire' },
+    { valeur: 'refere_administratif', label: 'Référé administratif' },
+  ],
+};
+
+export const LABELS_SPECIALITE: Record<SpecialiteDossier, string> = {
+  civil: 'Civil',
+  foncier: 'Foncier',
+  affaires_familiales: 'Affaires familiales',
+  sociale: 'Sociale',
+  commerciale: 'Commerciale',
+  refere: 'Référé',
+  contraventions: 'Contraventions',
+  delits: 'Délits',
+  crimes: 'Crimes',
+  ordinaire: 'Ordinaire',
+  refere_administratif: 'Référé administratif',
+};
+
+export const LABELS_INSTITUTION: Record<InstitutionDossier, string> = {
+  tribunal: 'Tribunal',
+  cour: 'Cour',
+  cour_supreme: 'Cour Suprême',
+  tribunal_administratif: 'Tribunal Administratif',
+  cour_appel_administrative: "Cour d'Appel Administrative",
+  conseil_etat: "Conseil d'État",
+};
+
+export const GROUPES_INSTITUTION: {
+  label: string;
+  options: InstitutionDossier[];
+}[] = [
+  {
+    label: 'Ordre Judiciaire',
+    options: ['tribunal', 'cour', 'cour_supreme'],
+  },
+  {
+    label: 'Ordre Administratif',
+    options: ['tribunal_administratif', 'cour_appel_administrative', 'conseil_etat'],
+  },
+];
+
+// -- Sous-document Report --
+
+export interface Report {
+  _id: string;
+  date: string;
+  raison: string;
+  jugement?: string;
+}
+
+// -- Interface principale Dossier --
 
 export interface Dossier {
   _id: string;
+  id: string;
   tenantId: string;
   reference: string;
-  titre: string;
-  client: ClientPopule | string;
-  type: TypeDossier;
+
+  // Parties
+  clientId: ClientPopule | string;
+  qualiteClient: QualitePartie;
+  adversaire: string;
+  qualiteAdversaire: QualitePartie;
+
+  // Identification judiciaire
+  dossierNumero?: string;
+  institution?: InstitutionDossier;
+  typeAffaire?: TypeAffaire;
+  specialite?: SpecialiteDossier;
+
+  // Procédure
   statut: StatutDossier;
-  description?: string;
   dateOuverture: string;
   dateCloture?: string;
+  description?: string;
+
+  // Reports d'audiences
+  reports: Report[];
+
+  // nom de l'institution personnalisée
+  nomInstitution?: string;
+
   isDeleted: boolean;
   createdAt: string;
   updatedAt: string;
 }
+
+// -- Helpers statut --
+
+export const LABELS_STATUT_DOSSIER: Record<StatutDossier, string> = {
+  encours: 'En cours',
+  suspendu: 'Suspendu',
+  cloture: 'Clôturé',
+};
+
+export const COULEURS_STATUT_DOSSIER: Record<StatutDossier, 'default' | 'secondary' | 'outline'> = {
+  encours: 'default',
+  suspendu: 'secondary',
+  cloture: 'outline',
+};
 
 // ─── Module Honoraires ────────────────────────────────────────────────────────
 
@@ -161,12 +310,13 @@ export interface Honoraire {
   dossier: string;
   montantTotal: number;
   type: TypeHonoraire;
-  description?: string; // ← seul champ optionnel, conforme au modèle backend
+  description?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-// ─── Module Factures ────────────────────────────────────────────────────────
+// ─── Module Factures ──────────────────────────────────────────────────────────
+
 export type StatutFacture = 'brouillon' | 'emise' | 'payee';
 
 export interface DossierPopuleFacture {
@@ -174,7 +324,7 @@ export interface DossierPopuleFacture {
   id: string;
   reference: string;
   titre: string;
-  type: TypeDossier;
+  type: StatutDossier;
   statut: StatutDossier;
 }
 

@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import fs from 'fs';
 import { DocumentModel } from '../models/document.model';
-import { Dossier } from '../models/dossier.model';
+import Dossier from '../models/dossier.model';
 import { Tenant } from '../models/tenant.model';
 import { AppError } from '../middlewares/error-handler';
 import { sendSuccess } from '../utils/api-response';

@@ -12,6 +12,7 @@ import authRoutes from './routes/auth.routes';
 import superadminRoutes from './routes/superadmin.routes';
 import clientRoutes from './routes/client.routes';
 import dossierRoutes from './routes/dossier.routes';
+import institutionPersonnaliseeRoutes from './routes/institutionPersonnalisee.routes';
 import paiementRoutes from './routes/paiement.routes';
 import factureRoutes from './routes/facture.routes';
 import evenementRoutes from './routes/evenement.routes';
@@ -50,6 +51,7 @@ app.use('/api/cabinet/evenements', evenementRoutes);
 app.use('/api/cabinet/documents', documentRoutes);
 app.use('/api/cabinet/etapes', etapeRoutes);
 app.use('/api/cabinet/utilisateurs', utilisateurRoutes);
+app.use('/api/cabinet', institutionPersonnaliseeRoutes);
 app.use('/api/cabinet', cabinetRoutes);
 
 app.use(errorHandler);

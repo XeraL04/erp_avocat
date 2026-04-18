@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { Etape } from '../models/etape.model';
-import { Dossier } from '../models/dossier.model';
+import Dossier from '../models/dossier.model';
 import { AppError } from '../middlewares/error-handler';
 import { sendSuccess } from '../utils/api-response';
 import { creerEtapeSchema, modifierEtapeSchema } from '../validations/etape.validation';
@@ -151,9 +151,10 @@ export const listerToutesEtapes = async (
       filtre.date = filtreDate;
     }
 
-    const etapes = await Etape.find(filtre)
-      .populate('dossier', 'reference titre type statut')
-      .sort({ date: 1 }) // ordre chronologique ascendant
+    const etapes = await Etape
+      .find(filtre)
+      .populate('dossier', 'reference adversaire section institution statut')
+      .sort({ date: 1 })
       .lean();
 
     sendSuccess(res, { etapes }, 200, { total: etapes.length });

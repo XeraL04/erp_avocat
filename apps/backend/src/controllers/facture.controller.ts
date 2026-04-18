@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import { Facture } from '../models/facture.model';
 import { Client } from '../models/client.model';
-import { Dossier } from '../models/dossier.model';
+import Dossier from '../models/dossier.model';
 import { Honoraire } from '../models/honoraire.model';
 import { Paiement } from '../models/paiement.model';
 import { Tenant } from '../models/tenant.model';
