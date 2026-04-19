@@ -530,7 +530,7 @@ export default function FactureDetailPage() {
                     {dossier.type}
                   </Badge>
                   <Badge variant="secondary" className="text-xs">
-                    {dossier.statut === 'en_cours'
+                    {dossier.statut === 'encours'
                       ? 'En cours'
                       : dossier.statut === 'suspendu'
                         ? 'Suspendu'

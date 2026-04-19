@@ -54,6 +54,14 @@ app.use('/api/cabinet/utilisateurs', utilisateurRoutes);
 app.use('/api/cabinet', institutionPersonnaliseeRoutes);
 app.use('/api/cabinet', cabinetRoutes);
 
+if (ENV.NODE_ENV === 'production') {
+	const frontendDist = path.join(__dirname, '..', '..','frontend', 'dist');
+	app.use(express.static(frontendDist));
+	app.get('*', (_req, res)=>{
+		res.sendFile(path.join(frontendDist, 'index.html'));
+	});
+}
+
 app.use(errorHandler);
 
 const startServer = async (): Promise<void> => {

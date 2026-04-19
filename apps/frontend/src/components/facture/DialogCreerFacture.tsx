@@ -85,7 +85,7 @@ export function DialogCreerFacture({ ouvert, onFermer }: Props) {
 
   const { data: dataDossiers } = useQuery({
     queryKey: ['cabinet', 'dossiers', 'selector', clientSelectionne?._id],
-    queryFn: () => listerDossiers({ client: clientSelectionne!._id, limit: 100 }),
+    queryFn: () => listerDossiers({ clientId: clientSelectionne!._id, limit: 100 }),
     enabled: ouvert && !!clientSelectionne,
   });
 
@@ -313,7 +313,9 @@ export function DialogCreerFacture({ ouvert, onFermer }: Props) {
                     {dossiers.map((dossier) => (
                       <SelectItem key={dossier._id} value={dossier._id}>
                         <span className="font-mono text-xs">{dossier.reference}</span>
-                        <span className="ml-2 text-muted-foreground">{dossier.titre}</span>
+                        {dossier.adversaire && (
+                          <span className="ml-2 text-muted-foreground">c/ {dossier.adversaire}</span>
+                        )}
                       </SelectItem>
                     ))}
                   </SelectContent>

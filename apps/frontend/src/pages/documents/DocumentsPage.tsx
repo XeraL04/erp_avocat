@@ -528,7 +528,7 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
   const [dossierSelectionne, setDossierSelectionne] = useState<{
     id: string;
     reference: string;
-    titre: string;
+    adversaire: string;
   } | null>(null);
   const [selectorOuvert, setSelectorOuvert] = useState(false);
   const selectorRef = useRef<HTMLDivElement>(null);
@@ -663,7 +663,7 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
                     {dossierSelectionne ? (
                       <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2">
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">{dossierSelectionne.titre}</p>
+                          <p className="truncate text-sm font-medium">{dossierSelectionne.adversaire}</p>
                           <p className="font-mono text-xs text-muted-foreground">
                             {dossierSelectionne.reference}
                           </p>
@@ -720,14 +720,14 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
                                   setDossierSelectionne({
                                     id: d._id,
                                     reference: d.reference,
-                                    titre: d.titre,
+                                    adversaire: d.adversaire ?? '—',
                                   });
                                   field.onChange(d._id);
                                   setSelectorOuvert(false);
                                   setRechercheDossier('');
                                 }}
                               >
-                                <p className="text-sm font-medium">{d.titre}</p>
+                                <p className="text-sm font-medium">{d.adversaire ?? '—'}</p>
                                 <p className="font-mono text-xs text-muted-foreground">
                                   {d.reference}
                                 </p>

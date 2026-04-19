@@ -1,6 +1,6 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import { Tenant } from './tenant.model';
-import { Dossier } from './dossier.model';
+import Dossier from './dossier.model';
 
 export interface IEvenement extends Document {
   tenantId: mongoose.Types.ObjectId;
