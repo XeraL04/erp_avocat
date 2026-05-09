@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
-import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
+
+import { cn } from '@/lib/utils';
 
 export interface ItemNav {
   label: string;
@@ -15,7 +16,7 @@ interface SidebarNavProps {
 
 export default function SidebarNav({ items, onNavigate }: SidebarNavProps) {
   return (
-    <nav className="flex flex-col gap-0.5 px-3" aria-label="Navigation principale">
+    <nav className="flex flex-col gap-1" aria-label="Navigation principale">
       {items.map(({ label, href, icone: Icone }) => (
         <NavLink
           key={href}
@@ -23,26 +24,44 @@ export default function SidebarNav({ items, onNavigate }: SidebarNavProps) {
           onClick={onNavigate}
           className={({ isActive }) =>
             cn(
-              'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium',
-              'transition-colors duration-150',
+              'group relative flex items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-sm font-medium',
+              'transition-all duration-200',
               isActive
                 ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm'
-                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                : 'text-sidebar-foreground/72 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground'
             )
           }
         >
           {({ isActive }) => (
             <>
-              <Icone
+              <span
                 className={cn(
-                  'h-4 w-4 shrink-0 transition-colors duration-150',
-                  isActive ? 'opacity-100' : 'opacity-70'
+                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all duration-200',
+                  isActive
+                    ? 'bg-sidebar-primary-foreground/10 text-sidebar-primary-foreground'
+                    : 'text-sidebar-foreground/65 group-hover:text-sidebar-accent-foreground'
+                )}
+              >
+                <Icone className="h-4 w-4 shrink-0" aria-hidden="true" />
+              </span>
+
+              <span className="min-w-0 flex-1 truncate">{label}</span>
+
+              <span
+                className={cn(
+                  'h-1.5 w-1.5 shrink-0 rounded-full transition-all duration-200',
+                  isActive
+                    ? 'bg-sidebar-primary-foreground/70 opacity-100'
+                    : 'bg-transparent opacity-0 group-hover:opacity-40'
                 )}
                 aria-hidden="true"
               />
-              <span className="truncate">{label}</span>
+
               {isActive && (
-                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-sidebar-primary-foreground/60 shrink-0" />
+                <span
+                  className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-sidebar-primary-foreground/75"
+                  aria-hidden="true"
+                />
               )}
             </>
           )}

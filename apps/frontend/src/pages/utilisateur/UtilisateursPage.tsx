@@ -12,6 +12,8 @@ import {
   MoreHorizontal,
   ShieldCheck,
   Loader2,
+  Settings,
+  Building2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -44,7 +46,13 @@ import {
   type Utilisateur,
 } from '@/api/utilisateur.api';
 import { cn } from '@/lib/utils';
+
 import { useAuthStore } from '@/stores/auth.store';
+
+import { obtenirMonCabinet } from '@/api/utilisateur.api';
+
+import DialogModifierAdmin from '@/components/admin/DialogModifierAdmin';
+import DialogModifierMonCabinet from '@/components/admin/DialogModifierMonCabinet';
 import DialogCreerAssistant from '@/components/admin/DialogCreerAssistant';
 import DialogModifierAssistant from '@/components/admin/DialogModifierAssistant';
 
@@ -56,10 +64,18 @@ export default function UtilisateursPage() {
   const [userAModifier, setUserAModifier] = useState<Utilisateur | null>(null);
   const [userASupprimer, setUserASupprimer] = useState<Utilisateur | null>(null);
 
+  const [dialogMonProfil, setDialogMonProfil] = useState(false);
+  const [dialogMonCabinet, setDialogMonCabinet] = useState(false);
+
   // ── Query ──────────────────────────────────────────────────────────────────
   const { data: utilisateurs = [], isLoading } = useQuery({
     queryKey: ['cabinet', 'utilisateurs'],
     queryFn: listerUtilisateurs,
+  });
+
+  const { data: cabinet } = useQuery({
+    queryKey: ['cabinet', 'mon-cabinet'],
+    queryFn: obtenirMonCabinet,
   });
 
   // ── Mutations ──────────────────────────────────────────────────────────────
@@ -117,6 +133,27 @@ export default function UtilisateursPage() {
             <span className="shrink-0 inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
               Administrateur
             </span>
+
+            <div className="flex gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setDialogMonProfil(true)}
+                aria-label="Modifier mon profil"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setDialogMonCabinet(true)}
+                aria-label="Modifier le cabinet"
+              >
+                <Building2 className="h-4 w-4" />
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -281,6 +318,26 @@ export default function UtilisateursPage() {
         />
       )}
 
+      {dialogMonProfil && moi && (
+        <DialogModifierAdmin
+          utilisateur={moi}
+          onFermer={() => setDialogMonProfil(false)}
+          onSuccess={() => {
+            setDialogMonProfil(false);
+          }}
+        />
+      )}
+
+      {dialogMonCabinet && cabinet && (
+        <DialogModifierMonCabinet
+          cabinet={cabinet}
+          onFermer={() => setDialogMonCabinet(false)}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['cabinet', 'mon-cabinet'] });
+            setDialogMonCabinet(false);
+          }}
+        />
+      )}
       {/* ── Confirmation suppression ─────────────────────────────── */}
       <AlertDialog open={!!userASupprimer} onOpenChange={(o) => !o && setUserASupprimer(null)}>
         <AlertDialogContent>

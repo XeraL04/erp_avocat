@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AxiosError } from 'axios';
 
@@ -13,13 +13,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import {
   Select,
   SelectContent,
@@ -32,7 +30,7 @@ import { modifierFacture, type Facture, type StatutFacture } from '@/api/facture
 import { couleurStatutFacture, libelleStatutFacture, formaterMontantDA } from '@/lib/utils';
 import { extraireMessageErreur } from '@/api/auth.api';
 
-// ─── Transitions autorisées (unidirectionnel) ─────────────────────────────────
+// ─── Transitions autorisées ───────────────────────────────────────────────────
 const TRANSITIONS: Record<StatutFacture, StatutFacture[]> = {
   brouillon: ['emise'],
   emise: ['payee'],
@@ -51,6 +49,7 @@ const schema = z
   .refine((d) => d.montant !== undefined || d.statut !== undefined, {
     message: 'Modifiez au moins un champ',
   });
+
 type FormModifier = z.infer<typeof schema>;
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -65,6 +64,7 @@ export function DialogModifierFacture({ facture, onFermer }: Props) {
   const uid = useId();
   const prochainsStatuts = TRANSITIONS[facture.statut];
   const peutModifierMontant = facture.statut === 'brouillon';
+  const estRegle = facture.statut === 'payee';
 
   const {
     register,
@@ -78,7 +78,6 @@ export function DialogModifierFacture({ facture, onFermer }: Props) {
     reset({ montant: facture.montant, statut: undefined });
   }, [facture, reset]);
 
-  // ── Mutation ───────────────────────────────────────────────────────────────
   const { mutate, isPending } = useMutation({
     mutationFn: (d: FormModifier) =>
       modifierFacture(facture.id, {
@@ -94,69 +93,74 @@ export function DialogModifierFacture({ facture, onFermer }: Props) {
   });
 
   return (
-    // Guard !isPending : empêche la fermeture accidentelle pendant une mutation
     <Dialog open onOpenChange={(o) => !o && !isPending && onFermer()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            Modifier la facture
+      <DialogContent className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
+        {/* ── Header ──────────────────────────────────────────── */}
+        <DialogHeader className="shrink-0 border-b px-6 py-4">
+          <div className="flex items-center gap-2.5">
+            <DialogTitle className="text-base">Modifier la facture</DialogTitle>
             <Badge variant={couleurStatutFacture(facture.statut)}>
               {libelleStatutFacture(facture.statut)}
             </Badge>
-          </DialogTitle>
-          <DialogDescription className="font-mono">{facture.numero}</DialogDescription>
+          </div>
+          <DialogDescription className="font-mono text-xs text-muted-foreground">
+            {facture.numero}
+          </DialogDescription>
         </DialogHeader>
 
+        {/* ── Body ────────────────────────────────────────────── */}
         <form
           id={`${uid}-form`}
           onSubmit={handleSubmit((d) => mutate(d))}
-          className="space-y-4"
           noValidate
+          className="px-6 py-5"
         >
-          {/* ── Montant ──────────────────────────────────────── */}
-          <div className="space-y-1.5">
-            <Label htmlFor={`${uid}-montant`} className="flex items-center gap-2">
-              Montant (DA)
+          <div className="space-y-4">
+            {/* ── Montant ─────────────────────────────────────── */}
+            <div className="space-y-1.5">
+              <Label htmlFor={`${uid}-montant`} className="text-xs font-medium">
+                Montant (DA)
+                {!peutModifierMontant && (
+                  <span className="ml-1.5 font-normal text-muted-foreground/70">
+                    (non modifiable — {libelleStatutFacture(facture.statut).toLowerCase()})
+                  </span>
+                )}
+              </Label>
+              <Input
+                id={`${uid}-montant`}
+                type="number"
+                min="0"
+                step="500"
+                className="h-9 w-full text-sm"
+                disabled={!peutModifierMontant || isPending}
+                {...register('montant', { valueAsNumber: true })}
+              />
               {!peutModifierMontant && (
-                <span className="text-xs font-normal text-muted-foreground">
-                  (non modifiable — {libelleStatutFacture(facture.statut).toLowerCase()})
-                </span>
+                <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <AlertCircle className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  Montant actuel : {formaterMontantDA(facture.montant)}
+                </p>
               )}
-            </Label>
-            <Input
-              id={`${uid}-montant`}
-              type="number"
-              min="0"
-              step="500"
-              disabled={!peutModifierMontant || isPending}
-              {...register('montant', { valueAsNumber: true })}
-            />
-            {!peutModifierMontant && (
-              <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                {/* Icône décorative — aria-hidden */}
-                <AlertCircle className="h-3 w-3 shrink-0" aria-hidden="true" />
-                Montant actuel : {formaterMontantDA(facture.montant)}
-              </p>
-            )}
-            {errors.montant && (
-              <p className="text-xs text-destructive" role="alert">
-                {errors.montant.message}
-              </p>
-            )}
-          </div>
+              {errors.montant && (
+                <p className="text-xs text-destructive" role="alert">
+                  {errors.montant.message}
+                </p>
+              )}
+            </div>
 
-          {/* ── Changement de statut ──────────────────────────── */}
-          {prochainsStatuts.length > 0 && (
-            <>
-              <Separator />
+            {/* ── Changement de statut ─────────────────────────── */}
+            {prochainsStatuts.length > 0 && (
               <div className="space-y-1.5">
-                <Label htmlFor={`${uid}-statut`}>Changer le statut</Label>
+                <div className="border-t border-dashed border-border/60" />
+                <Label htmlFor={`${uid}-statut`} className="text-xs font-medium">
+                  Changer le statut
+                </Label>
                 <Controller
                   name="statut"
                   control={control}
                   render={({ field }) => (
                     <Select value={field.value} onValueChange={field.onChange} disabled={isPending}>
-                      <SelectTrigger id={`${uid}-statut`}>
+                      <SelectTrigger id={`${uid}-statut`} className="h-9 w-full text-sm">
                         <SelectValue placeholder="Conserver le statut actuel" />
                       </SelectTrigger>
                       <SelectContent>
@@ -169,35 +173,40 @@ export function DialogModifierFacture({ facture, onFermer }: Props) {
                     </Select>
                   )}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Statut actuel : <strong>{libelleStatutFacture(facture.statut)}</strong>
-                  {' → '}
-                  {prochainsStatuts.map(libelleStatutFacture).join(' ou ')}
+                <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <span>{libelleStatutFacture(facture.statut)}</span>
+                  <ArrowRight className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  <span>{prochainsStatuts.map(libelleStatutFacture).join(' ou ')}</span>
                 </p>
               </div>
-            </>
-          )}
+            )}
 
-          {/* ── Facture réglée ───────────────────────────────── */}
-          {facture.statut === 'payee' && (
-            <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
-              Cette facture est entièrement réglée. Aucune modification possible.
-            </p>
-          )}
+            {/* ── Facture réglée ───────────────────────────────── */}
+            {estRegle && (
+              <p className="rounded-md bg-muted px-3 py-2.5 text-xs text-muted-foreground">
+                Cette facture est entièrement réglée. Aucune modification possible.
+              </p>
+            )}
+          </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onFermer} disabled={isPending}>
+          {/* ── Footer ──────────────────────────────────────────── */}
+          <div className="mt-5 flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onFermer}
+              disabled={isPending}
+            >
               Annuler
             </Button>
-            <Button
-              type="submit"
-              form={`${uid}-form`}
-              disabled={isPending || facture.statut === 'payee'}
-            >
-              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+            <Button type="submit" size="sm" form={`${uid}-form`} disabled={isPending || estRegle}>
+              {isPending && (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              )}
               {isPending ? 'Enregistrement…' : 'Enregistrer'}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

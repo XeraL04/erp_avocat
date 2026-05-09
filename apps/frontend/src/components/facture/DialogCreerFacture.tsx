@@ -38,24 +38,33 @@ import { extraireMessageErreur } from '@/api/auth.api';
 const schema = z.object({
   clientId: z.string({ required_error: 'Le client est obligatoire' }).min(1),
   dossierId: z.string({ required_error: 'Le dossier est obligatoire' }).min(1),
-  montant: z
-    .number({ invalid_type_error: 'Montant invalide', required_error: 'Montant obligatoire' })
-    .positive('Le montant doit être positif'),
+  montant: z.preprocess(
+    (val) => (val === '' || val === undefined || isNaN(Number(val)) ? undefined : Number(val)),
+    z.number({ required_error: 'Montant obligatoire' }).positive('Le montant doit être positif')
+  ) as z.ZodType<number>, // ✅ cast explicite pour RHF
   dateEmission: z
     .string()
     .optional()
     .refine((val) => !val || /^\d{4}-\d{2}-\d{2}$/.test(val), { message: 'Date invalide' }),
 });
+
 type FormCreerFacture = z.infer<typeof schema>;
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface Props {
   ouvert: boolean;
   onFermer: () => void;
+  dossierId?: string;
+  clientId?: string;
 }
 
 // ─── Composant ────────────────────────────────────────────────────────────────
-export function DialogCreerFacture({ ouvert, onFermer }: Props) {
+export function DialogCreerFacture({
+  ouvert,
+  onFermer,
+  dossierId: dossierIdProp,
+  clientId: clientIdProp,
+}: Props) {
   const queryClient = useQueryClient();
   const uid = useId();
 
@@ -63,10 +72,12 @@ export function DialogCreerFacture({ ouvert, onFermer }: Props) {
   const [clientSelectionne, setClientSelectionne] = useState<Client | null>(null);
   const [selectorOuvert, setSelectorOuvert] = useState(false);
 
-  // Pour gérer le focus de retour après sélection
   const inputRechercheRef = useRef<HTMLInputElement>(null);
   const selectorRef = useRef<HTMLDivElement>(null);
 
+  const modeContextualise = !!dossierIdProp && !!clientIdProp;
+
+  // ✅ Fix dossierId — defaultValues au lieu de useEffect
   const {
     register,
     handleSubmit,
@@ -74,7 +85,15 @@ export function DialogCreerFacture({ ouvert, onFermer }: Props) {
     control,
     setValue,
     formState: { errors },
-  } = useForm<FormCreerFacture>({ resolver: zodResolver(schema) });
+  } = useForm<FormCreerFacture>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      clientId: clientIdProp ?? '',
+      dossierId: dossierIdProp ?? '',
+      montant: undefined,
+      dateEmission: '',
+    },
+  });
 
   // ── Queries ────────────────────────────────────────────────────────────────
   const { data: dataClients, isLoading: chargementClients } = useQuery({
@@ -104,8 +123,8 @@ export function DialogCreerFacture({ ouvert, onFermer }: Props) {
 
   // ── Reset dossier quand client change ──────────────────────────────────────
   useEffect(() => {
-    setValue('dossierId', '');
-  }, [clientSelectionne, setValue]);
+    if (!modeContextualise) setValue('dossierId', '');
+  }, [clientSelectionne, setValue, modeContextualise]);
 
   // ── Mutation ───────────────────────────────────────────────────────────────
   const { mutate, isPending } = useMutation({
@@ -129,20 +148,23 @@ export function DialogCreerFacture({ ouvert, onFermer }: Props) {
   const deselectionnerClient = () => {
     setClientSelectionne(null);
     setValue('clientId', '', { shouldValidate: false });
-    // Remettre le focus sur l'input de recherche
     requestAnimationFrame(() => inputRechercheRef.current?.focus());
   };
 
   const handleFermer = () => {
     if (isPending) return;
-    reset();
+    reset({
+      clientId: clientIdProp ?? '',
+      dossierId: dossierIdProp ?? '',
+      montant: undefined,
+      dateEmission: '',
+    });
     setClientSelectionne(null);
     setRechercheClient('');
     setSelectorOuvert(false);
     onFermer();
   };
 
-  // Navigation clavier dans la liste déroulante
   const handleKeyDownListe = (e: React.KeyboardEvent, client: Client) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -165,169 +187,178 @@ export function DialogCreerFacture({ ouvert, onFermer }: Props) {
 
         <form
           id={`${uid}-form`}
-          onSubmit={handleSubmit((d) =>
-            mutate({
-              ...d,
-              montant: Number(d.montant),
-              dateEmission: d.dateEmission ? new Date(d.dateEmission).toISOString() : undefined,
-            })
+          onSubmit={handleSubmit(
+            (d) =>
+              mutate({
+                clientId: d.clientId,
+                dossierId: d.dossierId,
+                montant: d.montant as number,
+                dateEmission: d.dateEmission ? new Date(d.dateEmission).toISOString() : undefined,
+              }),
+            (errs) => console.log('❌ Erreurs Zod :', errs)
           )}
           className="space-y-4 pt-2"
           noValidate
         >
-          {/* ── Sélecteur client ───────────────────────────────── */}
-          <div className="space-y-1.5">
-            <Label htmlFor={inputId}>Client</Label>
-            <div ref={selectorRef} className="relative">
-              {clientSelectionne ? (
-                /* Client sélectionné — affichage + bouton désélection */
-                <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{nomAffiche(clientSelectionne)}</p>
-                    <p className="text-xs text-muted-foreground">{clientSelectionne.telephone}</p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 shrink-0"
-                    onClick={deselectionnerClient}
-                    aria-label={`Retirer ${nomAffiche(clientSelectionne)}`}
-                  >
-                    <X className="h-3.5 w-3.5" aria-hidden="true" />
-                  </Button>
-                </div>
-              ) : (
-                /* Champ de recherche */
-                <div className="relative">
-                  <Search
-                    className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <Input
-                    ref={inputRechercheRef}
-                    id={inputId}
-                    role="combobox"
-                    aria-expanded={selectorOuvert}
-                    aria-controls={selectorOuvert ? listboxId : undefined}
-                    aria-autocomplete="list"
-                    autoComplete="off"
-                    placeholder="Rechercher un client…"
-                    className="pl-9"
-                    value={rechercheClient}
-                    disabled={isPending}
-                    onChange={(e) => {
-                      setRechercheClient(e.target.value);
-                      setSelectorOuvert(true);
-                    }}
-                    onFocus={() => setSelectorOuvert(true)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') setSelectorOuvert(false);
-                    }}
-                  />
-                </div>
-              )}
+          {/* ✅ Inputs hidden en mode contextualisé */}
+          {modeContextualise && (
+            <>
+              <input type="hidden" {...register('clientId')} />
+              <input type="hidden" {...register('dossierId')} />
+            </>
+          )}
 
-              {/* Dropdown résultats */}
-              {selectorOuvert && !clientSelectionne && (
-                <div
-                  id={listboxId}
-                  role="listbox"
-                  aria-label="Résultats clients"
-                  className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md"
-                >
-                  {chargementClients ? (
-                    <div className="space-y-1.5 p-2">
-                      {Array.from({ length: 3 }).map((_, i) => (
-                        <Skeleton key={i} className="h-10 w-full" />
-                      ))}
+          {/* ── Sélecteur client ───────────────────────────────── */}
+          {!modeContextualise && (
+            <div className="space-y-1.5">
+              <Label htmlFor={inputId}>Client</Label>
+              <div ref={selectorRef} className="relative">
+                {clientSelectionne ? (
+                  <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
+                        {nomAffiche(clientSelectionne)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{clientSelectionne.telephone}</p>
                     </div>
-                  ) : clients.length === 0 ? (
-                    <p className="p-4 text-center text-sm text-muted-foreground">
-                      {rechercheClient ? 'Aucun client trouvé' : 'Tapez pour rechercher'}
-                    </p>
-                  ) : (
-                    <ul className="max-h-52 overflow-y-auto py-1" role="presentation">
-                      {clients.map((client) => (
-                        <li
-                          key={client._id}
-                          role="option"
-                          aria-selected={false}
-                          tabIndex={0}
-                          className="cursor-pointer px-3 py-2 transition-colors
-                            hover:bg-accent focus-visible:bg-accent
-                            focus-visible:outline-none"
-                          onMouseDown={(e) => {
-                            // preventDefault empêche le blur de l'input avant sélection
-                            e.preventDefault();
-                            selectionnerClient(client);
-                          }}
-                          onKeyDown={(e) => handleKeyDownListe(e, client)}
-                        >
-                          <p className="text-sm font-medium">{nomAffiche(client)}</p>
-                          <p className="text-xs text-muted-foreground">{client.telephone}</p>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 shrink-0"
+                      onClick={deselectionnerClient}
+                      aria-label={`Retirer ${nomAffiche(clientSelectionne)}`}
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <Search
+                      className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                    <Input
+                      ref={inputRechercheRef}
+                      id={inputId}
+                      role="combobox"
+                      aria-expanded={selectorOuvert}
+                      aria-controls={selectorOuvert ? listboxId : undefined}
+                      aria-autocomplete="list"
+                      autoComplete="off"
+                      placeholder="Rechercher un client…"
+                      className="pl-9"
+                      value={rechercheClient}
+                      disabled={isPending}
+                      onChange={(e) => {
+                        setRechercheClient(e.target.value);
+                        setSelectorOuvert(true);
+                      }}
+                      onFocus={() => setSelectorOuvert(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') setSelectorOuvert(false);
+                      }}
+                    />
+                  </div>
+                )}
+
+                {selectorOuvert && !clientSelectionne && (
+                  <div
+                    id={listboxId}
+                    role="listbox"
+                    aria-label="Résultats clients"
+                    className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md"
+                  >
+                    {chargementClients ? (
+                      <div className="space-y-1.5 p-2">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                          <Skeleton key={i} className="h-10 w-full" />
+                        ))}
+                      </div>
+                    ) : clients.length === 0 ? (
+                      <p className="p-4 text-center text-sm text-muted-foreground">
+                        {rechercheClient ? 'Aucun client trouvé' : 'Tapez pour rechercher'}
+                      </p>
+                    ) : (
+                      <ul className="max-h-52 overflow-y-auto py-1" role="presentation">
+                        {clients.map((client) => (
+                          <li
+                            key={client._id}
+                            role="option"
+                            aria-selected={false}
+                            tabIndex={0}
+                            className="cursor-pointer px-3 py-2 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              selectionnerClient(client);
+                            }}
+                            onKeyDown={(e) => handleKeyDownListe(e, client)}
+                          >
+                            <p className="text-sm font-medium">{nomAffiche(client)}</p>
+                            <p className="text-xs text-muted-foreground">{client.telephone}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <input type="hidden" aria-hidden="true" {...register('clientId')} />
+              {errors.clientId && (
+                <p className="text-xs text-destructive" role="alert">
+                  {errors.clientId.message}
+                </p>
               )}
             </div>
-
-            {/*
-              input hidden pour RHF — aria-hidden pour ne pas polluer
-              l'arbre d'accessibilité (la valeur est gérée via setValue)
-            */}
-            <input type="hidden" aria-hidden="true" {...register('clientId')} />
-            {errors.clientId && (
-              <p className="text-xs text-destructive" role="alert">
-                {errors.clientId.message}
-              </p>
-            )}
-          </div>
+          )}
 
           {/* ── Sélecteur dossier ───────────────────────────────── */}
-          <div className="space-y-1.5">
-            <Label htmlFor={`${uid}-dossier`}>Dossier</Label>
-            <Controller
-              name="dossierId"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  disabled={!clientSelectionne || isPending}
-                >
-                  <SelectTrigger id={`${uid}-dossier`}>
-                    <SelectValue
-                      placeholder={
-                        !clientSelectionne
-                          ? "Sélectionnez d'abord un client"
-                          : dossiers.length === 0
-                            ? 'Aucun dossier trouvé'
-                            : 'Sélectionner un dossier…'
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {dossiers.map((dossier) => (
-                      <SelectItem key={dossier._id} value={dossier._id}>
-                        <span className="font-mono text-xs">{dossier.reference}</span>
-                        {dossier.adversaire && (
-                          <span className="ml-2 text-muted-foreground">c/ {dossier.adversaire}</span>
-                        )}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          {!modeContextualise && (
+            <div className="space-y-1.5">
+              <Label htmlFor={`${uid}-dossier`}>Dossier</Label>
+              <Controller
+                name="dossierId"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    disabled={!clientSelectionne || isPending}
+                  >
+                    <SelectTrigger id={`${uid}-dossier`}>
+                      <SelectValue
+                        placeholder={
+                          !clientSelectionne
+                            ? "Sélectionnez d'abord un client"
+                            : dossiers.length === 0
+                              ? 'Aucun dossier trouvé'
+                              : 'Sélectionner un dossier…'
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {dossiers.map((dossier) => (
+                        <SelectItem key={dossier._id} value={dossier._id}>
+                          <span className="font-mono text-xs">{dossier.reference}</span>
+                          {dossier.adversaire && (
+                            <span className="ml-2 text-muted-foreground">
+                              c/ {dossier.adversaire}
+                            </span>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.dossierId && (
+                <p className="text-xs text-destructive" role="alert">
+                  {errors.dossierId.message}
+                </p>
               )}
-            />
-            {errors.dossierId && (
-              <p className="text-xs text-destructive" role="alert">
-                {errors.dossierId.message}
-              </p>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* ── Montant ────────────────────────────────────────── */}
           <div className="space-y-1.5">
@@ -339,7 +370,7 @@ export function DialogCreerFacture({ ouvert, onFermer }: Props) {
               min="0"
               step="500"
               disabled={isPending}
-              {...register('montant', { valueAsNumber: true })}
+              {...register('montant')} // ✅ pas de valueAsNumber — géré par preprocess
             />
             {errors.montant && (
               <p className="text-xs text-destructive" role="alert">

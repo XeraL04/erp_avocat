@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
@@ -59,6 +58,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/auth.store';
+import { cn } from '@/lib/utils';
 
 import {
   listerEvenementsDossier,
@@ -70,6 +70,7 @@ import {
 } from '@/api/evenement.api';
 
 // ─── Schéma ───────────────────────────────────────────────────────────────────
+
 const schema = z.object({
   titre: z.string().trim().min(2, 'Le titre doit contenir au moins 2 caractères'),
   type: z.enum(['audience', 'rdv', 'rappel'], { required_error: 'Le type est obligatoire' }),
@@ -79,40 +80,43 @@ const schema = z.object({
 });
 type FormValues = z.infer<typeof schema>;
 
-// ─── Config type — tokens CSS uniquement ─────────────────────────────────────
+// ─── Config type ──────────────────────────────────────────────────────────────
+
 const TYPE_CONFIG: Record<
   TypeEvenement,
   {
     label: string;
     icone: React.ElementType;
-    // className pour Badge — tokens CSS, pas de couleurs hardcodées
-    classe: string;
+    dot: string;
+    ring: string;
+    card: string;
   }
 > = {
   audience: {
     label: 'Audience',
     icone: Scale,
-    // token primary (teal) — accent fort pour les audiences
-    classe:
-      'border-[var(--color-primary)]/40 bg-[var(--color-primary)]/10 text-[var(--color-primary)]',
+    dot: 'bg-kpi-dossiers',
+    ring: 'bg-kpi-dossiers/30',
+    card: 'bg-kpi-dossiers-bg',
   },
   rdv: {
     label: 'Rendez-vous',
     icone: Users,
-    // token success (vert) — RDV à venir
-    classe:
-      'border-[var(--color-success)]/40 bg-[var(--color-success)]/10 text-[var(--color-success)]',
+    dot: 'bg-status-encours',
+    ring: 'bg-status-encours/30',
+    card: 'bg-status-encours-bg',
   },
   rappel: {
     label: 'Rappel',
     icone: Bell,
-    // token warning (terra brown) — rappel/alerte
-    classe:
-      'border-[var(--color-warning)]/40 bg-[var(--color-warning)]/10 text-[var(--color-warning)]',
+    dot: 'bg-kpi-audiences',
+    ring: 'bg-kpi-audiences/30',
+    card: 'bg-kpi-audiences-bg',
   },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function isoToDatetimeLocal(iso: string): string {
   const d = parseISO(iso);
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -123,12 +127,13 @@ function datetimeLocalToISO(local: string): string {
   return new Date(local).toISOString();
 }
 
-function etiquetteDate(dateHeure: string): string {
+function etiquetteDate(dateHeure: string): { label: string; isToday: boolean } {
   const d = parseISO(dateHeure);
-  if (isToday(d)) return "Aujourd'hui";
-  if (isTomorrow(d)) return 'Demain';
-  if (isThisWeek(d, { locale: fr })) return format(d, 'EEEE', { locale: fr });
-  return format(d, 'd MMMM yyyy', { locale: fr });
+  if (isToday(d)) return { label: "Aujourd'hui", isToday: true };
+  if (isTomorrow(d)) return { label: 'Demain', isToday: false };
+  if (isThisWeek(d, { locale: fr }))
+    return { label: format(d, 'EEEE', { locale: fr }), isToday: false };
+  return { label: format(d, 'd MMMM yyyy', { locale: fr }), isToday: false };
 }
 
 function grouperParJour(evenements: Evenement[]): Map<string, Evenement[]> {
@@ -142,6 +147,7 @@ function grouperParJour(evenements: Evenement[]): Map<string, Evenement[]> {
 }
 
 // ─── Composant ────────────────────────────────────────────────────────────────
+
 interface Props {
   dossierId: string;
 }
@@ -149,6 +155,7 @@ interface Props {
 export default function TabAgenda({ dossierId }: Props) {
   const qc = useQueryClient();
   const uid = useId();
+
   const role = useAuthStore((s) => s.utilisateur?.role);
   const peutModifier = role === 'admin' || role === 'assistant';
   const peutSupprimer = role === 'admin';
@@ -158,12 +165,14 @@ export default function TabAgenda({ dossierId }: Props) {
   const [idASupprimer, setIdASupprimer] = useState<string | null>(null);
 
   // ── Query ──────────────────────────────────────────────────────────────────
+
   const { data: evenements = [], isLoading } = useQuery({
     queryKey: ['evenements', dossierId],
     queryFn: () => listerEvenementsDossier(dossierId),
   });
 
   // ── Formulaire ─────────────────────────────────────────────────────────────
+
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { titre: '', type: 'audience', dateHeure: '', lieu: '', notes: '' },
@@ -194,6 +203,7 @@ export default function TabAgenda({ dossierId }: Props) {
   };
 
   // ── Mutations ──────────────────────────────────────────────────────────────
+
   const invalidate = () => qc.invalidateQueries({ queryKey: ['evenements', dossierId] });
 
   const mutCreer = useMutation({
@@ -244,34 +254,36 @@ export default function TabAgenda({ dossierId }: Props) {
   const isPending = mutCreer.isPending || mutModifier.isPending;
   const groupes = grouperParJour(evenements);
 
+  // ── Rendu ──────────────────────────────────────────────────────────────────
+
   return (
     <div className="space-y-4">
-      {/* En-tête */}
+      {/* ── En-tête ─────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <CalendarClock className="h-4 w-4" aria-hidden="true" />
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <CalendarClock className="h-3.5 w-3.5" aria-hidden="true" />
           <span>
             {evenements.length} événement{evenements.length > 1 ? 's' : ''}
           </span>
         </div>
         {peutModifier && (
           <Button size="sm" onClick={ouvrirCreation}>
-            <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />
+            <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
             Ajouter
           </Button>
         )}
       </div>
 
-      {/* Skeleton */}
+      {/* ── Skeleton ────────────────────────────────────────────── */}
       {isLoading && (
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="flex items-start gap-3 rounded-lg border p-3">
               <Skeleton className="mt-0.5 h-4 w-4 rounded" />
               <div className="flex-1 space-y-1.5">
                 <div className="flex items-center gap-2">
-                  <Skeleton className="h-4 w-40" />
-                  <Skeleton className="h-5 w-20 rounded-full" />
+                  <Skeleton className="h-3.5 w-40" />
+                  <Skeleton className="h-3.5 w-16 rounded-full" />
                 </div>
                 <Skeleton className="h-3 w-28" />
               </div>
@@ -280,268 +292,339 @@ export default function TabAgenda({ dossierId }: Props) {
         </div>
       )}
 
-      {/* Empty state */}
+      {/* ── Empty state ─────────────────────────────────────────── */}
       {!isLoading && evenements.length === 0 && (
-        <div className="flex flex-col items-center gap-3 py-12 text-muted-foreground">
-          <CalendarX className="h-10 w-10 opacity-30" aria-hidden="true" />
-          <p className="text-sm">Aucun événement pour ce dossier</p>
+        <div className="flex flex-col items-center gap-3 py-10 text-center">
+          <CalendarX className="h-8 w-8 text-muted-foreground/25" aria-hidden="true" />
+          <p className="text-sm text-muted-foreground">Aucun événement pour ce dossier</p>
           {peutModifier && (
             <Button variant="outline" size="sm" onClick={ouvrirCreation}>
-              <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />
+              <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
               Planifier une audience ou un RDV
             </Button>
           )}
         </div>
       )}
 
-      {/* Liste groupée par jour */}
+      {/* ── Timeline groupée par jour ───────────────────────────── */}
       {!isLoading && evenements.length > 0 && (
         <div className="space-y-5">
-          {[...groupes.entries()].map(([cle, items]) => (
-            <div key={cle}>
-              {/* Séparateur de jour */}
-              <div className="mb-2 flex items-center gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {etiquetteDate(items[0].dateHeure)}
-                </span>
-                <div className="flex-1 border-t" aria-hidden="true" />
-              </div>
+          {[...groupes.entries()].map(([cle, items]) => {
+            const { label, isToday: estAujourdhui } = etiquetteDate(items[0].dateHeure);
 
-              {/* Événements */}
-              <div className="space-y-2">
-                {items.map((evt) => {
-                  const cfg = TYPE_CONFIG[evt.type];
-                  const Icone = cfg.icone;
-                  const passe = isPast(parseISO(evt.dateHeure));
+            return (
+              <div key={cle}>
+                {/* Séparateur jour */}
+                <div className="mb-2 flex items-center gap-2">
+                  <span
+                    className={cn(
+                      'text-xs font-semibold uppercase tracking-wide',
+                      estAujourdhui ? 'text-primary' : 'text-muted-foreground'
+                    )}
+                  >
+                    {label}
+                  </span>
+                  <div className="flex-1 border-t" aria-hidden="true" />
+                  {estAujourdhui && (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                      Aujourd'hui
+                    </span>
+                  )}
+                </div>
 
-                  return (
-                    <div
-                      key={evt.id}
-                      className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
-                        passe ? 'bg-muted/30 opacity-60' : 'bg-card hover:bg-accent/30'
-                      }`}
-                    >
-                      {/* Icône type */}
-                      <div className="mt-0.5 shrink-0">
-                        <Icone className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                      </div>
+                {/* Événements du jour */}
+                <div className="relative space-y-1.5 pl-5">
+                  {items.length > 1 && (
+                    <span
+                      className="absolute left-1.75 top-2.5 h-[calc(100%-1.25rem)] w-px bg-border/60"
+                      aria-hidden="true"
+                    />
+                  )}
 
-                      {/* Contenu */}
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-medium leading-tight">{evt.titre}</span>
-                          <Badge variant="outline" className={`px-1.5 py-0 text-xs ${cfg.classe}`}>
-                            {cfg.label}
-                          </Badge>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                          <span>{format(parseISO(evt.dateHeure), "HH'h'mm", { locale: fr })}</span>
-                          {evt.lieu && (
-                            <span className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" aria-hidden="true" />
-                              {evt.lieu}
-                            </span>
+                  {items.map((evt) => {
+                    const cfg = TYPE_CONFIG[evt.type];
+                    const Icone = cfg.icone;
+                    const passe = isPast(parseISO(evt.dateHeure));
+
+                    return (
+                      <div key={evt.id} className="relative flex items-start gap-3">
+                        {/* Dot */}
+                        <span
+                          className={cn(
+                            'relative z-10 mt-2.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full ring-2 ring-background',
+                            passe ? 'bg-muted-foreground/30' : cfg.dot
                           )}
-                          {evt.notes && (
-                            <span className="flex items-center gap-1">
-                              <FileText className="h-3 w-3" aria-hidden="true" />
-                              <span className="max-w-50 truncate">{evt.notes}</span>
-                            </span>
+                          aria-hidden="true"
+                        />
+
+                        {/* Card */}
+                        <div
+                          className={cn(
+                            'group flex min-w-0 flex-1 items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors',
+                            passe
+                              ? 'border-border/50 bg-muted/20 opacity-55'
+                              : `border-border/60 ${cfg.card} hover:brightness-[0.97] dark:hover:brightness-110`
                           )}
+                        >
+                          <div className="mt-0.5 shrink-0">
+                            <Icone
+                              className={cn(
+                                'h-3.5 w-3.5',
+                                passe ? 'text-muted-foreground/50' : 'text-muted-foreground'
+                              )}
+                              aria-hidden="true"
+                            />
+                          </div>
+
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-sm font-medium leading-tight">{evt.titre}</span>
+                              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <span
+                                  className={cn(
+                                    'h-1.5 w-1.5 rounded-full',
+                                    passe ? 'bg-muted-foreground/30' : cfg.dot
+                                  )}
+                                  aria-hidden="true"
+                                />
+                                {cfg.label}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-muted-foreground">
+                              <span className="tabular-nums font-medium">
+                                {format(parseISO(evt.dateHeure), "HH'h'mm", { locale: fr })}
+                              </span>
+                              {evt.lieu && (
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" aria-hidden="true" />
+                                  {evt.lieu}
+                                </span>
+                              )}
+                              {evt.notes && (
+                                <span className="flex items-center gap-1">
+                                  <FileText className="h-3 w-3" aria-hidden="true" />
+                                  <span className="max-w-48 truncate">{evt.notes}</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                            {peutModifier && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                onClick={() => ouvrirEdition(evt)}
+                                aria-label={`Modifier l'événement ${evt.titre}`}
+                              >
+                                <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                              </Button>
+                            )}
+                            {peutSupprimer && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                onClick={() => setIdASupprimer(evt.id)}
+                                aria-label={`Supprimer l'événement ${evt.titre}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
-
-                      {/* Actions */}
-                      <div className="flex shrink-0 items-center gap-1">
-                        {peutModifier && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => ouvrirEdition(evt)}
-                            aria-label={`Modifier l'événement ${evt.titre}`}
-                          >
-                            <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                          </Button>
-                        )}
-                        {peutSupprimer && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-destructive hover:bg-destructive/5 hover:text-destructive"
-                            onClick={() => setIdASupprimer(evt.id)}
-                            aria-label={`Supprimer l'événement ${evt.titre}`}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {/* ── Dialog Créer / Modifier ──────────────────────────────── */}
       <Dialog open={dialogOuvert} onOpenChange={(o) => !o && !isPending && fermerDialog()}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
+        <DialogContent className="gap-0 p-0 sm:max-w-md">
+          <DialogHeader className="border-b px-6 py-4">
+            <DialogTitle className="text-base">
               {evenementEdite ? "Modifier l'événement" : 'Nouvel événement'}
             </DialogTitle>
-            <DialogDescription className="sr-only">
-              Formulaire de {evenementEdite ? 'modification' : 'création'} d'un événement
+            <DialogDescription className="text-xs text-muted-foreground">
+              {evenementEdite
+                ? `Modification de « ${evenementEdite.titre} »`
+                : 'Planifiez une audience, un rendez-vous ou un rappel.'}
             </DialogDescription>
           </DialogHeader>
 
-          <Form {...form}>
-            <form
-              id={`${uid}-form`}
-              onSubmit={form.handleSubmit(onSubmit)}
-              className="space-y-4"
-              noValidate
-            >
-              {/* Titre */}
-              <FormField
-                control={form.control}
-                name="titre"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Titre *</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="ex : Audience correctionnelle"
-                        disabled={isPending}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Type + Date en ligne */}
-              <div className="grid grid-cols-2 gap-3">
+          <div className="px-6 py-5">
+            <Form {...form}>
+              <form
+                id={`${uid}-form`}
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-4"
+                noValidate
+              >
+                {/* Titre */}
                 <FormField
                   control={form.control}
-                  name="type"
+                  name="titre"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Type *</FormLabel>
-                      <Select
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        disabled={isPending}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {/* Lucide à la place des emojis — accessibles et thémables */}
-                          <SelectItem value="audience">
-                            <span className="flex items-center gap-2">
-                              <Scale className="h-3.5 w-3.5" aria-hidden="true" />
-                              Audience
-                            </span>
-                          </SelectItem>
-                          <SelectItem value="rdv">
-                            <span className="flex items-center gap-2">
-                              <Users className="h-3.5 w-3.5" aria-hidden="true" />
-                              Rendez-vous
-                            </span>
-                          </SelectItem>
-                          <SelectItem value="rappel">
-                            <span className="flex items-center gap-2">
-                              <Bell className="h-3.5 w-3.5" aria-hidden="true" />
-                              Rappel
-                            </span>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="dateHeure"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Date & heure *</FormLabel>
+                      <FormLabel className="text-xs font-medium">
+                        Titre <span className="text-destructive">*</span>
+                      </FormLabel>
                       <FormControl>
-                        <Input type="datetime-local" disabled={isPending} {...field} />
+                        <Input
+                          className="h-9 text-sm"
+                          placeholder="ex : Audience correctionnelle"
+                          disabled={isPending}
+                          {...field}
+                        />
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-xs" />
                     </FormItem>
                   )}
                 />
-              </div>
 
-              {/* Lieu */}
-              <FormField
-                control={form.control}
-                name="lieu"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Lieu</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="ex : Tribunal de Constantine – Salle 3"
-                        disabled={isPending}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                {/* Type + Date */}
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-medium">
+                          Type <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <Select
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          disabled={isPending}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-9 w-full text-sm">
+                              <SelectValue placeholder="Type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {(
+                              Object.entries(TYPE_CONFIG) as [
+                                TypeEvenement,
+                                (typeof TYPE_CONFIG)[TypeEvenement],
+                              ][]
+                            ).map(([val, { label, dot }]) => (
+                              <SelectItem key={val} value={val}>
+                                <span className="flex items-center gap-2">
+                                  <span
+                                    className={cn('h-1.5 w-1.5 rounded-full', dot)}
+                                    aria-hidden="true"
+                                  />
+                                  {label}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="dateHeure"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-medium">
+                          Date & heure <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="datetime-local"
+                            className="h-9 text-sm"
+                            disabled={isPending}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-              {/* Notes */}
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Notes</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Informations complémentaires…"
-                        className="resize-none"
-                        rows={3}
-                        disabled={isPending}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={fermerDialog} disabled={isPending}>
-                  Annuler
-                </Button>
-                <Button type="submit" form={`${uid}-form`} disabled={isPending}>
-                  {isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                {/* Lieu */}
+                <FormField
+                  control={form.control}
+                  name="lieu"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-medium">
+                        Lieu <span className="font-normal text-muted-foreground/70">(opt.)</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-9 text-sm"
+                          placeholder="ex : Tribunal de Constantine – Salle 3"
+                          disabled={isPending}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
                   )}
-                  {isPending
-                    ? evenementEdite
-                      ? 'Enregistrement…'
-                      : 'Ajout en cours…'
-                    : evenementEdite
-                      ? 'Enregistrer'
-                      : 'Ajouter'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
+                />
+
+                {/* Notes */}
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-medium">
+                        Notes <span className="font-normal text-muted-foreground/70">(opt.)</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea
+                          className="resize-none text-sm"
+                          rows={2}
+                          placeholder="Informations complémentaires…"
+                          disabled={isPending}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+
+                <DialogFooter className="pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={fermerDialog}
+                    disabled={isPending}
+                  >
+                    Annuler
+                  </Button>
+                  <Button type="submit" size="sm" form={`${uid}-form`} disabled={isPending}>
+                    {isPending && (
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                    )}
+                    {isPending
+                      ? evenementEdite
+                        ? 'Enregistrement…'
+                        : 'Ajout en cours…'
+                      : evenementEdite
+                        ? 'Enregistrer'
+                        : 'Ajouter'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -554,14 +637,16 @@ export default function TabAgenda({ dossierId }: Props) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive hover:bg-destructive/90"
-              onClick={() => {
-                if (idASupprimer) mutSupprimer.mutate(idASupprimer);
-                setIdASupprimer(null);
-              }}
-            >
-              Supprimer
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (idASupprimer) mutSupprimer.mutate(idASupprimer);
+                  setIdASupprimer(null);
+                }}
+              >
+                Supprimer
+              </Button>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

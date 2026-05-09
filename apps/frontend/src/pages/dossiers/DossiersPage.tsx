@@ -9,6 +9,7 @@ import {
   Pencil,
   Trash2,
   ChevronRight,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDebounce } from 'use-debounce';
@@ -86,7 +87,7 @@ export default function DossiersPage() {
   const utilisateur = useAuthStore((s) => s.utilisateur);
   const estAdmin = utilisateur?.role === 'admin';
 
-  // ─── Filtres ──────────────────────────────────────────────────────
+  // ─── Filtres ────────────────────────────────────────────────────
   const [recherche, setRecherche] = useState('');
   const [filtreStatut, setFiltreStatut] = useState<StatutDossier | 'tous'>('tous');
   const [filtreType, setFiltreType] = useState<TypeAffaire | 'tous'>('tous');
@@ -94,13 +95,13 @@ export default function DossiersPage() {
   const [page, setPage] = useState(1);
   const [rechercheDebounced] = useDebounce(recherche, 300);
 
-  // ─── Dialogs ──────────────────────────────────────────────────────
+  // ─── Dialogs ────────────────────────────────────────────────────
   const [dialogCreer, setDialogCreer] = useState(false);
   const [clientPreselectionne, setClientPreselectionne] = useState<string | undefined>();
   const [dossierAModifier, setDossierAModifier] = useState<Dossier | null>(null);
   const [dossierASupprimer, setDossierASupprimer] = useState<Dossier | null>(null);
 
-  // ─── Ouverture automatique depuis DialogCreerClient ───────────────
+  // ─── Ouverture automatique depuis DialogCreerClient ─────────────
   useEffect(() => {
     const state = location.state as LocationState | null;
     if (state?.ouvrirCreerDossier) {
@@ -112,7 +113,7 @@ export default function DossiersPage() {
     }
   }, [location.state]);
 
-  // ─── Query ────────────────────────────────────────────────────────
+  // ─── Query ──────────────────────────────────────────────────────
   const { data, isLoading } = useQuery({
     queryKey: [
       'cabinet',
@@ -143,7 +144,7 @@ export default function DossiersPage() {
     filtreInstitution !== 'tous'
   );
 
-  // ─── Suppression ──────────────────────────────────────────────────
+  // ─── Suppression ────────────────────────────────────────────────
   const { mutate: supprimer, isPending: suppression } = useMutation({
     mutationFn: () => supprimerDossier(dossierASupprimer!._id),
     onSuccess: () => {
@@ -175,37 +176,58 @@ export default function DossiersPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* ── En-tête ─────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Dossiers</h2>
+    <div className="space-y-6 px-1">
+      {/* ── En-tête ────────────────────────────────────────────── */}
+      <div
+        className="animate-fade-up opacity-0 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+        style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}
+      >
+        <div className="space-y-0.5">
+          <h2 className="text-xl font-semibold tracking-tight">Dossiers</h2>
           <p className="text-sm text-muted-foreground">
             {meta
               ? `${meta.total} dossier${meta.total > 1 ? 's' : ''} au total`
               : 'Gestion de vos affaires juridiques'}
           </p>
         </div>
-        <Button onClick={() => setDialogCreer(true)}>
-          <Plus className="mr-2 h-4 w-4" />
+        <Button size="sm" onClick={() => setDialogCreer(true)}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
           Nouveau dossier
         </Button>
       </div>
 
-      {/* ── Filtres ─────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+      {/* ── Filtres ────────────────────────────────────────────── */}
+      <div
+        className="animate-fade-up opacity-0 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"
+        style={{ animationDelay: '60ms', animationFillMode: 'forwards' }}
+      >
         {/* Recherche */}
         <div className="relative flex-1 sm:min-w-56">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
           <Input
-            placeholder="Référence, adversaire, n° dossier..."
-            className="pl-9"
+            placeholder="Référence, adversaire, n° dossier…"
+            className="h-9 pl-8.5 pr-9 text-sm"
             value={recherche}
             onChange={(e) => {
               setRecherche(e.target.value);
               setPage(1);
             }}
           />
+          {recherche && (
+            <button
+              onClick={() => {
+                setRecherche('');
+                setPage(1);
+              }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+              aria-label="Effacer la recherche"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Statut */}
@@ -216,7 +238,7 @@ export default function DossiersPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="w-full sm:w-44">
+          <SelectTrigger className="h-9 w-full text-sm sm:w-40">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -231,7 +253,7 @@ export default function DossiersPage() {
           </SelectContent>
         </Select>
 
-        {/* Section */}
+        {/* Type affaire */}
         <Select
           value={filtreType}
           onValueChange={(v) => {
@@ -239,7 +261,7 @@ export default function DossiersPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="h-9 w-full text-sm sm:w-44">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -262,7 +284,7 @@ export default function DossiersPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="w-full sm:w-52">
+          <SelectTrigger className="h-9 w-full text-sm sm:w-48">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -280,206 +302,235 @@ export default function DossiersPage() {
           </SelectContent>
         </Select>
 
+        {/* Reset */}
         {filtresActifs && (
-          <Button variant="ghost" onClick={reinitialiserFiltres}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-9 shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={reinitialiserFiltres}
+          >
+            <X className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
             Réinitialiser
           </Button>
         )}
       </div>
 
-      {/* ── Tableau ─────────────────────────────────────────────── */}
-      <Card>
-        <CardContent className="p-0">
-          {isLoading && <SkeletonTable avecAvatar={false} avecBadge={true} />}
+      {/* ── Tableau ────────────────────────────────────────────── */}
+      <div
+        className="animate-fade-up opacity-0"
+        style={{ animationDelay: '120ms', animationFillMode: 'forwards' }}
+      >
+        <Card>
+          <CardContent className="p-0">
+            {isLoading && <SkeletonTable avecAvatar={false} avecBadge={true} />}
 
-          {!isLoading && dossiers.length === 0 && (
-            <EmptyState
-              icone={FolderOpen}
-              titre={filtresActifs ? 'Aucun dossier trouvé' : 'Aucun dossier pour le moment'}
-              description={
-                filtresActifs
-                  ? 'Aucun dossier ne correspond à vos critères. Modifiez ou réinitialisez les filtres.'
-                  : 'Ouvrez votre premier dossier pour commencer à gérer vos affaires.'
-              }
-              action={
-                !filtresActifs
-                  ? { label: 'Nouveau dossier', onClick: () => setDialogCreer(true), icone: Plus }
-                  : undefined
-              }
-            />
-          )}
+            {!isLoading && dossiers.length === 0 && (
+              <EmptyState
+                icone={FolderOpen}
+                titre={filtresActifs ? 'Aucun dossier trouvé' : 'Aucun dossier pour le moment'}
+                description={
+                  filtresActifs
+                    ? 'Aucun dossier ne correspond à vos critères. Modifiez ou réinitialisez les filtres.'
+                    : 'Ouvrez votre premier dossier pour commencer à gérer vos affaires.'
+                }
+                action={
+                  !filtresActifs
+                    ? { label: 'Nouveau dossier', onClick: () => setDialogCreer(true), icone: Plus }
+                    : undefined
+                }
+              />
+            )}
 
-          {!isLoading && dossiers.length > 0 && (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="pl-6">Référence</TableHead>
-                    <TableHead className="hidden md:table-cell">Parties</TableHead>
-                    <TableHead className="hidden lg:table-cell">Type</TableHead>
-                    <TableHead className="hidden lg:table-cell">Institution</TableHead>
-                    <TableHead className="hidden sm:table-cell">Ouverture</TableHead>
-                    <TableHead className="hidden sm:table-cell">Statut</TableHead>
-                    <TableHead className="w-13 pr-4" />
-                  </TableRow>
-                </TableHeader>
+            {!isLoading && dossiers.length > 0 && (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="pl-5 text-xs">Référence</TableHead>
+                      <TableHead className="hidden text-xs md:table-cell">Parties</TableHead>
+                      <TableHead className="hidden text-xs lg:table-cell">Type</TableHead>
+                      <TableHead className="hidden text-xs lg:table-cell">Institution</TableHead>
+                      <TableHead className="hidden text-xs sm:table-cell">Ouverture</TableHead>
+                      <TableHead className="hidden text-xs sm:table-cell">Statut</TableHead>
+                      <TableHead className="w-12 pr-4" />
+                    </TableRow>
+                  </TableHeader>
 
-                <TableBody>
-                  {dossiers.map((dossier) => {
-                    const s = styleStatutDossier(dossier.statut);
-                    return (
-                      <TableRow
-                        key={dossier._id}
-                        className="cursor-pointer"
-                        onClick={() => navigate(`/cabinet/dossiers/${dossier._id}`)}
-                      >
-                        {/* Référence + N° dossier */}
-                        <TableCell className="pl-6">
-                          <p className="font-mono text-sm font-medium">{dossier.reference}</p>
-                          {dossier.dossierNumero && (
-                            <p className="text-xs text-muted-foreground">
-                              N° {dossier.dossierNumero}
+                  <TableBody>
+                    {dossiers.map((dossier, i) => {
+                      const s = styleStatutDossier(dossier.statut);
+                      return (
+                        <TableRow
+                          key={dossier._id}
+                          className="animate-fade-up opacity-0 cursor-pointer transition-colors"
+                          style={{
+                            animationDelay: `${160 + i * 30}ms`,
+                            animationFillMode: 'forwards',
+                          }}
+                          onClick={() => navigate(`/cabinet/dossiers/${dossier._id}`)}
+                        >
+                          {/* Référence */}
+                          <TableCell className="pl-5">
+                            <p className="font-mono text-xs font-semibold text-foreground">
+                              {dossier.reference}
                             </p>
-                          )}
-                        </TableCell>
-
-                        {/* Parties — client c/ adversaire */}
-                        <TableCell className="hidden md:table-cell">
-                          <p className="font-medium leading-tight">{nomClient(dossier)}</p>
-                          <p className="text-xs text-muted-foreground">
-                            c/{' '}
-                            <span className="font-medium text-foreground">
-                              {dossier.adversaire}
-                            </span>
-                          </p>
-                        </TableCell>
-
-                        {/* Section */}
-                        <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                          {dossier.typeAffaire ? (
-                            LABELS_TYPE_AFFAIRE[dossier.typeAffaire]
-                          ) : (
-                            <span className="text-muted-foreground/40">—</span>
-                          )}
-                        </TableCell>
-
-                        {/* Institution */}
-                        <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                          {dossier.institution ? (
-                            LABELS_INSTITUTION[dossier.institution]
-                          ) : (
-                            <span className="text-muted-foreground/40">—</span>
-                          )}
-                        </TableCell>
-
-                        {/* Date d'ouverture */}
-                        <TableCell className="hidden sm:table-cell text-sm tabular-nums text-muted-foreground">
-                          {formaterDateCourte(dossier.dateOuverture)}
-                        </TableCell>
-
-                        {/* Statut */}
-                        <TableCell className="hidden sm:table-cell">
-                          <span
-                            className={cn(
-                              'inline-flex items-center gap-1.5',
-                              'rounded-full border px-2.5 py-0.5 text-xs font-medium',
-                              s.text,
-                              s.bg,
-                              s.border
+                            {dossier.dossierNumero && (
+                              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                N° {dossier.dossierNumero}
+                              </p>
                             )}
-                          >
-                            <span className={cn('h-1.5 w-1.5 rounded-full', s.dot)} />
-                            {s.label}
-                          </span>
-                        </TableCell>
+                          </TableCell>
 
-                        {/* Actions */}
-                        <TableCell className="pr-4 text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={(e) => e.stopPropagation()}
-                                aria-label="Actions"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`/cabinet/dossiers/${dossier._id}`);
-                                }}
-                              >
-                                <ChevronRight className="mr-2 h-4 w-4" />
-                                Ouvrir
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDossierAModifier(dossier);
-                                }}
-                              >
-                                <Pencil className="mr-2 h-4 w-4" />
-                                Modifier
-                              </DropdownMenuItem>
-                              {estAdmin && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    className="text-destructive focus:text-destructive"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setDossierASupprimer(dossier);
-                                    }}
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Archiver
-                                  </DropdownMenuItem>
-                                </>
+                          {/* Parties */}
+                          <TableCell className="hidden md:table-cell">
+                            <p className="text-sm font-medium leading-tight">
+                              {nomClient(dossier)}
+                            </p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              c/{' '}
+                              <span className="font-medium text-foreground/80">
+                                {dossier.adversaire}
+                              </span>
+                            </p>
+                          </TableCell>
+
+                          {/* Type */}
+                          <TableCell className="hidden lg:table-cell">
+                            {dossier.typeAffaire ? (
+                              <span className="text-xs text-muted-foreground">
+                                {LABELS_TYPE_AFFAIRE[dossier.typeAffaire]}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground/30">—</span>
+                            )}
+                          </TableCell>
+
+                          {/* Institution */}
+                          <TableCell className="hidden lg:table-cell">
+                            {dossier.institution ? (
+                              <span className="text-xs text-muted-foreground">
+                                {LABELS_INSTITUTION[dossier.institution]}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground/30">—</span>
+                            )}
+                          </TableCell>
+
+                          {/* Date ouverture */}
+                          <TableCell className="hidden sm:table-cell">
+                            <span className="text-xs tabular-nums text-muted-foreground">
+                              {formaterDateCourte(dossier.dateOuverture)}
+                            </span>
+                          </TableCell>
+
+                          {/* Statut */}
+                          <TableCell className="hidden sm:table-cell">
+                            <span
+                              className={cn(
+                                'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                                s.text,
+                                s.bg,
+                                s.border
                               )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                            >
+                              <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', s.dot)} />
+                              {s.label}
+                            </span>
+                          </TableCell>
+
+                          {/* Actions */}
+                          <TableCell className="pr-3 text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                  onClick={(e) => e.stopPropagation()}
+                                  aria-label="Actions sur ce dossier"
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-40">
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/cabinet/dossiers/${dossier._id}`);
+                                  }}
+                                >
+                                  <ChevronRight className="mr-2 h-3.5 w-3.5" />
+                                  Ouvrir
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDossierAModifier(dossier);
+                                  }}
+                                >
+                                  <Pencil className="mr-2 h-3.5 w-3.5" />
+                                  Modifier
+                                </DropdownMenuItem>
+                                {estAdmin && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="text-destructive focus:text-destructive"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDossierASupprimer(dossier);
+                                      }}
+                                    >
+                                      <Trash2 className="mr-2 h-3.5 w-3.5" />
+                                      Archiver
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+
+          {/* ── Pagination ──────────────────────────────────────── */}
+          {meta && meta.totalPages > 1 && (
+            <div className="flex items-center justify-between border-t px-4 py-3">
+              <p className="text-xs text-muted-foreground">
+                Page {meta.page} sur {meta.totalPages}
+                <span className="mx-1.5 text-muted-foreground/40">·</span>
+                {meta.total} dossier{meta.total > 1 ? 's' : ''}
+              </p>
+              <div className="flex gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs"
+                  disabled={page === 1}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  Précédent
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs"
+                  disabled={page >= meta.totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Suivant
+                </Button>
+              </div>
             </div>
           )}
-        </CardContent>
-
-        {/* ── Pagination ──────────────────────────────────────────── */}
-        {meta && meta.totalPages > 1 && (
-          <div className="flex items-center justify-between border-t px-4 py-3">
-            <p className="text-xs text-muted-foreground">
-              Page {meta.page} sur {meta.totalPages} · {meta.total} dossiers
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page === 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                Précédent
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= meta.totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Suivant
-              </Button>
-            </div>
-          </div>
-        )}
-      </Card>
+        </Card>
+      </div>
 
       {/* ── Dialogs ─────────────────────────────────────────────── */}
       <DialogCreerDossier
@@ -514,13 +565,11 @@ export default function DossiersPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive hover:bg-destructive/90"
-              onClick={() => supprimer()}
-              disabled={suppression}
-            >
-              Archiver
+            <AlertDialogCancel disabled={suppression}>Annuler</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button variant="destructive" disabled={suppression} onClick={() => supprimer()}>
+                {suppression ? 'Archivage…' : 'Archiver'}
+              </Button>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

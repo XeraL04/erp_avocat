@@ -4,14 +4,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import type { Resolver } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AxiosError } from 'axios';
 
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
+  // DialogHeader,
   DialogTitle,
   DialogDescription,
   DialogFooter,
@@ -19,15 +19,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 
 import { modifierClient } from '@/api/client.api';
 import { extraireMessageErreur } from '@/api/auth.api';
-import { nomAffiche } from '@/types';
+import { nomAffiche, initialesAvatar } from '@/lib/utils';
 import type { Client } from '@/types';
 
-// ─── Type formulaire input ────────────────────────────────────────────────────
+// ─── Type formulaire ──────────────────────────────────────────────────────────
 interface FormModifier {
   telephone: string;
   nom?: string;
@@ -69,7 +68,51 @@ const schema = z.object({
   notes: vide(),
 });
 
-// ─── Composant ────────────────────────────────────────────────────────────────
+// ─── Sous-composant champ ─────────────────────────────────────────────────────
+function Champ({
+  id,
+  label,
+  requis,
+  optionnel,
+  erreur,
+  children,
+}: {
+  id: string;
+  label: string;
+  requis?: boolean;
+  optionnel?: boolean;
+  erreur?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id} className="text-sm">
+        {label}
+        {requis && <span className="ml-0.5 text-destructive">*</span>}
+        {optionnel && (
+          <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">optionnel</span>
+        )}
+      </Label>
+      {children}
+      {erreur && (
+        <p id={`${id}-error`} className="text-xs text-destructive" role="alert">
+          {erreur}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─── Séparateur de section ────────────────────────────────────────────────────
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+      {children}
+    </p>
+  );
+}
+
+// ─── Composant principal ──────────────────────────────────────────────────────
 interface Props {
   client: Client;
   onFermer: () => void;
@@ -77,6 +120,8 @@ interface Props {
 
 export default function DialogModifierClient({ client, onFermer }: Props) {
   const queryClient = useQueryClient();
+  const estMorale = client.type === 'morale';
+  const nomClient = nomAffiche(client);
 
   const {
     register,
@@ -131,165 +176,174 @@ export default function DialogModifierClient({ client, onFermer }: Props) {
 
   return (
     <Dialog open onOpenChange={(o) => !o && onFermer()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            Modifier le client
-            {/* Badge type — span inline, cohérent avec le reste du projet */}
-            <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-              {client.type === 'physique' ? 'Physique' : 'Morale'}
-            </span>
-          </DialogTitle>
-          <DialogDescription>{nomAffiche(client)}</DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-h-[90vh] gap-0 overflow-y-auto p-0 sm:max-w-lg">
+        {/* ── Header identité ───────────────────────────────────── */}
+        <div className="border-b px-6 pb-4 pt-6">
+          <div className="flex items-center gap-3">
+            {/* Avatar */}
+            <div
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-primary-foreground"
+              style={{ backgroundColor: 'var(--primary)' }}
+              aria-hidden="true"
+            >
+              {estMorale ? <Building2 className="h-5 w-5" /> : initialesAvatar(nomClient)}
+            </div>
 
-        <form onSubmit={handleSubmit((data) => mutate(data))} className="space-y-4" noValidate>
-          {/* ── Champs spécifiques au type ─────────────────────── */}
-          {client.type === 'physique' ? (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="mod-prenom">Prénom</Label>
-                  <Input
-                    id="mod-prenom"
-                    disabled={isPending}
-                    aria-invalid={!!errors.prenom}
-                    aria-describedby={errors.prenom ? 'mod-prenom-error' : undefined}
-                    {...register('prenom')}
-                  />
-                  {errors.prenom && (
-                    <p id="mod-prenom-error" className="text-xs text-destructive" role="alert">
-                      {errors.prenom.message}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="mod-nom">Nom</Label>
-                  <Input
-                    id="mod-nom"
-                    disabled={isPending}
-                    aria-invalid={!!errors.nom}
-                    aria-describedby={errors.nom ? 'mod-nom-error' : undefined}
-                    {...register('nom')}
-                  />
-                  {errors.nom && (
-                    <p id="mod-nom-error" className="text-xs text-destructive" role="alert">
-                      {errors.nom.message}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="mod-cin">
-                  Numéro d'identification nationale
-                  <span className="ml-1 text-xs font-normal text-muted-foreground">
-                    (optionnel)
-                  </span>
-                </Label>
-                <Input
-                  id="mod-cin"
-                  maxLength={18}
-                  inputMode="numeric"
-                  disabled={isPending}
-                  {...register('cin')}
-                />
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-base font-semibold leading-tight">
+                {nomClient}
+              </DialogTitle>
+              <div className="mt-1 flex items-center gap-2">
+                <DialogDescription className="text-xs">
+                  Modification des informations client
+                </DialogDescription>
+                <span
+                  className="rounded-full px-2 py-0.5 text-[11px] font-medium"
+                  style={{
+                    color: estMorale ? 'var(--plan-pro)' : 'var(--status-essai)',
+                    backgroundColor: estMorale ? 'var(--plan-pro-bg)' : 'var(--status-essai-bg)',
+                  }}
+                >
+                  {estMorale ? 'Morale' : 'Physique'}
+                </span>
               </div>
             </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="mod-rs">Raison sociale</Label>
-                <Input
-                  id="mod-rs"
-                  disabled={isPending}
-                  aria-invalid={!!errors.raisonSociale}
-                  aria-describedby={errors.raisonSociale ? 'mod-rs-error' : undefined}
-                  {...register('raisonSociale')}
-                />
-                {errors.raisonSociale && (
-                  <p id="mod-rs-error" className="text-xs text-destructive" role="alert">
-                    {errors.raisonSociale.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="mod-rep">Représentant légal</Label>
-                <Input id="mod-rep" disabled={isPending} {...register('representantLegal')} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="mod-nif">NIF / RC</Label>
-                <Input id="mod-nif" disabled={isPending} {...register('nifRc')} />
-              </div>
-            </div>
-          )}
+          </div>
+        </div>
 
-          <Separator />
+        {/* ── Formulaire ────────────────────────────────────────── */}
+        <form
+          onSubmit={handleSubmit((data) => mutate(data))}
+          className="space-y-0 px-6 py-4"
+          noValidate
+        >
+          {/* Section spécifique au type */}
+          <SectionLabel>{estMorale ? 'Informations société' : 'Identité'}</SectionLabel>
 
-          {/* ── Champs communs ──────────────────────────────────── */}
+          <div className="space-y-3">
+            {!estMorale ? (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <Champ id="mod-prenom" label="Prénom" erreur={errors.prenom?.message}>
+                    <Input
+                      id="mod-prenom"
+                      disabled={isPending}
+                      aria-invalid={!!errors.prenom}
+                      aria-describedby={errors.prenom ? 'mod-prenom-error' : undefined}
+                      {...register('prenom')}
+                    />
+                  </Champ>
+                  <Champ id="mod-nom" label="Nom" erreur={errors.nom?.message}>
+                    <Input
+                      id="mod-nom"
+                      disabled={isPending}
+                      aria-invalid={!!errors.nom}
+                      aria-describedby={errors.nom ? 'mod-nom-error' : undefined}
+                      {...register('nom')}
+                    />
+                  </Champ>
+                </div>
+                <Champ id="mod-cin" label="N° identification nationale" optionnel>
+                  <Input
+                    id="mod-cin"
+                    maxLength={18}
+                    inputMode="numeric"
+                    disabled={isPending}
+                    {...register('cin')}
+                  />
+                </Champ>
+              </>
+            ) : (
+              <>
+                <Champ id="mod-rs" label="Raison sociale" erreur={errors.raisonSociale?.message}>
+                  <Input
+                    id="mod-rs"
+                    disabled={isPending}
+                    aria-invalid={!!errors.raisonSociale}
+                    aria-describedby={errors.raisonSociale ? 'mod-rs-error' : undefined}
+                    {...register('raisonSociale')}
+                  />
+                </Champ>
+                <Champ id="mod-rep" label="Représentant légal" optionnel>
+                  <Input id="mod-rep" disabled={isPending} {...register('representantLegal')} />
+                </Champ>
+                <Champ id="mod-nif" label="NIF / RC" optionnel>
+                  <Input id="mod-nif" disabled={isPending} {...register('nifRc')} />
+                </Champ>
+              </>
+            )}
+          </div>
+
+          {/* Séparateur section contact */}
+          <SectionLabel>Contact</SectionLabel>
+
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="mod-tel">Téléphone *</Label>
+              <Champ id="mod-tel" label="Téléphone" requis erreur={errors.telephone?.message}>
                 <Input
                   id="mod-tel"
+                  inputMode="tel"
                   disabled={isPending}
                   aria-invalid={!!errors.telephone}
                   aria-describedby={errors.telephone ? 'mod-tel-error' : undefined}
                   {...register('telephone')}
                 />
-                {errors.telephone && (
-                  <p id="mod-tel-error" className="text-xs text-destructive" role="alert">
-                    {errors.telephone.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="mod-tel2">Tél. secondaire</Label>
-                <Input id="mod-tel2" disabled={isPending} {...register('telephoneSecondaire')} />
-              </div>
+              </Champ>
+              <Champ id="mod-tel2" label="Tél. secondaire" optionnel>
+                <Input
+                  id="mod-tel2"
+                  inputMode="tel"
+                  disabled={isPending}
+                  {...register('telephoneSecondaire')}
+                />
+              </Champ>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="mod-email">Email</Label>
+            <Champ id="mod-email" label="Email" optionnel erreur={errors.email?.message}>
               <Input
                 id="mod-email"
                 type="email"
+                inputMode="email"
                 disabled={isPending}
                 aria-invalid={!!errors.email}
                 aria-describedby={errors.email ? 'mod-email-error' : undefined}
                 {...register('email')}
               />
-              {errors.email && (
-                <p id="mod-email-error" className="text-xs text-destructive" role="alert">
-                  {errors.email.message}
-                </p>
-              )}
-            </div>
+            </Champ>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="mod-adresse">Adresse</Label>
+            <Champ id="mod-adresse" label="Adresse" optionnel>
               <Input id="mod-adresse" disabled={isPending} {...register('adresse')} />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="mod-notes">Notes</Label>
-              <Textarea
-                id="mod-notes"
-                rows={2}
-                className="resize-none"
-                disabled={isPending}
-                {...register('notes')}
-              />
-            </div>
+            </Champ>
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onFermer} disabled={isPending}>
+          {/* Séparateur section notes */}
+          <SectionLabel>Notes</SectionLabel>
+
+          <Textarea
+            id="mod-notes"
+            rows={3}
+            placeholder="Informations complémentaires…"
+            className="resize-none text-sm"
+            disabled={isPending}
+            {...register('notes')}
+          />
+
+          {/* Footer */}
+          <DialogFooter className="mt-6 gap-2 border-t pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onFermer}
+              disabled={isPending}
+            >
               Annuler
             </Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
-              {isPending ? 'Enregistrement en cours…' : 'Enregistrer'}
+            <Button type="submit" size="sm" disabled={isPending}>
+              {isPending && (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              )}
+              {isPending ? 'Enregistrement…' : 'Enregistrer les modifications'}
             </Button>
           </DialogFooter>
         </form>

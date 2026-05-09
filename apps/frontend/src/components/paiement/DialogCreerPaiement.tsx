@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
 import {
   Dialog,
   DialogContent,
@@ -61,17 +60,15 @@ export default function DialogCreerPaiement({ onFermer, onSuccess }: Props) {
   const [rechercheDossier, setRechercheDossier] = useState('');
   const [rechercheDebounced] = useDebounce(rechercheDossier, 300);
   const [selectorOuvert, setSelectorOuvert] = useState(false);
-
   const selectorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (selectorRef.current && !selectorRef.current.contains(e.target as Node)) {
+    const handler = (e: MouseEvent) => {
+      if (selectorRef.current && !selectorRef.current.contains(e.target as Node))
         setSelectorOuvert(false);
-      }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, []);
 
   const { data: dossiersData, isLoading: chargementDossiers } = useQuery({
@@ -79,7 +76,6 @@ export default function DialogCreerPaiement({ onFermer, onSuccess }: Props) {
     queryFn: () => listerDossiers({ q: rechercheDebounced || undefined, limit: 5 }),
     enabled: selectorOuvert,
   });
-
   const dossiers = (dossiersData?.data ?? []) as unknown as DossierSelectorItem[];
 
   const { data: reponseHonoraire, isLoading: chargementHonoraire } = useQuery({
@@ -103,9 +99,8 @@ export default function DialogCreerPaiement({ onFermer, onSuccess }: Props) {
 
   useEffect(() => {
     const honoraire = reponseHonoraire?.honoraire;
-    if (honoraire && form.getValues('honoraireId') !== honoraire._id) {
+    if (honoraire && form.getValues('honoraireId') !== honoraire._id)
       form.setValue('honoraireId', honoraire._id);
-    }
   }, [reponseHonoraire, form]);
 
   const { mutate, isPending } = useMutation({
@@ -133,32 +128,36 @@ export default function DialogCreerPaiement({ onFermer, onSuccess }: Props) {
   const afficherFormulaire = reponseHonoraire && reponseHonoraire.resteAPayer > 0;
   const dossierSolde = reponseHonoraire && reponseHonoraire.resteAPayer === 0;
 
+  const Opt = () => <span className="font-normal text-muted-foreground/70">(opt.)</span>;
+
   return (
     <Dialog open onOpenChange={(o) => !o && onFermer()}>
-      <DialogContent className="flex min-h-120 max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
-        {/* ── Header fixe ── */}
+      <DialogContent className="flex max-h-[90vh] min-h-96 flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
+        {/* ── Header ──────────────────────────────────────────── */}
         <DialogHeader className="shrink-0 border-b px-6 py-4">
-          <DialogTitle>Enregistrer un paiement</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-base">Enregistrer un paiement</DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground">
             Associez le paiement à un dossier — le client est automatiquement déduit.
           </DialogDescription>
         </DialogHeader>
 
-        {/* ── Body scrollable ── */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+        {/* ── Body scrollable ─────────────────────────────────── */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <Form {...form}>
             <form
               id="form-creer-paiement"
               onSubmit={form.handleSubmit((v) => mutate(v))}
               className="space-y-4"
             >
-              {/* Sélecteur de dossier */}
+              {/* ── Sélecteur dossier ────────────────────────── */}
               <FormField
                 control={form.control}
                 name="dossierId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Dossier *</FormLabel>
+                    <FormLabel className="text-xs font-medium">
+                      Dossier <span className="text-destructive">*</span>
+                    </FormLabel>
                     <div className="relative" ref={selectorRef}>
                       {dossierSelectionne ? (
                         <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2">
@@ -193,7 +192,7 @@ export default function DialogCreerPaiement({ onFermer, onSuccess }: Props) {
                           />
                           <Input
                             placeholder="Rechercher un dossier…"
-                            className="pl-9"
+                            className="h-9 pl-9 text-sm"
                             value={rechercheDossier}
                             onChange={(e) => {
                               setRechercheDossier(e.target.value);
@@ -251,26 +250,26 @@ export default function DialogCreerPaiement({ onFermer, onSuccess }: Props) {
                         </div>
                       )}
                     </div>
-                    <FormMessage />
+                    <FormMessage className="text-xs" />
                   </FormItem>
                 )}
               />
 
-              {/* Info honoraire */}
+              {/* ── Récapitulatif honoraire ──────────────────── */}
               {dossierSelectionne && (
                 <div className="rounded-lg border bg-muted/30 p-3">
                   {chargementHonoraire ? (
                     <div className="space-y-2">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-4 w-48" />
+                      <Skeleton className="h-3.5 w-32" />
+                      <Skeleton className="h-3.5 w-48" />
                     </div>
                   ) : !reponseHonoraire ? (
-                    <div className="flex items-center gap-2 text-sm text-destructive">
-                      <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <div className="flex items-center gap-2 text-xs text-destructive">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                       <span>Aucun honoraire défini pour ce dossier. Définissez-en un d'abord.</span>
                     </div>
                   ) : (
-                    <div className="space-y-2 text-sm">
+                    <div className="space-y-2 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Honoraire total</span>
                         <span className="font-medium tabular-nums">
@@ -283,8 +282,7 @@ export default function DialogCreerPaiement({ onFermer, onSuccess }: Props) {
                           {formaterMontant(reponseHonoraire.totalPaye)}
                         </span>
                       </div>
-                      <Separator />
-                      <div className="flex items-center justify-between font-semibold">
+                      <div className="border-t border-dashed border-border/60 pt-2 flex items-center justify-between font-semibold">
                         <span>Reste à payer</span>
                         <span
                           className="tabular-nums"
@@ -299,7 +297,7 @@ export default function DialogCreerPaiement({ onFermer, onSuccess }: Props) {
                         </span>
                       </div>
 
-                      {/* Badge statut — nouvelle API CONFIG_STATUT */}
+                      {/* Badge statut */}
                       {(() => {
                         const cfg =
                           CONFIG_STATUT[reponseHonoraire.statut as StatutKey] ??
@@ -307,10 +305,10 @@ export default function DialogCreerPaiement({ onFermer, onSuccess }: Props) {
                         const { Icone } = cfg;
                         return (
                           <div
-                            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium"
+                            className="mt-1 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium"
                             style={cfg.style}
                           >
-                            <Icone className="h-3.5 w-3.5" aria-hidden="true" />
+                            <Icone className="h-3 w-3" aria-hidden="true" />
                             {cfg.label}
                           </div>
                         );
@@ -320,28 +318,32 @@ export default function DialogCreerPaiement({ onFermer, onSuccess }: Props) {
                 </div>
               )}
 
-              {/* Formulaire paiement */}
+              {/* ── Formulaire paiement ──────────────────────── */}
               {afficherFormulaire && (
                 <>
+                  {/* Montant + Mode */}
                   <div className="grid grid-cols-2 gap-3">
                     <FormField
                       control={form.control}
                       name="montant"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Montant (DA) *</FormLabel>
+                          <FormLabel className="text-xs font-medium">
+                            Montant (DA) <span className="text-destructive">*</span>
+                          </FormLabel>
                           <FormControl>
                             <Input
                               type="number"
                               min={1}
                               max={resteAPayer}
+                              className="h-9 text-sm"
                               placeholder={`Max : ${resteAPayer ? formaterMontant(resteAPayer) : ''}`}
                               {...field}
                               value={field.value ?? ''}
                               onChange={(e) => field.onChange(e.target.valueAsNumber)}
                             />
                           </FormControl>
-                          <FormMessage />
+                          <FormMessage className="text-xs" />
                         </FormItem>
                       )}
                     />
@@ -350,36 +352,41 @@ export default function DialogCreerPaiement({ onFermer, onSuccess }: Props) {
                       name="mode"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Mode *</FormLabel>
+                          <FormLabel className="text-xs font-medium">
+                            Mode <span className="text-destructive">*</span>
+                          </FormLabel>
                           <Select value={field.value} onValueChange={field.onChange}>
                             <FormControl>
-                              <SelectTrigger>
+                              <SelectTrigger className="h-9 w-full text-sm">
                                 <SelectValue />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="cash">💵 Espèces</SelectItem>
-                              <SelectItem value="virement">🏦 Virement</SelectItem>
-                              <SelectItem value="ccp">📮 CCP</SelectItem>
+                              <SelectItem value="cash">Espèces</SelectItem>
+                              <SelectItem value="virement">Virement</SelectItem>
+                              <SelectItem value="ccp">CCP</SelectItem>
                             </SelectContent>
                           </Select>
-                          <FormMessage />
+                          <FormMessage className="text-xs" />
                         </FormItem>
                       )}
                     />
                   </div>
 
+                  {/* Date + Référence */}
                   <div className="grid grid-cols-2 gap-3">
                     <FormField
                       control={form.control}
                       name="date"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Date *</FormLabel>
+                          <FormLabel className="text-xs font-medium">
+                            Date <span className="text-destructive">*</span>
+                          </FormLabel>
                           <FormControl>
-                            <Input type="date" {...field} />
+                            <Input type="date" className="h-9 text-sm" {...field} />
                           </FormControl>
-                          <FormMessage />
+                          <FormMessage className="text-xs" />
                         </FormItem>
                       )}
                     />
@@ -388,30 +395,34 @@ export default function DialogCreerPaiement({ onFermer, onSuccess }: Props) {
                       name="reference"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>
-                            Référence{' '}
-                            <span className="font-normal text-muted-foreground">(opt.)</span>
+                          <FormLabel className="text-xs font-medium">
+                            Référence <Opt />
                           </FormLabel>
                           <FormControl>
-                            <Input placeholder="ex : VIR-2026-001" {...field} />
+                            <Input
+                              className="h-9 text-sm"
+                              placeholder="ex : VIR-2026-001"
+                              {...field}
+                            />
                           </FormControl>
-                          <FormMessage />
+                          <FormMessage className="text-xs" />
                         </FormItem>
                       )}
                     />
                   </div>
 
+                  {/* Note */}
                   <FormField
                     control={form.control}
                     name="note"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>
-                          Note <span className="font-normal text-muted-foreground">(opt.)</span>
+                        <FormLabel className="text-xs font-medium">
+                          Note <Opt />
                         </FormLabel>
                         <FormControl>
                           <Textarea
-                            className="resize-none"
+                            className="resize-none text-sm"
                             rows={2}
                             placeholder="Détails…"
                             {...field}
@@ -423,16 +434,16 @@ export default function DialogCreerPaiement({ onFermer, onSuccess }: Props) {
                 </>
               )}
 
-              {/* Banner dossier soldé */}
+              {/* ── Banner dossier soldé ─────────────────────── */}
               {dossierSolde && (
                 <div
-                  className="flex items-center gap-2 rounded-lg p-3 text-sm"
+                  className="flex items-center gap-2 rounded-lg p-3 text-xs font-medium"
                   style={{
                     backgroundColor: 'color-mix(in oklch, var(--color-success) 10%, transparent)',
                     color: 'var(--color-success)',
                   }}
                 >
-                  <CheckCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <CheckCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   <span>Ce dossier est entièrement réglé.</span>
                 </div>
               )}
@@ -440,21 +451,29 @@ export default function DialogCreerPaiement({ onFermer, onSuccess }: Props) {
           </Form>
         </div>
 
-        {/* ── Footer fixe ── */}
+        {/* ── Footer ──────────────────────────────────────────── */}
         <div className="shrink-0 border-t px-6 py-4">
           {afficherFormulaire ? (
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={onFermer} disabled={isPending}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onFermer}
+                disabled={isPending}
+              >
                 Annuler
               </Button>
-              <Button type="submit" form="form-creer-paiement" disabled={isPending}>
-                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+              <Button type="submit" size="sm" form="form-creer-paiement" disabled={isPending}>
+                {isPending && (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                )}
                 {isPending ? 'Enregistrement…' : 'Enregistrer'}
               </Button>
             </div>
           ) : (
             <div className="flex justify-end">
-              <Button type="button" variant="outline" onClick={onFermer}>
+              <Button type="button" variant="outline" size="sm" onClick={onFermer}>
                 Fermer
               </Button>
             </div>

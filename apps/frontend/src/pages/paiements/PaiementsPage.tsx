@@ -18,7 +18,6 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import {
   Select,
   SelectContent,
@@ -46,7 +45,6 @@ import {
   type PaiementPopule,
 } from '@/api/paiement.api';
 import { useAuthStore } from '@/stores/auth.store';
-// libelleModeReglement et styleModeReglement supprimés — remplacés par CONFIG_MODE
 import { formaterMontantDA } from '@/lib/utils';
 
 import { CONFIG_MODE, type FiltreModeType } from '@/components/paiement/paiement.config';
@@ -97,18 +95,18 @@ export default function PaiementsPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* ── En-tête ─────────────────────────────────────────────── */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Paiements</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="text-lg font-semibold tracking-tight">Paiements</h2>
+          <p className="text-xs text-muted-foreground">
             Encaissements et suivi financier du cabinet
           </p>
         </div>
         {peutModifier && (
           <Button size="sm" onClick={() => setDialogCreer(true)}>
-            <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />
+            <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
             Enregistrer un paiement
           </Button>
         )}
@@ -153,18 +151,18 @@ export default function PaiementsPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="w-44">
+          <SelectTrigger className="h-9 w-44 text-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="tous">Tous les modes</SelectItem>
-            <SelectItem value="cash">💵 Espèces</SelectItem>
-            <SelectItem value="virement">🏦 Virement</SelectItem>
-            <SelectItem value="ccp">📮 CCP</SelectItem>
+            <SelectItem value="cash">Espèces</SelectItem>
+            <SelectItem value="virement">Virement</SelectItem>
+            <SelectItem value="ccp">CCP</SelectItem>
           </SelectContent>
         </Select>
         {meta && (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {meta.total} paiement{meta.total > 1 ? 's' : ''}
           </p>
         )}
@@ -173,13 +171,14 @@ export default function PaiementsPage() {
       {/* ── Erreur réseau ───────────────────────────────────────── */}
       {isError && (
         <Card>
-          <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
-              <WifiOff className="h-7 w-7 text-destructive" aria-hidden="true" />
+          <CardContent className="flex flex-col items-center gap-3 py-14 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+              <WifiOff className="h-6 w-6 text-destructive" aria-hidden="true" />
             </div>
-            <p className="font-medium">Impossible de charger les paiements</p>
+            <p className="text-sm font-medium">Impossible de charger les paiements</p>
             <Button
               variant="outline"
+              size="sm"
               onClick={() => qc.invalidateQueries({ queryKey: ['paiements', 'global'] })}
             >
               Réessayer
@@ -200,6 +199,7 @@ export default function PaiementsPage() {
       {/* ── Contenu ─────────────────────────────────────────────── */}
       {!isLoading && !isError && (
         <>
+          {/* Empty state */}
           {paiements.length === 0 && (
             <Card>
               <CardContent className="p-0">
@@ -229,12 +229,12 @@ export default function PaiementsPage() {
             </Card>
           )}
 
+          {/* Liste */}
           {paiements.length > 0 && (
             <Card>
               <CardContent className="p-0">
                 <div className="divide-y">
                   {paiements.map((p) => {
-                    // Nouvelle API CONFIG_MODE — Icone (composant) + badgeStyle (CSS vars)
                     const modeConfig = CONFIG_MODE[p.mode];
                     const ModeIcone = modeConfig?.Icone ?? Wallet;
                     const client = p.dossier?.client;
@@ -242,29 +242,28 @@ export default function PaiementsPage() {
                     return (
                       <div
                         key={p._id}
-                        className="flex items-start gap-3 px-4 py-4 transition-colors hover:bg-muted/30 sm:px-6"
+                        className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/30 sm:px-5"
                       >
-                        {/* Cercle icône mode — décoratif */}
+                        {/* Icône mode */}
                         <div
-                          className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                          className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
                           style={{
                             backgroundColor: modeConfig?.badgeStyle.backgroundColor,
                             color: modeConfig?.badgeStyle.color,
                           }}
                           aria-hidden="true"
                         >
-                          <ModeIcone className="h-4 w-4" />
+                          <ModeIcone className="h-3.5 w-3.5" />
                         </div>
 
                         {/* Infos */}
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-base font-semibold tabular-nums">
+                        <div className="min-w-0 flex-1 space-y-0.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-sm font-semibold tabular-nums">
                               {formaterMontantDA(p.montant)}
                             </span>
-                            {/* Badge mode — style inline via badgeStyle */}
                             <span
-                              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+                              className="inline-flex items-center gap-1 rounded-full px-1.5 py-px text-xs font-medium"
                               style={modeConfig?.badgeStyle}
                             >
                               <ModeIcone className="h-3 w-3" aria-hidden="true" />
@@ -277,7 +276,7 @@ export default function PaiementsPage() {
                             )}
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                             <span>{format(parseISO(p.date), 'd MMM yyyy', { locale: fr })}</span>
                             {p.dossier && (
                               <Link
@@ -295,7 +294,7 @@ export default function PaiementsPage() {
                             {p.honoraire && (
                               <span>Honoraire {formaterMontantDA(p.honoraire.montantTotal)}</span>
                             )}
-                            {p.note && <span className="max-w-50 truncate italic">{p.note}</span>}
+                            {p.note && <span className="max-w-48 truncate italic">{p.note}</span>}
                           </div>
                         </div>
 
@@ -305,22 +304,22 @@ export default function PaiementsPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8"
+                              className="h-7 w-7"
                               aria-label={`Modifier le paiement de ${formaterMontantDA(p.montant)}`}
                               onClick={() => setPaiementEdite(p)}
                             >
-                              <Pencil className="h-4 w-4" aria-hidden="true" />
+                              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                             </Button>
                           )}
                           {peutSupprimer && (
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
                               aria-label={`Supprimer le paiement de ${formaterMontantDA(p.montant)}`}
                               onClick={() => setPaiementASupprimer(p)}
                             >
-                              <Trash2 className="h-4 w-4" aria-hidden="true" />
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                             </Button>
                           )}
                         </div>
@@ -331,32 +330,29 @@ export default function PaiementsPage() {
 
                 {/* Pagination */}
                 {meta && meta.totalPages > 1 && (
-                  <>
-                    <Separator />
-                    <div className="flex items-center justify-between px-6 py-3">
-                      <p className="text-xs text-muted-foreground">
-                        Page {meta.page} / {meta.totalPages}
-                      </p>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={page <= 1}
-                          onClick={() => setPage((p) => p - 1)}
-                        >
-                          Précédent
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={page >= meta.totalPages}
-                          onClick={() => setPage((p) => p + 1)}
-                        >
-                          Suivant
-                        </Button>
-                      </div>
+                  <div className="flex items-center justify-between border-t px-5 py-3">
+                    <p className="text-xs text-muted-foreground">
+                      Page {meta.page} / {meta.totalPages}
+                    </p>
+                    <div className="flex gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={page <= 1}
+                        onClick={() => setPage((p) => p - 1)}
+                      >
+                        Précédent
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={page >= meta.totalPages}
+                        onClick={() => setPage((p) => p + 1)}
+                      >
+                        Suivant
+                      </Button>
                     </div>
-                  </>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -385,6 +381,7 @@ export default function PaiementsPage() {
         />
       )}
 
+      {/* ── Confirmation suppression ─────────────────────────────── */}
       <AlertDialog
         open={!!paiementASupprimer}
         onOpenChange={(o) => !o && setPaiementASupprimer(null)}
@@ -403,7 +400,7 @@ export default function PaiementsPage() {
             <AlertDialogAction asChild>
               <Button variant="destructive" disabled={suppressionEnCours} onClick={() => effacer()}>
                 {suppressionEnCours && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
                 )}
                 {suppressionEnCours ? 'Suppression…' : 'Supprimer'}
               </Button>

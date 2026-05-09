@@ -10,6 +10,9 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
+  ChevronLeft,
+  ChevronRight,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDebounce } from 'use-debounce';
@@ -17,7 +20,6 @@ import { useDebounce } from 'use-debounce';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -51,22 +53,37 @@ import type { Client, TypeClient } from '@/types';
 import DialogCreerClient from '@/components/admin/DialogCreerClient';
 import DialogModifierClient from '@/components/admin/DialogModifierClient';
 
+// ─── Config badge type client ─────────────────────────────────────────────────
+const TYPE_CLIENT_CONFIG: Record<string, { label: string; varCouleur: string; varBg: string }> = {
+  physique: {
+    label: 'Physique',
+    varCouleur: 'var(--status-essai)',
+    varBg: 'var(--status-essai-bg)',
+  },
+  morale: {
+    label: 'Morale',
+    varCouleur: 'var(--plan-pro)',
+    varBg: 'var(--plan-pro-bg)',
+  },
+};
+
+// ─── Composant principal ──────────────────────────────────────────────────────
 export default function ClientsPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // ─── Filtres ──────────────────────────────────────────────────────
+  // ─── Filtres ────────────────────────────────────────────────────
   const [recherche, setRecherche] = useState('');
   const [filtreType, setFiltreType] = useState<TypeClient | 'tous'>('tous');
   const [page, setPage] = useState(1);
   const [rechercheDebounced] = useDebounce(recherche, 300);
 
-  // ─── Dialogs ──────────────────────────────────────────────────────
+  // ─── Dialogs ────────────────────────────────────────────────────
   const [dialogCreer, setDialogCreer] = useState(false);
   const [clientAModifier, setClientAModifier] = useState<Client | null>(null);
   const [clientASupprimer, setClientASupprimer] = useState<Client | null>(null);
 
-  // ─── Query ────────────────────────────────────────────────────────
+  // ─── Query ──────────────────────────────────────────────────────
   const { data, isLoading } = useQuery({
     queryKey: ['cabinet', 'clients', rechercheDebounced, filtreType, page],
     queryFn: () =>
@@ -82,7 +99,7 @@ export default function ClientsPage() {
   const meta = data?.meta;
   const filtresActifs = !!(recherche || filtreType !== 'tous');
 
-  // ─── Suppression ──────────────────────────────────────────────────
+  // ─── Suppression ────────────────────────────────────────────────
   const { mutate: supprimer, isPending: suppression } = useMutation({
     mutationFn: () => supprimerClient(clientASupprimer!._id),
     onSuccess: () => {
@@ -100,37 +117,61 @@ export default function ClientsPage() {
   }, []);
 
   return (
-    <div className="space-y-6">
-      {/* ── En-tête ─────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Clients</h2>
+    <div className="space-y-6 px-1">
+      {/* ── En-tête ────────────────────────────────────────────── */}
+      <div
+        className="animate-fade-up opacity-0 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+        style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}
+      >
+        <div className="space-y-0.5">
+          <h2 className="text-xl font-semibold tracking-tight">Clients</h2>
           <p className="text-sm text-muted-foreground">
             {meta
               ? `${meta.total} client${meta.total > 1 ? 's' : ''} au total`
               : 'Gestion de votre clientèle'}
           </p>
         </div>
-        <Button onClick={() => setDialogCreer(true)}>
-          <Plus className="mr-2 h-4 w-4" />
+        <Button size="sm" onClick={() => setDialogCreer(true)}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
           Nouveau client
         </Button>
       </div>
 
-      {/* ── Filtres ─────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3 sm:flex-row">
+      {/* ── Filtres ────────────────────────────────────────────── */}
+      <div
+        className="animate-fade-up opacity-0 flex flex-col gap-2 sm:flex-row sm:items-center"
+        style={{ animationDelay: '60ms', animationFillMode: 'forwards' }}
+      >
+        {/* Champ recherche */}
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
           <Input
-            placeholder="Rechercher par nom, raison sociale..."
-            className="pl-9"
+            placeholder="Rechercher par nom, raison sociale…"
+            className="h-9 pl-8.5 pr-9 text-sm"
             value={recherche}
             onChange={(e) => {
               setRecherche(e.target.value);
               setPage(1);
             }}
           />
+          {recherche && (
+            <button
+              onClick={() => {
+                setRecherche('');
+                setPage(1);
+              }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+              aria-label="Effacer la recherche"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
+
+        {/* Filtre type */}
         <Select
           value={filtreType}
           onValueChange={(v) => {
@@ -138,7 +179,7 @@ export default function ClientsPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="w-full sm:w-44">
+          <SelectTrigger className="h-9 w-full text-sm sm:w-44">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -148,147 +189,181 @@ export default function ClientsPage() {
           </SelectContent>
         </Select>
 
+        {/* Reset filtres */}
         {filtresActifs && (
-          <Button variant="ghost" onClick={reinitialiserFiltres}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-9 shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={reinitialiserFiltres}
+          >
+            <X className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
             Réinitialiser
           </Button>
         )}
       </div>
 
-      {/* ── Liste ───────────────────────────────────────────────── */}
-      <Card>
-        <CardContent className="p-0">
-          {/* Skeleton */}
-          {isLoading && <SkeletonTable />}
+      {/* ── Liste ──────────────────────────────────────────────── */}
+      <div
+        className="animate-fade-up opacity-0"
+        style={{ animationDelay: '120ms', animationFillMode: 'forwards' }}
+      >
+        <Card>
+          <CardContent className="p-0">
+            {/* Skeleton */}
+            {isLoading && <SkeletonTable />}
 
-          {/* Empty state */}
-          {!isLoading && clients.length === 0 && (
-            <EmptyState
-              icone={Users}
-              titre={filtresActifs ? 'Aucun client trouvé' : 'Aucun client pour le moment'}
-              description={
-                filtresActifs
-                  ? 'Aucun client ne correspond à vos critères. Modifiez ou réinitialisez les filtres.'
-                  : 'Ajoutez votre premier client pour commencer à gérer votre clientèle.'
-              }
-              action={
-                !filtresActifs
-                  ? { label: 'Nouveau client', onClick: () => setDialogCreer(true), icone: Plus }
-                  : undefined
-              }
-            />
-          )}
+            {/* Empty state */}
+            {!isLoading && clients.length === 0 && (
+              <EmptyState
+                icone={Users}
+                titre={filtresActifs ? 'Aucun client trouvé' : 'Aucun client pour le moment'}
+                description={
+                  filtresActifs
+                    ? 'Aucun client ne correspond à vos critères. Modifiez ou réinitialisez les filtres.'
+                    : 'Ajoutez votre premier client pour commencer à gérer votre clientèle.'
+                }
+                action={
+                  !filtresActifs
+                    ? { label: 'Nouveau client', onClick: () => setDialogCreer(true), icone: Plus }
+                    : undefined
+                }
+              />
+            )}
 
-          {/* Liste */}
-          {!isLoading && clients.length > 0 && (
-            <div className="divide-y">
-              {clients.map((client) => (
-                <div
-                  key={client._id}
-                  className="flex cursor-pointer items-center gap-4 p-4 transition-colors hover:bg-muted/40"
-                  onClick={() => navigate(`/cabinet/clients/${client._id}`)}
-                >
-                  {/* Avatar */}
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                    {client.type === 'morale' ? (
-                      <Building2 className="h-5 w-5 text-primary" />
-                    ) : (
-                      <Users className="h-5 w-5 text-primary" />
-                    )}
-                  </div>
+            {/* Rows */}
+            {!isLoading && clients.length > 0 && (
+              <div className="divide-y divide-border">
+                {clients.map((client, i) => {
+                  const cfgType = TYPE_CLIENT_CONFIG[client.type] ?? {
+                    label: client.type,
+                    varCouleur: 'var(--muted-foreground)',
+                    varBg: 'var(--muted)',
+                  };
 
-                  {/* Infos */}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{nomAffiche(client)}</p>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Phone className="h-3 w-3" />
-                        {client.telephone}
+                  return (
+                    <div
+                      key={client._id}
+                      className="animate-fade-up opacity-0 group flex cursor-pointer items-center gap-4 px-4 py-3 transition-colors hover:bg-muted/40"
+                      style={{
+                        animationDelay: `${160 + i * 35}ms`,
+                        animationFillMode: 'forwards',
+                      }}
+                      onClick={() => navigate(`/cabinet/clients/${client._id}`)}
+                    >
+                      {/* Avatar */}
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/8 transition-all duration-200 group-hover:bg-primary/14 group-hover:scale-105">
+                        {client.type === 'morale' ? (
+                          <Building2 className="h-4 w-4 text-primary" aria-hidden="true" />
+                        ) : (
+                          <Users className="h-4 w-4 text-primary" aria-hidden="true" />
+                        )}
+                      </div>
+
+                      {/* Infos */}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{nomAffiche(client)}</p>
+                        <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Phone className="h-3 w-3 shrink-0" aria-hidden="true" />
+                            {client.telephone}
+                          </span>
+                          {client.email && (
+                            <span className="hidden truncate sm:block">{client.email}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Badge type */}
+                      <span
+                        className="hidden shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium sm:inline-flex"
+                        style={{
+                          color: cfgType.varCouleur,
+                          backgroundColor: cfgType.varBg,
+                        }}
+                      >
+                        {cfgType.label}
                       </span>
-                      {client.email && (
-                        <span className="hidden truncate sm:block">{client.email}</span>
-                      )}
+
+                      {/* Actions dropdown */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Actions pour ${nomAffiche(client)}`}
+                          >
+                            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setClientAModifier(client);
+                            }}
+                          >
+                            <Pencil className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+                            Modifier
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setClientASupprimer(client);
+                            }}
+                          >
+                            <Trash2 className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+                            Archiver
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                  </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
 
-                  {/* Badge type */}
-                  <Badge
-                    variant={client.type === 'morale' ? 'secondary' : 'outline'}
-                    className="shrink-0 hidden sm:flex"
-                  >
-                    {client.type === 'physique' ? 'Physique' : 'Morale'}
-                  </Badge>
-
-                  {/* Actions */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 shrink-0"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setClientAModifier(client);
-                        }}
-                      >
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Modifier
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setClientASupprimer(client);
-                        }}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Archiver
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              ))}
+          {/* Pagination */}
+          {meta && meta.totalPages > 1 && (
+            <div className="flex items-center justify-between border-t px-4 py-3">
+              <p className="text-xs text-muted-foreground">
+                Page {meta.page} / {meta.totalPages}
+                <span className="mx-1.5 text-muted-foreground/40">·</span>
+                {meta.total} client{meta.total > 1 ? 's' : ''}
+              </p>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7"
+                  disabled={page === 1}
+                  onClick={() => setPage((p) => p - 1)}
+                  aria-label="Page précédente"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7"
+                  disabled={page >= meta.totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                  aria-label="Page suivante"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </Button>
+              </div>
             </div>
           )}
-        </CardContent>
+        </Card>
+      </div>
 
-        {/* Pagination */}
-        {meta && meta.totalPages > 1 && (
-          <div className="flex items-center justify-between border-t px-4 py-3">
-            <p className="text-xs text-muted-foreground">
-              Page {meta.page} sur {meta.totalPages} · {meta.total} clients
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page === 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                Précédent
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= meta.totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Suivant
-              </Button>
-            </div>
-          </div>
-        )}
-      </Card>
-
-      {/* ── Dialogs ─────────────────────────────────────────────── */}
+      {/* ── Dialogs ────────────────────────────────────────────── */}
       <DialogCreerClient ouvert={dialogCreer} onFermer={() => setDialogCreer(false)} />
 
       {clientAModifier && (
@@ -305,13 +380,11 @@ export default function ClientsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive hover:bg-destructive/90"
-              onClick={() => supprimer()}
-              disabled={suppression}
-            >
-              Archiver
+            <AlertDialogCancel disabled={suppression}>Annuler</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button variant="destructive" disabled={suppression} onClick={() => supprimer()}>
+                {suppression ? 'Archivage\u2026' : 'Archiver'}
+              </Button>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

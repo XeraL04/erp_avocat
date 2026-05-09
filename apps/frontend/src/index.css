@@ -1,64 +1,79 @@
+/* ─── Fonts — DOIT être en premier, avant tout ─── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap');
+
 @import 'tailwindcss';
 
 @layer base {
   :root {
     /* ─── Surfaces ─── */
-    --background: oklch(0.98 0.004 240);
-    --foreground: oklch(0.15 0.01 250);
+    --background: oklch(0.975 0.003 245);
+    --foreground: oklch(0.14 0.012 252);
     --card: oklch(1 0 0);
-    --card-foreground: oklch(0.15 0.01 250);
+    --card-foreground: oklch(0.14 0.012 252);
     --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.15 0.01 250);
+    --popover-foreground: oklch(0.14 0.012 252);
 
     /* ─── Primaire — Bleu ardoise juridique ─── */
-    --primary: oklch(0.38 0.12 255);
-    --primary-foreground: oklch(0.98 0 0);
+    --primary: oklch(0.40 0.13 257);
+    --primary-foreground: oklch(0.99 0 0);
 
     /* ─── Secondaire / Muted / Accent ─── */
-    --secondary: oklch(0.94 0.005 250);
-    --secondary-foreground: oklch(0.25 0.01 250);
-    --muted: oklch(0.94 0.005 250);
-    --muted-foreground: oklch(0.52 0.01 250);
-    --accent: oklch(0.91 0.015 255);
-    --accent-foreground: oklch(0.25 0.01 250);
+    --secondary: oklch(0.945 0.004 248);
+    --secondary-foreground: oklch(0.24 0.012 252);
+    --muted: oklch(0.945 0.004 248);
+    --muted-foreground: oklch(0.50 0.012 252);
+    --accent: oklch(0.925 0.012 255);
+    --accent-foreground: oklch(0.24 0.012 252);
+
+    /* ─── Surface teintée primaire (hover, actif) ─── */
+    --surface-accent: oklch(0.94 0.025 255);
 
     /* ─── Destructive ─── */
     --destructive: oklch(0.577 0.245 27.325);
     --destructive-foreground: oklch(0.985 0 0);
 
     /* ─── Bordures / Inputs ─── */
-    --border: oklch(0.88 0.005 250);
-    --input: oklch(0.88 0.005 250);
-    --ring: oklch(0.38 0.12 255);
+    --border: oklch(0.875 0.006 250);
+    --input: oklch(0.875 0.006 250);
+    --ring: oklch(0.40 0.13 257);
 
     /* ─── Radius ─── */
-    --radius: 0.625rem;
+    --radius: 0.5rem;
+
+    /* ─── Ombres ─── */
+    --shadow-xs: 0 1px 2px oklch(0.2 0.02 255 / 0.05);
+    --shadow-sm: 0 1px 3px oklch(0.2 0.02 255 / 0.07), 0 1px 2px oklch(0.2 0.02 255 / 0.04);
+    --shadow-md: 0 4px 12px oklch(0.2 0.02 255 / 0.08), 0 2px 4px oklch(0.2 0.02 255 / 0.04);
+    --shadow-lg: 0 12px 32px oklch(0.2 0.02 255 / 0.10), 0 4px 8px oklch(0.2 0.02 255 / 0.05);
+
+    /* ─── Transitions ─── */
+    --transition-ui: 160ms cubic-bezier(0.16, 1, 0.3, 1);
 
     /* ─── Sidebar ─── */
-    --sidebar-background: oklch(0.2 0.02 255);
-    --sidebar-foreground: oklch(0.88 0.005 250);
-    --sidebar-primary: oklch(0.7 0.12 255);
-    --sidebar-primary-foreground: oklch(0.12 0.02 255);
-    --sidebar-accent: oklch(0.28 0.03 255);
-    --sidebar-accent-foreground: oklch(0.95 0.005 250);
-    --sidebar-border: oklch(1 0 0 / 8%);
-    --sidebar-ring: oklch(0.7 0.12 255);
+    --sidebar-background: oklch(0.18 0.022 257);
+    --sidebar-foreground: oklch(0.86 0.006 250);
+    --sidebar-primary: oklch(0.68 0.13 257);
+    --sidebar-primary-foreground: oklch(0.10 0.02 257);
+    --sidebar-accent: oklch(0.26 0.032 257);
+    --sidebar-accent-foreground: oklch(0.94 0.005 250);
+    --sidebar-border: oklch(1 0 0 / 7%);
+    --sidebar-ring: oklch(0.68 0.13 257);
 
     /* ─── Statuts dossier ─── */
-    --status-encours: oklch(0.5 0.16 145);
+    --status-encours: oklch(0.50 0.16 145);
     --status-encours-bg: oklch(0.94 0.05 145);
-    --status-encours-border: oklch(0.82 0.1 145);
+    --status-encours-border: oklch(0.82 0.10 145);
 
-    --status-suspendu: oklch(0.6 0.17 75);
+    --status-suspendu: oklch(0.60 0.17 75);
     --status-suspendu-bg: oklch(0.96 0.06 80);
     --status-suspendu-border: oklch(0.86 0.12 75);
 
     --status-cloture: oklch(0.52 0.01 250);
     --status-cloture-bg: oklch(0.93 0.005 250);
-    --status-cloture-border: oklch(0.8 0.008 250);
+    --status-cloture-border: oklch(0.80 0.008 250);
 
     /* ─── Statuts tenant ─── */
-    --status-actif: oklch(0.5 0.16 145);
+    --status-actif: oklch(0.50 0.16 145);
     --status-actif-bg: oklch(0.94 0.05 145);
     --status-essai: oklch(0.45 0.14 255);
     --status-essai-bg: oklch(0.91 0.04 255);
@@ -74,11 +89,11 @@
     --plan-premium-bg: oklch(0.93 0.06 295);
 
     /* ─── Types de paiement ─── */
-    --mode-especes: oklch(0.5 0.16 145);
+    --mode-especes: oklch(0.50 0.16 145);
     --mode-especes-bg: oklch(0.94 0.05 145);
     --mode-virement: oklch(0.45 0.14 255);
     --mode-virement-bg: oklch(0.91 0.04 255);
-    --mode-cheque: oklch(0.6 0.17 75);
+    --mode-cheque: oklch(0.60 0.17 75);
     --mode-cheque-bg: oklch(0.96 0.06 80);
 
     /* ─── Statuts facture ─── */
@@ -86,7 +101,7 @@
     --facture-brouillon-bg: oklch(0.93 0.005 250);
     --facture-emise: oklch(0.45 0.14 255);
     --facture-emise-bg: oklch(0.91 0.04 255);
-    --facture-payee: oklch(0.5 0.16 145);
+    --facture-payee: oklch(0.50 0.16 145);
     --facture-payee-bg: oklch(0.94 0.05 145);
 
     /* ─── KPIs dashboard ─── */
@@ -94,56 +109,65 @@
     --kpi-dossiers-bg: oklch(0.91 0.04 255);
     --kpi-clients: oklch(0.55 0.17 295);
     --kpi-clients-bg: oklch(0.93 0.06 295);
-    --kpi-revenus: oklch(0.5 0.16 145);
+    --kpi-revenus: oklch(0.50 0.16 145);
     --kpi-revenus-bg: oklch(0.94 0.05 145);
-    --kpi-audiences: oklch(0.6 0.17 75);
+    --kpi-audiences: oklch(0.60 0.17 75);
     --kpi-audiences-bg: oklch(0.96 0.06 80);
   }
 
   .dark {
     /* ─── Surfaces ─── */
-    --background: oklch(0.13 0.015 255);
-    --foreground: oklch(0.93 0.005 250);
-    --card: oklch(0.18 0.018 255);
-    --card-foreground: oklch(0.93 0.005 250);
-    --popover: oklch(0.18 0.018 255);
-    --popover-foreground: oklch(0.93 0.005 250);
+    --background: oklch(0.12 0.014 255);
+    --foreground: oklch(0.92 0.005 250);
+    --card: oklch(0.17 0.016 255);
+    --card-foreground: oklch(0.92 0.005 250);
+    --popover: oklch(0.17 0.016 255);
+    --popover-foreground: oklch(0.92 0.005 250);
 
     /* ─── Primaire ─── */
-    --primary: oklch(0.65 0.14 255);
-    --primary-foreground: oklch(0.12 0.02 255);
+    --primary: oklch(0.64 0.14 255);
+    --primary-foreground: oklch(0.10 0.02 255);
 
     /* ─── Secondaire / Muted / Accent ─── */
-    --secondary: oklch(0.24 0.02 255);
-    --secondary-foreground: oklch(0.9 0.005 250);
-    --muted: oklch(0.24 0.02 255);
-    --muted-foreground: oklch(0.62 0.01 250);
-    --accent: oklch(0.28 0.025 255);
-    --accent-foreground: oklch(0.93 0.005 250);
+    --secondary: oklch(0.23 0.018 255);
+    --secondary-foreground: oklch(0.90 0.005 250);
+    --muted: oklch(0.23 0.018 255);
+    --muted-foreground: oklch(0.60 0.012 250);
+    --accent: oklch(0.27 0.024 255);
+    --accent-foreground: oklch(0.92 0.005 250);
+
+    /* ─── Surface teintée primaire (hover, actif) ─── */
+    --surface-accent: oklch(0.24 0.038 255);
 
     /* ─── Destructive ─── */
     --destructive: oklch(0.704 0.191 22.216);
     --destructive-foreground: oklch(0.985 0 0);
 
     /* ─── Bordures / Inputs ─── */
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.65 0.14 255);
+    --border: oklch(1 0 0 / 9%);
+    --input: oklch(1 0 0 / 13%);
+    --ring: oklch(0.64 0.14 255);
+
+    /* ─── Ombres dark ─── */
+    --shadow-xs: 0 1px 2px oklch(0 0 0 / 0.18);
+    --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.22), 0 1px 2px oklch(0 0 0 / 0.14);
+    --shadow-md: 0 4px 12px oklch(0 0 0 / 0.30), 0 2px 4px oklch(0 0 0 / 0.16);
+    --shadow-lg: 0 12px 32px oklch(0 0 0 / 0.40), 0 4px 8px oklch(0 0 0 / 0.20);
 
     /* ─── Sidebar ─── */
-    --sidebar-background: oklch(0.16 0.02 255);
-    --sidebar-foreground: oklch(0.85 0.008 250);
-    --sidebar-primary: oklch(0.65 0.14 255);
-    --sidebar-primary-foreground: oklch(0.12 0.02 255);
-    --sidebar-accent: oklch(0.24 0.025 255);
-    --sidebar-accent-foreground: oklch(0.93 0.005 250);
-    --sidebar-border: oklch(1 0 0 / 8%);
-    --sidebar-ring: oklch(0.65 0.14 255);
+    --sidebar-background: oklch(0.14 0.018 257);
+    --sidebar-foreground: oklch(0.84 0.008 250);
+    --sidebar-primary: oklch(0.64 0.14 255);
+    --sidebar-primary-foreground: oklch(0.10 0.02 255);
+    --sidebar-accent: oklch(0.22 0.024 255);
+    --sidebar-accent-foreground: oklch(0.92 0.005 250);
+    --sidebar-border: oklch(1 0 0 / 7%);
+    --sidebar-ring: oklch(0.64 0.14 255);
 
     /* ─── Statuts dossier ─── */
     --status-encours: oklch(0.65 0.16 145);
     --status-encours-bg: oklch(0.22 0.05 145);
-    --status-encours-border: oklch(0.35 0.1 145);
+    --status-encours-border: oklch(0.35 0.10 145);
 
     --status-suspendu: oklch(0.75 0.16 75);
     --status-suspendu-bg: oklch(0.22 0.06 80);
@@ -195,6 +219,22 @@
     --kpi-audiences: oklch(0.75 0.16 75);
     --kpi-audiences-bg: oklch(0.22 0.06 80);
   }
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-up {
+    animation: fade-up 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
 }
 
 @theme inline {
@@ -218,6 +258,8 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
+  --color-surface-accent: var(--surface-accent);
+
   --color-sidebar-background: var(--sidebar-background);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -227,7 +269,6 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Statuts — accessibles via bg-status-encours, text-status-encours, etc. */
   --color-status-encours: var(--status-encours);
   --color-status-encours-bg: var(--status-encours-bg);
   --color-status-encours-border: var(--status-encours-border);
@@ -275,28 +316,37 @@
   --color-kpi-audiences: var(--kpi-audiences);
   --color-kpi-audiences-bg: var(--kpi-audiences-bg);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 3px);
+  --radius-md: calc(var(--radius) - 1px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  --transition-ui: var(--transition-ui);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
-    font-feature-settings:
-      'rlig' 1,
-      'calt' 1;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'rlig' 1, 'calt' 1, 'cv01' 1, 'cv02' 1, 'cv03' 1, 'cv04' 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
-  /* Scrollbar discrète */
+
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
@@ -307,5 +357,17 @@
   }
   ::-webkit-scrollbar-thumb:hover {
     background: var(--muted-foreground);
+  }
+
+  a, button, [role="button"] {
+    transition: color var(--transition-ui),
+                background-color var(--transition-ui),
+                border-color var(--transition-ui),
+                box-shadow var(--transition-ui),
+                opacity var(--transition-ui);
+  }
+
+  table {
+    font-variant-numeric: tabular-nums;
   }
 }

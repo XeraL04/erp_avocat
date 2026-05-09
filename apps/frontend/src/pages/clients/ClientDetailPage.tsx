@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeft,
   Phone,
   Mail,
   MapPin,
@@ -15,15 +14,15 @@ import {
   FolderOpen,
   StickyNote,
   BadgeCheck,
+  Plus,
+  ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -43,32 +42,121 @@ import {
   obtenirPaiementsClient,
   supprimerClient,
 } from '@/api/client.api';
-import { nomAffiche } from '@/types';
-import type { Client } from '@/types';
+import {
+  nomAffiche,
+  formaterMontantDA,
+  initialesAvatar,
+  styleStatutDossier,
+  styleModeReglement,
+  libelleModeReglement,
+} from '@/lib/utils';
+import type { Client, StatutDossier } from '@/types';
+
 import DialogModifierClient from '../../components/admin/DialogModifierClient';
+import DialogCreerDossier from '@/components/dossier/DialogCreerDossier';
 import type { DossierResume, PaiementResume } from '@/api/client.api';
 
-// ─── Statuts dossier ──────────────────────────────────────────────────────────
-const STATUT_DOSSIER: Record<
-  string,
-  { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }
-> = {
-  ouvert: { label: 'Ouvert', variant: 'default' },
-  en_cours: { label: 'En cours', variant: 'secondary' },
-  clos: { label: 'Clôturé', variant: 'outline' },
-  archive: { label: 'Archivé', variant: 'destructive' },
-};
+// ─── Hook count-up ────────────────────────────────────────────────────────────
+function useCountUp(cible: number, actif: boolean, duree = 700): number {
+  const [val, setVal] = useState(0);
+  const raf = useRef<number>(0);
+  useEffect(() => {
+    if (!actif) return;
+    const debut = performance.now();
+    const run = (now: number) => {
+      const p = Math.min((now - debut) / duree, 1);
+      const e = 1 - Math.pow(1 - p, 3);
+      setVal(Math.round(e * cible));
+      if (p < 1) raf.current = requestAnimationFrame(run);
+    };
+    raf.current = requestAnimationFrame(run);
+    return () => cancelAnimationFrame(raf.current);
+  }, [cible, actif, duree]);
+  return val;
+}
 
-// ─── Composant ────────────────────────────────────────────────────────────────
+// ─── Composant KPI ────────────────────────────────────────────────────────────
+function KpiBloc({
+  icone: Icone,
+  label,
+  valeur,
+  varCouleur,
+  varBg,
+  actif,
+  suffixe,
+  index,
+}: {
+  icone: React.ElementType;
+  label: string;
+  valeur: number;
+  varCouleur: string;
+  varBg: string;
+  actif: boolean;
+  suffixe?: string;
+  index: number;
+}) {
+  const v = useCountUp(valeur, actif);
+  return (
+    <div
+      className="animate-fade-up opacity-0 flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-xs"
+      style={{ animationDelay: `${200 + index * 70}ms`, animationFillMode: 'forwards' }}
+    >
+      <div
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+        style={{ backgroundColor: varBg }}
+      >
+        <Icone className="h-4.5 w-4.5" style={{ color: varCouleur }} aria-hidden="true" />
+      </div>
+      <div>
+        <p className="text-xl font-bold tabular-nums leading-none">
+          {v}
+          {suffixe && (
+            <span className="ml-1 text-sm font-medium text-muted-foreground">{suffixe}</span>
+          )}
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Ligne info fiche ─────────────────────────────────────────────────────────
+function LigneInfo({
+  icone: Icone,
+  label,
+  valeur,
+}: {
+  icone: React.ElementType;
+  label: string;
+  valeur: string;
+}) {
+  return (
+    <div className="flex items-start gap-3 py-2.5">
+      <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted">
+        <Icone className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+          {label}
+        </p>
+        <p className="mt-0.5 text-sm font-medium wrap-break-word">{valeur}</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Composant principal ──────────────────────────────────────────────────────
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [kpisActifs, setKpisActifs] = useState(false);
 
   const [dialogModifier, setDialogModifier] = useState(false);
   const [confirmerArchivage, setConfirmerArchivage] = useState(false);
+  const [dialogCreerDossier, setDialogCreerDossier] = useState(false);
 
-  // ── Queries ──────────────────────────────────────────────────────────────
+  // ── Queries ────────────────────────────────────────────────────────────────
   const { data: client, isLoading: chargementClient } = useQuery<Client>({
     queryKey: ['cabinet', 'client', id],
     queryFn: () => obtenirClient(id!),
@@ -97,7 +185,14 @@ export default function ClientDetailPage() {
   const paiements = paiementsData?.data ?? [];
   const totalPaye = paiementsData?.meta?.totalPaye ?? 0;
 
-  // ── Archivage ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!chargementClient && client) {
+      const t = setTimeout(() => setKpisActifs(true), 150);
+      return () => clearTimeout(t);
+    }
+  }, [chargementClient, client]);
+
+  // ── Archivage ──────────────────────────────────────────────────────────────
   const { mutate: archiver, isPending: archivageEnCours } = useMutation({
     mutationFn: () => supprimerClient(id!),
     onSuccess: () => {
@@ -108,37 +203,26 @@ export default function ClientDetailPage() {
     onError: () => toast.error("Erreur lors de l'archivage"),
   });
 
-  // ── Skeleton chargement ──────────────────────────────────────────────────
+  // ── Skeleton ───────────────────────────────────────────────────────────────
   if (chargementClient) {
     return (
       <div className="space-y-6">
-        {/* En-tête */}
         <div className="flex items-center gap-3">
-          <Skeleton className="h-9 w-9 rounded-md" />
-          <Skeleton className="h-10 w-10 rounded-full" />
-          <div className="space-y-1.5">
-            <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-8 w-8 rounded-lg" />
+          <Skeleton className="h-14 w-14 rounded-2xl" />
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-52" />
             <Skeleton className="h-3.5 w-36" />
           </div>
         </div>
-        {/* KPIs */}
-        <div className="grid gap-4 sm:grid-cols-3">
-          {[...Array(3)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="flex items-center gap-4 p-4">
-                <Skeleton className="h-10 w-10 rounded-full" />
-                <div className="space-y-1.5">
-                  <Skeleton className="h-7 w-12" />
-                  <Skeleton className="h-3 w-20" />
-                </div>
-              </CardContent>
-            </Card>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 rounded-xl" />
           ))}
         </div>
-        {/* Corps */}
         <div className="grid gap-6 lg:grid-cols-3">
-          <Skeleton className="h-64 lg:col-span-1" />
-          <Skeleton className="h-64 lg:col-span-2" />
+          <Skeleton className="h-72 rounded-xl" />
+          <Skeleton className="h-72 rounded-xl lg:col-span-2" />
         </div>
       </div>
     );
@@ -146,11 +230,18 @@ export default function ClientDetailPage() {
 
   if (!client) {
     return (
-      <div className="flex flex-col items-center gap-3 py-16 text-center">
-        <Users className="h-12 w-12 text-muted-foreground/30" aria-hidden="true" />
-        <p className="font-medium">Client introuvable</p>
-        <Button variant="outline" onClick={() => navigate('/cabinet/clients')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
+      <div className="flex flex-col items-center gap-4 py-20 text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+          <Users className="h-8 w-8 text-muted-foreground/40" aria-hidden="true" />
+        </div>
+        <div>
+          <p className="font-semibold">Client introuvable</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Ce client n'existe pas ou a été supprimé.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => navigate('/cabinet/clients')}>
+          <ChevronRight className="mr-1.5 h-3.5 w-3.5 rotate-180" aria-hidden="true" />
           Retour à la liste
         </Button>
       </div>
@@ -159,255 +250,226 @@ export default function ClientDetailPage() {
 
   const c = client;
   const estMorale = c.type === 'morale';
+  const nomClient = nomAffiche(c);
 
   return (
-    <div className="space-y-6">
-      {/* ── En-tête ─────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
+    <div className="space-y-6 px-1">
+      {/* ── En-tête ──────────────────────────────────────────────── */}
+      <div
+        className="animate-fade-up opacity-0"
+        style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}
+      >
+        {/* Breadcrumb */}
+        <div className="mb-4 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <button
             onClick={() => navigate('/cabinet/clients')}
-            aria-label="Retour à la liste des clients"
+            className="transition-colors hover:text-foreground"
           >
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          </Button>
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-            {estMorale ? (
-              <Building2 className="h-5 w-5 text-primary" aria-hidden="true" />
-            ) : (
-              <Users className="h-5 w-5 text-primary" aria-hidden="true" />
-            )}
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold tracking-tight">{nomAffiche(c)}</h2>
-              {/* Badge type — token border, cohérent avec DialogModifierClient */}
-              <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                {estMorale ? 'Personne morale' : 'Personne physique'}
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Client depuis le {format(new Date(c.createdAt), 'dd MMMM yyyy', { locale: fr })}
-            </p>
-          </div>
+            Clients
+          </button>
+          <ChevronRight className="h-3 w-3" aria-hidden="true" />
+          <span className="max-w-48 truncate font-medium text-foreground">{nomClient}</span>
         </div>
 
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setDialogModifier(true)}>
-            <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
-            Modifier
-          </Button>
-          {/* Bouton destructif — border + text token, pas de classe hover custom */}
-          <Button
-            variant="outline"
-            className="border-destructive/30 text-destructive hover:bg-destructive/5 hover:text-destructive"
-            onClick={() => setConfirmerArchivage(true)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
-            Archiver
-          </Button>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          {/* Identité */}
+          <div className="flex items-center gap-4">
+            {/* Avatar initiales */}
+            <div
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-base font-bold text-primary-foreground shadow-sm"
+              style={{ backgroundColor: 'var(--primary)' }}
+              aria-hidden="true"
+            >
+              {estMorale ? <Building2 className="h-6 w-6" /> : initialesAvatar(nomClient)}
+            </div>
+
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-xl font-semibold tracking-tight">{nomClient}</h2>
+                <span
+                  className="rounded-full px-2 py-0.5 text-[11px] font-medium"
+                  style={{
+                    color: estMorale ? 'var(--plan-pro)' : 'var(--status-essai)',
+                    backgroundColor: estMorale ? 'var(--plan-pro-bg)' : 'var(--status-essai-bg)',
+                  }}
+                >
+                  {estMorale ? 'Personne morale' : 'Personne physique'}
+                </span>
+              </div>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                Client depuis le {format(new Date(c.createdAt), 'dd MMMM yyyy', { locale: fr })}
+              </p>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button size="sm" onClick={() => setDialogCreerDossier(true)}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+              Nouveau dossier
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setDialogModifier(true)}>
+              <Pencil className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+              Modifier
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-destructive/30 text-destructive hover:border-destructive/50 hover:bg-destructive/5"
+              onClick={() => setConfirmerArchivage(true)}
+            >
+              <Trash2 className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+              Archiver
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* ── KPIs ─────────────────────────────────────────────────── */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        {/* Dossiers — token primary */}
-        <Card>
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-              <FolderOpen className="h-5 w-5 text-primary" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold tabular-nums">{dossiers.length}</p>
-              <p className="text-xs text-muted-foreground">
-                Dossier{dossiers.length > 1 ? 's' : ''}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Paiements — token success via CSS var */}
-        <Card>
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-(--color-success)/10">
-              <CreditCard className="h-5 w-5 text-(--color-success)" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold tabular-nums">{paiements.length}</p>
-              <p className="text-xs text-muted-foreground">
-                Paiement{paiements.length > 1 ? 's' : ''}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Total encaissé — token warning/gold */}
-        <Card>
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-(--color-gold)/10">
-              <BadgeCheck className="h-5 w-5 text-(--color-gold)" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold tabular-nums">
-                {totalPaye.toLocaleString('fr-DZ')} DA
-              </p>
-              <p className="text-xs text-muted-foreground">Total encaissé</p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* ── KPIs strip ───────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <KpiBloc
+          icone={FolderOpen}
+          label={`Dossier${dossiers.length > 1 ? 's' : ''}`}
+          valeur={dossiers.length}
+          varCouleur="var(--kpi-dossiers)"
+          varBg="var(--kpi-dossiers-bg)"
+          actif={kpisActifs}
+          index={0}
+        />
+        <KpiBloc
+          icone={CreditCard}
+          label={`Paiement${paiements.length > 1 ? 's' : ''}`}
+          valeur={paiements.length}
+          varCouleur="var(--facture-payee)"
+          varBg="var(--facture-payee-bg)"
+          actif={kpisActifs}
+          index={1}
+        />
+        <KpiBloc
+          icone={BadgeCheck}
+          label="Total encaissé"
+          valeur={totalPaye}
+          varCouleur="var(--kpi-revenus)"
+          varBg="var(--kpi-revenus-bg)"
+          actif={kpisActifs}
+          suffixe="DA"
+          index={2}
+        />
       </div>
 
-      {/* ── Fiche + Onglets ──────────────────────────────────────── */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Fiche client — 1/3 */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold">Informations</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {!estMorale && c.cin && (
-              <div className="flex items-start gap-3">
-                <FileText
-                  className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <div>
-                  <p className="text-xs text-muted-foreground">NIN</p>
-                  <p className="text-sm font-medium">{c.cin}</p>
-                </div>
-              </div>
-            )}
+      {/* ── Corps — fiche + onglets ───────────────────────────────── */}
+      <div className="grid gap-5 lg:grid-cols-3">
+        {/* Fiche client */}
+        <div
+          className="animate-fade-up opacity-0 lg:col-span-1"
+          style={{ animationDelay: '420ms', animationFillMode: 'forwards' }}
+        >
+          <Card>
+            <CardHeader className="border-b pb-3 pt-4">
+              <CardTitle className="text-sm font-semibold">Fiche client</CardTitle>
+            </CardHeader>
+            <CardContent className="divide-y divide-border px-4 py-0">
+              {!estMorale && c.cin && <LigneInfo icone={FileText} label="NIN" valeur={c.cin} />}
 
-            {estMorale && (
-              <>
-                {c.representantLegal && (
-                  <div className="flex items-start gap-3">
-                    <Users
-                      className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
-                      aria-hidden="true"
+              {estMorale && (
+                <>
+                  {c.representantLegal && (
+                    <LigneInfo
+                      icone={Users}
+                      label="Représentant légal"
+                      valeur={c.representantLegal}
                     />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Représentant légal</p>
-                      <p className="text-sm font-medium">{c.representantLegal}</p>
+                  )}
+                  {c.nifRc && <LigneInfo icone={BadgeCheck} label="NIF / RC" valeur={c.nifRc} />}
+                </>
+              )}
+
+              <LigneInfo icone={Phone} label="Téléphone principal" valeur={c.telephone} />
+
+              {c.telephoneSecondaire && (
+                <LigneInfo
+                  icone={Phone}
+                  label="Téléphone secondaire"
+                  valeur={c.telephoneSecondaire}
+                />
+              )}
+
+              {c.email && <LigneInfo icone={Mail} label="Email" valeur={c.email} />}
+
+              {c.adresse && <LigneInfo icone={MapPin} label="Adresse" valeur={c.adresse} />}
+
+              {c.notes && (
+                <div className="py-2.5">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted">
+                      <StickyNote
+                        className="h-3.5 w-3.5 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                        Notes
+                      </p>
+                      <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
+                        {c.notes}
+                      </p>
                     </div>
                   </div>
-                )}
-                {c.nifRc && (
-                  <div className="flex items-start gap-3">
-                    <BadgeCheck
-                      className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
-                      aria-hidden="true"
-                    />
-                    <div>
-                      <p className="text-xs text-muted-foreground">NIF / RC</p>
-                      <p className="text-sm font-medium">{c.nifRc}</p>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            <Separator />
-
-            <div className="flex items-start gap-3">
-              <Phone className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <div>
-                <p className="text-xs text-muted-foreground">Téléphone principal</p>
-                <p className="text-sm font-medium">{c.telephone}</p>
-              </div>
-            </div>
-
-            {c.telephoneSecondaire && (
-              <div className="flex items-start gap-3">
-                <Phone
-                  className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <div>
-                  <p className="text-xs text-muted-foreground">Téléphone secondaire</p>
-                  <p className="text-sm font-medium">{c.telephoneSecondaire}</p>
                 </div>
-              </div>
-            )}
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-            {c.email && (
-              <div className="flex items-start gap-3">
-                <Mail
-                  className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <div>
-                  <p className="text-xs text-muted-foreground">Email</p>
-                  <p className="text-sm font-medium">{c.email}</p>
-                </div>
-              </div>
-            )}
-
-            {c.adresse && (
-              <div className="flex items-start gap-3">
-                <MapPin
-                  className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <div>
-                  <p className="text-xs text-muted-foreground">Adresse</p>
-                  <p className="text-sm font-medium">{c.adresse}</p>
-                </div>
-              </div>
-            )}
-
-            {c.notes && (
-              <>
-                <Separator />
-                <div className="flex items-start gap-3">
-                  <StickyNote
-                    className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Notes</p>
-                    <p className="text-sm leading-relaxed text-muted-foreground">{c.notes}</p>
-                  </div>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Onglets dossiers / paiements — 2/3 */}
-        <div className="lg:col-span-2">
-          <Tabs defaultValue="dossiers">
-            <TabsList>
-              <TabsTrigger value="dossiers">
+        {/* Onglets dossiers / paiements */}
+        <div
+          className="animate-fade-up opacity-0 lg:col-span-2"
+          style={{ animationDelay: '460ms', animationFillMode: 'forwards' }}
+        >
+          <Tabs defaultValue="dossiers" className="flex flex-col">
+            <TabsList className="h-9 w-full rounded-xl p-1">
+              <TabsTrigger value="dossiers" className="flex-1 gap-2 text-xs">
                 Dossiers
                 {dossiers.length > 0 && (
-                  <Badge variant="secondary" className="ml-2 text-xs">
+                  <span
+                    className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none"
+                    style={{
+                      color: 'var(--kpi-dossiers)',
+                      backgroundColor: 'var(--kpi-dossiers-bg)',
+                    }}
+                  >
                     {dossiers.length}
-                  </Badge>
+                  </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="paiements">
+              <TabsTrigger value="paiements" className="flex-1 gap-2 text-xs">
                 Paiements
                 {paiements.length > 0 && (
-                  <Badge variant="secondary" className="ml-2 text-xs">
+                  <span
+                    className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none"
+                    style={{
+                      color: 'var(--facture-payee)',
+                      backgroundColor: 'var(--facture-payee-bg)',
+                    }}
+                  >
                     {paiements.length}
-                  </Badge>
+                  </span>
                 )}
               </TabsTrigger>
             </TabsList>
 
-            {/* Dossiers */}
-            <TabsContent value="dossiers" className="mt-4">
+            {/* Tab Dossiers */}
+            <TabsContent value="dossiers" className="mt-3">
               <Card>
                 <CardContent className="p-0">
                   {chargementDossiers ? (
-                    <div className="divide-y">
+                    <div className="divide-y divide-border">
                       {Array.from({ length: 3 }).map((_, i) => (
-                        <div key={i} className="flex items-center gap-4 p-4">
+                        <div key={i} className="flex items-center gap-3 px-4 py-3">
+                          <Skeleton className="h-8 w-8 rounded-lg" />
                           <div className="flex-1 space-y-1.5">
-                            <Skeleton className="h-4 w-48" />
+                            <Skeleton className="h-3.5 w-44" />
                             <Skeleton className="h-3 w-32" />
                           </div>
                           <Skeleton className="h-5 w-16 rounded-full" />
@@ -415,43 +477,55 @@ export default function ClientDetailPage() {
                       ))}
                     </div>
                   ) : dossiers.length === 0 ? (
-                    <div className="flex flex-col items-center gap-2 py-12 text-center">
-                      <FolderOpen
-                        className="h-10 w-10 text-muted-foreground/30"
-                        aria-hidden="true"
-                      />
-                      <p className="text-sm font-medium">Aucun dossier</p>
-                      <p className="text-xs text-muted-foreground">
-                        Aucun dossier n'est associé à ce client
-                      </p>
+                    <div className="flex flex-col items-center gap-3 py-14 text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
+                        <FolderOpen
+                          className="h-6 w-6 text-muted-foreground/40"
+                          aria-hidden="true"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Aucun dossier</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          Aucun dossier n'est associé à ce client
+                        </p>
+                      </div>
+                      <Button size="sm" onClick={() => setDialogCreerDossier(true)}>
+                        <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                        Créer un dossier
+                      </Button>
                     </div>
                   ) : (
-                    <div className="divide-y">
-                      {dossiers.map((dossier: DossierResume) => {
-                        const statut = STATUT_DOSSIER[dossier.statut] ?? {
-                          label: dossier.statut,
-                          variant: 'outline' as const,
-                        };
+                    <div className="divide-y divide-border">
+                      {dossiers.map((dossier: DossierResume, i) => {
+                        // const cfg = styleStatutDossier(dossier.statut as any);
+                        const cfg = styleStatutDossier(dossier.statut as StatutDossier);
                         return (
-                          <div
+                          <button
                             key={dossier._id}
-                            role="button"
-                            tabIndex={0}
-                            className="flex cursor-pointer items-center gap-4 p-4 transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
+                            className="animate-fade-up opacity-0 group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+                            style={{
+                              animationDelay: `${500 + i * 40}ms`,
+                              animationFillMode: 'forwards',
+                            }}
                             onClick={() => navigate(`/cabinet/dossiers/${dossier._id}`)}
-                            onKeyDown={(e) =>
-                              e.key === 'Enter' && navigate(`/cabinet/dossiers/${dossier._id}`)
-                            }
                           >
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/8 transition-all duration-200 group-hover:scale-105 group-hover:bg-primary/14">
+                              <FolderOpen className="h-4 w-4 text-primary" aria-hidden="true" />
+                            </div>
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-medium">{dossier.titre}</p>
-                              <p className="text-xs text-muted-foreground">
-                                Réf. {dossier.reference} · Ouvert le{' '}
+                              <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                                {dossier.reference} ·{' '}
                                 {format(new Date(dossier.dateOuverture), 'dd/MM/yyyy')}
                               </p>
                             </div>
-                            <Badge variant={statut.variant}>{statut.label}</Badge>
-                          </div>
+                            <span
+                              className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${cfg.text} ${cfg.bg} ${cfg.border}`}
+                            >
+                              {cfg.label}
+                            </span>
+                          </button>
                         );
                       })}
                     </div>
@@ -460,16 +534,17 @@ export default function ClientDetailPage() {
               </Card>
             </TabsContent>
 
-            {/* Paiements */}
-            <TabsContent value="paiements" className="mt-4">
+            {/* Tab Paiements */}
+            <TabsContent value="paiements" className="mt-3">
               <Card>
                 <CardContent className="p-0">
                   {chargementPaiements ? (
-                    <div className="divide-y">
+                    <div className="divide-y divide-border">
                       {Array.from({ length: 3 }).map((_, i) => (
-                        <div key={i} className="flex items-center gap-4 p-4">
+                        <div key={i} className="flex items-center gap-3 px-4 py-3">
+                          <Skeleton className="h-8 w-8 rounded-lg" />
                           <div className="flex-1 space-y-1.5">
-                            <Skeleton className="h-4 w-48" />
+                            <Skeleton className="h-3.5 w-44" />
                             <Skeleton className="h-3 w-32" />
                           </div>
                           <Skeleton className="h-4 w-24" />
@@ -477,35 +552,74 @@ export default function ClientDetailPage() {
                       ))}
                     </div>
                   ) : paiements.length === 0 ? (
-                    <div className="flex flex-col items-center gap-2 py-12 text-center">
-                      <CreditCard
-                        className="h-10 w-10 text-muted-foreground/30"
-                        aria-hidden="true"
-                      />
-                      <p className="text-sm font-medium">Aucun paiement</p>
-                      <p className="text-xs text-muted-foreground">
-                        Aucun paiement enregistré pour ce client
-                      </p>
+                    <div className="flex flex-col items-center gap-3 py-14 text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
+                        <CreditCard
+                          className="h-6 w-6 text-muted-foreground/40"
+                          aria-hidden="true"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Aucun paiement</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          Aucun paiement enregistré pour ce client
+                        </p>
+                      </div>
                     </div>
                   ) : (
-                    <div className="divide-y">
-                      {paiements.map((paiement: PaiementResume) => (
-                        <div key={paiement._id} className="flex items-center gap-4 p-4">
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium">
-                              {paiement.dossier?.titre ?? 'Dossier inconnu'}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {format(new Date(paiement.date), 'dd MMMM yyyy', { locale: fr })}
-                              {paiement.modePaiement && ` · ${paiement.modePaiement}`}
+                    <div className="divide-y divide-border">
+                      {paiements.map((paiement: PaiementResume, i) => {
+                        const modeStyle = paiement.modePaiement
+                          ? styleModeReglement(paiement.modePaiement)
+                          : null;
+                        return (
+                          <div
+                            key={paiement._id}
+                            className="animate-fade-up opacity-0 flex items-center gap-3 px-4 py-3"
+                            style={{
+                              animationDelay: `${500 + i * 40}ms`,
+                              animationFillMode: 'forwards',
+                            }}
+                          >
+                            <div
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                              style={{ backgroundColor: 'var(--facture-payee-bg)' }}
+                            >
+                              <CreditCard
+                                className="h-4 w-4"
+                                style={{ color: 'var(--facture-payee)' }}
+                                aria-hidden="true"
+                              />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium">
+                                {paiement.dossier?.titre ?? 'Dossier inconnu'}
+                              </p>
+                              <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                                {format(new Date(paiement.date), 'dd MMMM yyyy', {
+                                  locale: fr,
+                                })}
+                                {modeStyle && paiement.modePaiement && (
+                                  <>
+                                    <span className="text-muted-foreground/40">·</span>
+                                    <span
+                                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${modeStyle.text} ${modeStyle.bg}`}
+                                    >
+                                      {libelleModeReglement(paiement.modePaiement)}
+                                    </span>
+                                  </>
+                                )}
+                              </p>
+                            </div>
+                            <p
+                              className="shrink-0 text-sm font-semibold tabular-nums"
+                              style={{ color: 'var(--facture-payee)' }}
+                            >
+                              +{formaterMontantDA(paiement.montant)}
                             </p>
                           </div>
-                          {/* Montant — token success, pas de text-green-600 hardcodé */}
-                          <p className="shrink-0 text-sm font-semibold tabular-nums text-(--color-success)">
-                            +{paiement.montant.toLocaleString('fr-DZ')} DA
-                          </p>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
@@ -515,9 +629,17 @@ export default function ClientDetailPage() {
         </div>
       </div>
 
-      {/* ── Dialogs ──────────────────────────────────────────────── */}
+      {/* ── Dialogs ───────────────────────────────────────────────── */}
       {dialogModifier && (
         <DialogModifierClient client={c} onFermer={() => setDialogModifier(false)} />
+      )}
+      {dialogCreerDossier && (
+        <DialogCreerDossier
+          ouvert={dialogCreerDossier}
+          onFermer={() => setDialogCreerDossier(false)}
+          clientPreselectionne={id}
+          onSuccess={(dossierId) => navigate(`/cabinet/dossiers/${dossierId}`)}
+        />
       )}
 
       <AlertDialog open={confirmerArchivage} onOpenChange={setConfirmerArchivage}>
@@ -525,18 +647,16 @@ export default function ClientDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Archiver ce client ?</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{nomAffiche(c)}</strong> sera archivé. Ses dossiers restent accessibles mais
-              il n'apparaîtra plus dans la liste des clients actifs.
+              <strong>{nomClient}</strong> sera archivé. Ses dossiers restent accessibles mais il
+              n'apparaîtra plus dans la liste des clients actifs.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive hover:bg-destructive/90"
-              onClick={() => archiver()}
-              disabled={archivageEnCours}
-            >
-              Archiver
+            <AlertDialogCancel disabled={archivageEnCours}>Annuler</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button variant="destructive" disabled={archivageEnCours} onClick={() => archiver()}>
+                {archivageEnCours ? 'Archivage\u2026' : 'Archiver'}
+              </Button>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

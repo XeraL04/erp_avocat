@@ -36,18 +36,15 @@ import {
 
 import type { Report } from '@/types';
 import { ajouterReport, modifierReport, supprimerReport } from '@/api/dossier.api';
-import { formaterDate } from '@/lib/utils';
+import { formaterDate, cn } from '@/lib/utils';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
-
 interface TabReportsProps {
   dossierId: string;
   reports: Report[];
   estAdmin: boolean;
   onMutationSuccess: () => void;
 }
-
-// ─── État interne du formulaire ───────────────────────────────────────────────
 
 interface EtatFormulaire {
   date: string;
@@ -58,26 +55,21 @@ interface EtatFormulaire {
 const formulaireVide: EtatFormulaire = { date: '', raison: '', jugement: '' };
 
 // ─── Composant ────────────────────────────────────────────────────────────────
-
 export default function TabReports({
   dossierId,
   reports,
   estAdmin,
   onMutationSuccess,
 }: TabReportsProps) {
-  // ── Dialog ajout ──────────────────────────────────────────────────────────
   const [dialogAjoutOuvert, setDialogAjoutOuvert] = useState(false);
   const [formulaireAjout, setFormulaireAjout] = useState<EtatFormulaire>(formulaireVide);
 
-  // ── Dialog modification ───────────────────────────────────────────────────
   const [reportAModifier, setReportAModifier] = useState<Report | null>(null);
   const [formulaireModif, setFormulaireModif] = useState<EtatFormulaire>(formulaireVide);
 
-  // ── Dialog suppression ────────────────────────────────────────────────────
   const [reportASupprimer, setReportASupprimer] = useState<Report | null>(null);
 
   // ── Mutations ──────────────────────────────────────────────────────────────
-
   const { mutate: ajouter, isPending: ajoutEnCours } = useMutation({
     mutationFn: () =>
       ajouterReport(dossierId, {
@@ -119,7 +111,6 @@ export default function TabReports({
   });
 
   // ── Helpers ────────────────────────────────────────────────────────────────
-
   const fermerDialogAjout = () => {
     setDialogAjoutOuvert(false);
     setFormulaireAjout(formulaireVide);
@@ -150,87 +141,131 @@ export default function TabReports({
   );
 
   // ── Rendu ──────────────────────────────────────────────────────────────────
-
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-3">
-          <CardTitle className="text-base">Reports d'audience</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between pb-3 pt-4">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Reports d'audience
+          </CardTitle>
           <Button size="sm" onClick={() => setDialogAjoutOuvert(true)}>
-            <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-            Ajouter un report
+            <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+            Ajouter
           </Button>
         </CardHeader>
 
         <CardContent className="p-0">
           {sorted.length === 0 ? (
             /* ── État vide ─────────────────────────────────────── */
-            <div className="flex flex-col items-center gap-2 py-16 text-center">
-              <CalendarClock className="h-10 w-10 text-muted-foreground/30" aria-hidden="true" />
+            <div className="flex flex-col items-center gap-2 py-14 text-center">
+              <CalendarClock className="h-9 w-9 text-muted-foreground/25" aria-hidden="true" />
               <p className="text-sm font-medium">Aucun report enregistré</p>
-              <p className="text-xs text-muted-foreground">
-                Cliquez sur « Ajouter un report » pour enregistrer la prochaine audience.
+              <p className="max-w-xs text-xs text-muted-foreground">
+                Cliquez sur « Ajouter » pour enregistrer la prochaine audience reportée.
               </p>
             </div>
           ) : (
-            /* ── Tableau ───────────────────────────────────────── */
+            /* ── Timeline table ────────────────────────────────── */
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-40 pl-6">Les Renvois</TableHead>
-                    <TableHead>Les Motifs</TableHead>
-                    <TableHead>Le Dispositif</TableHead>
-                    {estAdmin && <TableHead className="w-24 pr-4" />}
+                    <TableHead className="w-10 pl-5" />
+                    <TableHead className="w-36 text-xs">Renvoi</TableHead>
+                    <TableHead className="text-xs">Motif</TableHead>
+                    <TableHead className="hidden text-xs md:table-cell">Dispositif</TableHead>
+                    {estAdmin && <TableHead className="w-20 pr-4" />}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sorted.map((report, index) => (
-                    <TableRow key={report._id ?? index}>
-                      {/* Les Renvois — date */}
-                      <TableCell className="pl-6 font-medium tabular-nums">
-                        {formaterDate(report.date)}
-                      </TableCell>
-
-                      {/* Les Motifs — raison */}
-                      <TableCell className="text-muted-foreground">{report.raison}</TableCell>
-
-                      {/* Le Dispositif — jugement */}
-                      <TableCell className="text-muted-foreground">
-                        {report.jugement ? (
-                          report.jugement
-                        ) : (
-                          <span className="text-muted-foreground/40">—</span>
-                        )}
-                      </TableCell>
-
-                      {/* Actions : modifier + supprimer */}
-                      {estAdmin && (
-                        <TableCell className="pr-4 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                              onClick={() => ouvrirDialogModif(report)}
-                              aria-label="Modifier ce report"
+                  {sorted.map((report, index) => {
+                    const isLast = index === sorted.length - 1;
+                    return (
+                      <TableRow
+                        key={report._id ?? index}
+                        className="group align-top hover:bg-accent/40"
+                      >
+                        {/* ── Indicateur timeline ─────────────── */}
+                        <TableCell className="pl-5 pt-3.5">
+                          <div className="relative flex flex-col items-center">
+                            {/* Ligne verticale reliant les étapes */}
+                            {!isLast && (
+                              <span
+                                className="absolute top-5 h-full w-px bg-border/60"
+                                aria-hidden="true"
+                              />
+                            )}
+                            {/* Dot */}
+                            <span
+                              className={cn(
+                                'relative z-10 flex h-5 w-5 items-center justify-center rounded-full ring-2',
+                                isLast ? 'bg-primary/10 ring-primary/20' : 'bg-muted ring-border'
+                              )}
+                              aria-hidden="true"
                             >
-                              <Pencil className="h-4 w-4" aria-hidden="true" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                              onClick={() => setReportASupprimer(report)}
-                              aria-label="Supprimer ce report"
-                            >
-                              <Trash2 className="h-4 w-4" aria-hidden="true" />
-                            </Button>
+                              <span
+                                className={cn(
+                                  'h-1.5 w-1.5 rounded-full',
+                                  isLast ? 'bg-primary' : 'bg-muted-foreground/40'
+                                )}
+                              />
+                            </span>
                           </div>
                         </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
+
+                        {/* ── Date ────────────────────────────── */}
+                        <TableCell className="pt-3">
+                          <span className="text-xs font-semibold tabular-nums text-foreground">
+                            {formaterDate(report.date)}
+                          </span>
+                          {/* Motif visible en mobile sous la date */}
+                          <p className="mt-0.5 text-xs text-muted-foreground md:hidden">
+                            {report.raison}
+                          </p>
+                        </TableCell>
+
+                        {/* ── Motif ───────────────────────────── */}
+                        <TableCell className="hidden pt-3 text-xs text-muted-foreground md:table-cell">
+                          {report.raison}
+                        </TableCell>
+
+                        {/* ── Dispositif ──────────────────────── */}
+                        <TableCell className="hidden pt-3 text-xs text-muted-foreground md:table-cell">
+                          {report.jugement ? (
+                            <span className="leading-relaxed">{report.jugement}</span>
+                          ) : (
+                            <span className="text-muted-foreground/30">—</span>
+                          )}
+                        </TableCell>
+
+                        {/* ── Actions ─────────────────────────── */}
+                        {estAdmin && (
+                          <TableCell className="pr-4 pt-2 text-right">
+                            <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                onClick={() => ouvrirDialogModif(report)}
+                                aria-label="Modifier ce report"
+                              >
+                                <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                onClick={() => setReportASupprimer(report)}
+                                aria-label="Supprimer ce report"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -249,15 +284,13 @@ export default function TabReports({
           <DialogHeader>
             <DialogTitle>Ajouter un report</DialogTitle>
           </DialogHeader>
-
           <FormulaireReport valeurs={formulaireAjout} onChange={setFormulaireAjout} />
-
           <DialogFooter>
             <Button variant="outline" onClick={fermerDialogAjout} disabled={ajoutEnCours}>
               Annuler
             </Button>
             <Button onClick={() => ajouter()} disabled={!peutSoumettreAjout || ajoutEnCours}>
-              {ajoutEnCours ? 'Ajout...' : 'Ajouter'}
+              {ajoutEnCours ? 'Ajout…' : 'Ajouter'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -274,15 +307,13 @@ export default function TabReports({
           <DialogHeader>
             <DialogTitle>Modifier le report</DialogTitle>
           </DialogHeader>
-
           <FormulaireReport valeurs={formulaireModif} onChange={setFormulaireModif} />
-
           <DialogFooter>
             <Button variant="outline" onClick={fermerDialogModif} disabled={modifEnCours}>
               Annuler
             </Button>
             <Button onClick={() => modifier()} disabled={!peutSoumettreModif || modifEnCours}>
-              {modifEnCours ? 'Enregistrement...' : 'Enregistrer'}
+              {modifEnCours ? 'Enregistrement…' : 'Enregistrer'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -308,13 +339,15 @@ export default function TabReports({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive hover:bg-destructive/90"
-              onClick={() => supprimer()}
-              disabled={suppressionEnCours}
-            >
-              Supprimer
+            <AlertDialogCancel disabled={suppressionEnCours}>Annuler</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                disabled={suppressionEnCours}
+                onClick={() => supprimer()}
+              >
+                {suppressionEnCours ? 'Suppression…' : 'Supprimer'}
+              </Button>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -323,8 +356,7 @@ export default function TabReports({
   );
 }
 
-// ─── Sous-composant formulaire partagé ────────────────────────────────────────
-
+// ─── Sous-composant formulaire ────────────────────────────────────────────────
 interface FormulaireReportProps {
   valeurs: EtatFormulaire;
   onChange: (v: EtatFormulaire) => void;
@@ -334,19 +366,25 @@ function FormulaireReport({ valeurs, onChange }: FormulaireReportProps) {
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
-        <Label htmlFor="report-date">Les Renvois (date) *</Label>
+        <Label htmlFor="report-date" className="text-xs font-medium">
+          Les Renvois (date) <span className="text-destructive">*</span>
+        </Label>
         <Input
           id="report-date"
           type="date"
+          className="h-9 text-sm"
           value={valeurs.date}
           onChange={(e) => onChange({ ...valeurs, date: e.target.value })}
         />
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="report-raison">Les Motifs *</Label>
+        <Label htmlFor="report-raison" className="text-xs font-medium">
+          Les Motifs <span className="text-destructive">*</span>
+        </Label>
         <Input
           id="report-raison"
+          className="h-9 text-sm"
           placeholder="Ex : Absence de l'avocat adverse"
           value={valeurs.raison}
           onChange={(e) => onChange({ ...valeurs, raison: e.target.value })}
@@ -354,12 +392,13 @@ function FormulaireReport({ valeurs, onChange }: FormulaireReportProps) {
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="report-jugement">
-          Le Dispositif <span className="text-xs text-muted-foreground">(optionnel)</span>
+        <Label htmlFor="report-jugement" className="text-xs font-medium">
+          Le Dispositif <span className="font-normal text-muted-foreground">(optionnel)</span>
         </Label>
         <Textarea
           id="report-jugement"
-          rows={2}
+          rows={3}
+          className="resize-none text-sm"
           placeholder="Ex : Renvoi au 15/06/2026 pour production de pièces"
           value={valeurs.jugement}
           onChange={(e) => onChange({ ...valeurs, jugement: e.target.value })}

@@ -51,7 +51,6 @@ export default function DialogModifierPaiement({ paiement, onFermer, onSuccess }
     },
   });
 
-  // FIX #2 : isDirty pour bloquer la soumission sans modification
   const { isDirty } = form.formState;
 
   const { mutate, isPending } = useMutation({
@@ -73,13 +72,15 @@ export default function DialogModifierPaiement({ paiement, onFermer, onSuccess }
     },
   });
 
+  const Opt = () => <span className="font-normal text-muted-foreground/70">(opt.)</span>;
+
   return (
     <Dialog open onOpenChange={(o) => !o && onFermer()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Modifier le paiement</DialogTitle>
-          {/* FIX #1 & #5 : description visible et informative, pas sr-only */}
-          <DialogDescription>
+      <DialogContent className="gap-0 p-0 sm:max-w-md">
+        {/* ── Header ──────────────────────────────────────────── */}
+        <DialogHeader className="border-b px-6 py-4">
+          <DialogTitle className="text-base">Modifier le paiement</DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground">
             {formaterMontant(paiement.montant)}
             {paiement.dossier && (
               <>
@@ -90,125 +91,139 @@ export default function DialogModifierPaiement({ paiement, onFermer, onSuccess }
           </DialogDescription>
         </DialogHeader>
 
-        {/* Bandeau contextuel dossier + client */}
-        {paiement.dossier && (
-          <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-            <span className="font-mono">{paiement.dossier.reference}</span>
-            {' · '}
-            {paiement.dossier.titre}
-            {paiement.dossier.client && (
-              <span className="ml-2 font-medium text-foreground">
-                — {nomClient(paiement.dossier.client)}
-              </span>
-            )}
-          </div>
-        )}
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit((v) => mutate(v))} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <FormField
-                control={form.control}
-                name="montant"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Montant (DA)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={1}
-                        {...field}
-                        value={field.value ?? ''}
-                        onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="mode"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Mode</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="cash">💵 Espèces</SelectItem>
-                        <SelectItem value="virement">🏦 Virement</SelectItem>
-                        <SelectItem value="ccp">📮 CCP</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+        <div className="px-6 py-5">
+          {/* ── Bandeau dossier / client ─────────────────────── */}
+          {paiement.dossier && (
+            <div className="mb-4 rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              <span className="font-mono">{paiement.dossier.reference}</span>
+              {' · '}
+              {paiement.dossier.titre}
+              {paiement.dossier.client && (
+                <span className="ml-2 font-medium text-foreground">
+                  — {nomClient(paiement.dossier.client)}
+                </span>
+              )}
             </div>
+          )}
 
-            <div className="grid grid-cols-2 gap-3">
+          {/* ── Formulaire ──────────────────────────────────── */}
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit((v) => mutate(v))} className="space-y-4">
+              {/* Montant + Mode */}
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="montant"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-medium">Montant (DA)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={1}
+                          className="h-9 text-sm"
+                          {...field}
+                          value={field.value ?? ''}
+                          onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="mode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-medium">Mode</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="h-9 w-full text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="cash">Espèces</SelectItem>
+                          <SelectItem value="virement">Virement</SelectItem>
+                          <SelectItem value="ccp">CCP</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Date + Référence */}
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-medium">Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" className="h-9 text-sm" {...field} />
+                      </FormControl>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="reference"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-medium">
+                        Référence <Opt />
+                      </FormLabel>
+                      <FormControl>
+                        <Input className="h-9 text-sm" {...field} />
+                      </FormControl>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Note */}
               <FormField
                 control={form.control}
-                name="date"
+                name="note"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="reference"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Référence <span className="font-normal text-muted-foreground">(opt.)</span>
+                    <FormLabel className="text-xs font-medium">
+                      Note <Opt />
                     </FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Textarea className="resize-none text-sm" rows={2} {...field} />
                     </FormControl>
-                    {/* FIX #3 : FormMessage manquant */}
-                    <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
 
-            <FormField
-              control={form.control}
-              name="note"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Note <span className="font-normal text-muted-foreground">(opt.)</span>
-                  </FormLabel>
-                  <FormControl>
-                    <Textarea className="resize-none" rows={2} {...field} />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={onFermer} disabled={isPending}>
-                Annuler
-              </Button>
-              {/* FIX #2 : désactivé si rien n'a changé OU si en cours de soumission */}
-              <Button type="submit" disabled={isPending || !isDirty}>
-                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isPending ? 'Enregistrement…' : 'Enregistrer'}
-              </Button>
-            </div>
-          </form>
-        </Form>
+              {/* ── Footer actions ───────────────────────────── */}
+              <div className="flex justify-end gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onFermer}
+                  disabled={isPending}
+                >
+                  Annuler
+                </Button>
+                <Button type="submit" size="sm" disabled={isPending || !isDirty}>
+                  {isPending && (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  )}
+                  {isPending ? 'Enregistrement…' : 'Enregistrer'}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -3,7 +3,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, CalendarPlus, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -33,7 +33,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 
 import { modifierDossier, ajouterReport, supprimerReport } from '@/api/dossier.api';
 import type {
@@ -46,16 +45,13 @@ import type {
 import {
   LABELS_QUALITE,
   LABELS_TYPE_AFFAIRE,
-  // LABELS_SPECIALITE,
   SPECIALITES_PAR_TYPE,
   LABELS_INSTITUTION,
   GROUPES_INSTITUTION,
 } from '@/types';
-
 import InputInstitution from '@/components/dossier/InputInstitution';
 
 // ─── Schéma Zod ───────────────────────────────────────────────────────────────
-
 const qualiteEnum = z.enum([
   'demandeur',
   'defendeur',
@@ -89,14 +85,12 @@ const schemaModifierDossier = z.object({
 type FormModifierDossier = z.infer<typeof schemaModifierDossier>;
 
 // ─── Props ────────────────────────────────────────────────────────────────────
-
 interface Props {
   dossier: Dossier;
   onFermer: () => void;
 }
 
 // ─── Composant ────────────────────────────────────────────────────────────────
-
 export default function DialogModifierDossier({ dossier, onFermer }: Props) {
   const queryClient = useQueryClient();
 
@@ -115,13 +109,11 @@ export default function DialogModifierDossier({ dossier, onFermer }: Props) {
     remove: removeReport,
   } = useFieldArray({ control: form.control, name: 'reports' });
 
-  // Resync si le dossier change
   useEffect(() => {
     form.reset(buildDefaultValues(dossier));
   }, [dossier, form]);
 
-  // typeAffaire observé pour filtrer les spécialités
-  const typeAffaireSelectionne = form.watch('typeAffaire'); // string | undefined — pas de cast
+  const typeAffaireSelectionne = form.watch('typeAffaire');
   const optionsSpecialite =
     typeAffaireSelectionne && typeAffaireSelectionne !== '_none' && typeAffaireSelectionne !== ''
       ? (SPECIALITES_PAR_TYPE[typeAffaireSelectionne as TypeAffaire] ?? [])
@@ -129,7 +121,6 @@ export default function DialogModifierDossier({ dossier, onFermer }: Props) {
 
   const { mutate, isPending } = useMutation({
     mutationFn: async (data: FormModifierDossier) => {
-      // 1. Modifier les champs du dossier (sans reports)
       const dossierMaj = await modifierDossier(dossier._id, {
         qualiteClient: data.qualiteClient as QualitePartie,
         adversaire: data.adversaire,
@@ -152,15 +143,11 @@ export default function DialogModifierDossier({ dossier, onFermer }: Props) {
       const reportsFormulaire = data.reports ?? [];
       const reportsOriginaux = dossier.reports ?? [];
 
-      // 2. Reports supprimés
       const idsFormulaire = new Set(reportsFormulaire.map((r) => r._id).filter(Boolean));
       const aSupprimer = reportsOriginaux.filter((r) => !idsFormulaire.has(r._id));
-
       await Promise.all(aSupprimer.map((r) => supprimerReport(dossier._id, r._id)));
 
-      // 3. Reports ajoutés
       const aAjouter = reportsFormulaire.filter((r) => !r._id);
-
       await Promise.all(
         aAjouter.map((r) =>
           ajouterReport(dossier._id, {
@@ -182,163 +169,190 @@ export default function DialogModifierDossier({ dossier, onFermer }: Props) {
     onError: () => toast.error('Erreur lors de la modification'),
   });
 
+  const Opt = () => <span className="font-normal text-muted-foreground/70">(opt.)</span>;
+
+  const SectionTitle = ({ children }: { children: React.ReactNode }) => (
+    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+      {children}
+    </p>
+  );
+
   return (
     <Dialog open onOpenChange={(o) => !o && !isPending && onFermer()}>
       <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
-        {/* ── Header fixe ── */}
+        {/* ── Header ──────────────────────────────────────────── */}
         <DialogHeader className="shrink-0 border-b px-6 py-4">
-          <DialogTitle>Modifier le dossier</DialogTitle>
-          <DialogDescription className="font-mono">{dossier.reference}</DialogDescription>
+          <DialogTitle className="text-base">Modifier le dossier</DialogTitle>
+          <DialogDescription className="font-mono text-xs text-muted-foreground">
+            {dossier.reference}
+          </DialogDescription>
         </DialogHeader>
 
-        {/* ── Body scrollable ── */}
+        {/* ── Body scrollable ─────────────────────────────────── */}
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <Form {...form}>
             <form
               id="form-modifier-dossier"
               onSubmit={form.handleSubmit((data) => mutate(data))}
-              className="space-y-6"
+              className="space-y-7"
+              noValidate
             >
-              {/* ── Parties ──────────────────────────────────────────────── */}
-              <div className="space-y-4">
-                <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                  Parties
-                </h3>
+              {/* ══ Parties ═══════════════════════════════════════
+                  Toute la section dans une seule grille à 2 col.
+                  qualiteClient → col-span-2 (pleine largeur)
+                  séparateur    → col-span-2
+                  adversaire    → col 1
+                  qualiteAdv.   → col 2
+              ════════════════════════════════════════════════════ */}
+              <section className="space-y-3">
+                <SectionTitle>Parties</SectionTitle>
 
-                {/* Qualité du client */}
-                <FormField
-                  control={form.control}
-                  name="qualiteClient"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Qualité du client *</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {/* Qualité du client — occupe les 2 colonnes */}
+                  <FormField
+                    control={form.control}
+                    name="qualiteClient"
+                    render={({ field }) => (
+                      <FormItem className="sm:col-span-2">
+                        <FormLabel className="text-xs font-medium">
+                          Qualité du client <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger className="h-9 w-full text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {(Object.entries(LABELS_QUALITE) as [QualitePartie, string][]).map(
+                              ([val, label]) => (
+                                <SelectItem key={val} value={val}>
+                                  {label}
+                                </SelectItem>
+                              )
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Séparateur — occupe les 2 colonnes */}
+                  <div className="sm:col-span-2 border-t border-dashed border-border/60" />
+
+                  {/* Adversaire — col 1 */}
+                  <FormField
+                    control={form.control}
+                    name="adversaire"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-medium">
+                          Contre (adversaire) <span className="text-destructive">*</span>
+                        </FormLabel>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
+                          <Input
+                            className="h-9 w-full text-sm"
+                            placeholder="Nom complet ou raison sociale"
+                            {...field}
+                          />
                         </FormControl>
-                        <SelectContent>
-                          {(Object.entries(LABELS_QUALITE) as [QualitePartie, string][]).map(
-                            ([val, label]) => (
-                              <SelectItem key={val} value={val}>
-                                {label}
-                              </SelectItem>
-                            )
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
 
-                <Separator />
+                  {/* Qualité adversaire — col 2 */}
+                  <FormField
+                    control={form.control}
+                    name="qualiteAdversaire"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-medium">
+                          Qualité de l'adversaire <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger className="h-9 w-full text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {(Object.entries(LABELS_QUALITE) as [QualitePartie, string][]).map(
+                              ([val, label]) => (
+                                <SelectItem key={val} value={val}>
+                                  {label}
+                                </SelectItem>
+                              )
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </section>
 
-                {/* Adversaire */}
-                <FormField
-                  control={form.control}
-                  name="adversaire"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Contre (adversaire) *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Nom complet ou raison sociale" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              {/* ══ Identification judiciaire ═════════════════════ */}
+              <section className="space-y-3">
+                <SectionTitle>Identification judiciaire</SectionTitle>
 
-                {/* Qualité de l'adversaire */}
-                <FormField
-                  control={form.control}
-                  name="qualiteAdversaire"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Qualité de l'adversaire *</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {(Object.entries(LABELS_QUALITE) as [QualitePartie, string][]).map(
-                            ([val, label]) => (
-                              <SelectItem key={val} value={val}>
-                                {label}
-                              </SelectItem>
-                            )
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* ── Identification judiciaire ─────────────────────────────── */}
-              <div className="space-y-4">
-                <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                  Identification judiciaire
-                </h3>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  {/* N° dossier */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {/* Dossier n° — col 1 */}
                   <FormField
                     control={form.control}
                     name="dossierNumero"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>
-                          Dossier n°{' '}
-                          <span className="font-normal text-muted-foreground">(opt.)</span>
+                        <FormLabel className="text-xs font-medium">
+                          Dossier n° <Opt />
                         </FormLabel>
                         <FormControl>
-                          <Input placeholder="Ex : 2024/1234" {...field} />
+                          <Input
+                            className="h-9 w-full text-sm"
+                            placeholder="ex : 2024/1234"
+                            {...field}
+                          />
                         </FormControl>
-                        <FormMessage />
+                        <FormMessage className="text-xs" />
                       </FormItem>
                     )}
                   />
 
-                  {/* Date d'ouverture */}
+                  {/* Date d'ouverture — col 2 */}
                   <FormField
                     control={form.control}
                     name="dateOuverture"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>
-                          Date d'ouverture{' '}
-                          <span className="font-normal text-muted-foreground">(opt.)</span>
+                        <FormLabel className="text-xs font-medium">
+                          Date d'ouverture <Opt />
                         </FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} />
+                          <Input type="date" className="h-9 w-full text-sm" {...field} />
                         </FormControl>
-                        <FormMessage />
+                        <FormMessage className="text-xs" />
                       </FormItem>
                     )}
                   />
 
-                  {/* Institution */}
+                  {/* Institution — col 1 */}
                   <FormField
                     control={form.control}
                     name="institution"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>
-                          Institution{' '}
-                          <span className="font-normal text-muted-foreground">(opt.)</span>
+                        <FormLabel className="text-xs font-medium">
+                          Institution <Opt />
                         </FormLabel>
                         <Select
                           value={field.value || '_none'}
                           onValueChange={(v) => field.onChange(v === '_none' ? '' : v)}
                         >
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Sélectionner l'institution" />
+                            <SelectTrigger className="h-9 w-full text-sm">
+                              <SelectValue placeholder="Sélectionner" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -355,49 +369,47 @@ export default function DialogModifierDossier({ dossier, onFermer }: Props) {
                             ))}
                           </SelectContent>
                         </Select>
-                        <FormMessage />
+                        <FormMessage className="text-xs" />
                       </FormItem>
                     )}
                   />
 
+                  {/* Nom institution — col 2 */}
                   <FormField
                     control={form.control}
                     name="nomInstitution"
                     render={({ field }) => (
-                      <FormItem className="sm:col-span-2">
-                        <FormLabel>
-                          Quelle institution{' '}
-                          <span className="font-normal text-muted-foreground">(opt.)</span>
+                      <FormItem>
+                        <FormLabel className="text-xs font-medium">
+                          Nom de l'institution <Opt />
                         </FormLabel>
                         <FormControl>
                           <InputInstitution value={field.value ?? ''} onChange={field.onChange} />
                         </FormControl>
-                        <FormMessage />
+                        <FormMessage className="text-xs" />
                       </FormItem>
                     )}
                   />
 
-                  {/* Type d'affaire */}
+                  {/* Type d'affaire — col 1 */}
                   <FormField
                     control={form.control}
                     name="typeAffaire"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>
-                          Type d'affaire{' '}
-                          <span className="font-normal text-muted-foreground">(opt.)</span>
+                        <FormLabel className="text-xs font-medium">
+                          Type d'affaire <Opt />
                         </FormLabel>
                         <Select
                           value={field.value || '_none'}
                           onValueChange={(v) => {
                             field.onChange(v === '_none' ? '' : v);
-                            // Réinitialise la spécialité quand le type change
                             form.setValue('specialite', '', { shouldDirty: true });
                           }}
                         >
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Sélectionner le type" />
+                            <SelectTrigger className="h-9 w-full text-sm">
+                              <SelectValue placeholder="Sélectionner" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -411,20 +423,19 @@ export default function DialogModifierDossier({ dossier, onFermer }: Props) {
                             )}
                           </SelectContent>
                         </Select>
-                        <FormMessage />
+                        <FormMessage className="text-xs" />
                       </FormItem>
                     )}
                   />
 
-                  {/* Spécialité — dépend du type d'affaire */}
+                  {/* Spécialité — col 2 */}
                   <FormField
                     control={form.control}
                     name="specialite"
                     render={({ field }) => (
-                      <FormItem className="sm:col-span-2">
-                        <FormLabel>
-                          Spécialité{' '}
-                          <span className="font-normal text-muted-foreground">(opt.)</span>
+                      <FormItem>
+                        <FormLabel className="text-xs font-medium">
+                          Spécialité <Opt />
                         </FormLabel>
                         <Select
                           value={field.value || '_none'}
@@ -436,12 +447,12 @@ export default function DialogModifierDossier({ dossier, onFermer }: Props) {
                           }
                         >
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className="h-9 w-full text-sm">
                               <SelectValue
                                 placeholder={
                                   typeAffaireSelectionne && typeAffaireSelectionne !== '_none'
-                                    ? 'Sélectionner la spécialité'
-                                    : "Choisir d'abord un type d'affaire"
+                                    ? 'Sélectionner'
+                                    : "Choisir d'abord un type"
                                 }
                               />
                             </SelectTrigger>
@@ -455,72 +466,76 @@ export default function DialogModifierDossier({ dossier, onFermer }: Props) {
                             ))}
                           </SelectContent>
                         </Select>
-                        <FormMessage />
+                        <FormMessage className="text-xs" />
                       </FormItem>
                     )}
                   />
                 </div>
-              </div>
+              </section>
 
-              {/* ── Description ──────────────────────────────────────────── */}
+              {/* ══ Description ═══════════════════════════════════ */}
               <FormField
                 control={form.control}
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      Description <span className="font-normal text-muted-foreground">(opt.)</span>
+                    <FormLabel className="text-xs font-medium">
+                      Description <Opt />
                     </FormLabel>
                     <FormControl>
                       <Textarea
                         rows={3}
                         placeholder="Contexte de l'affaire, faits importants…"
-                        className="resize-none"
+                        className="w-full resize-none text-sm"
                         {...field}
                       />
                     </FormControl>
-                    <FormMessage />
+                    <FormMessage className="text-xs" />
                   </FormItem>
                 )}
               />
 
-              {/* ── Reports d'audience ────────────────────────────────────── */}
-              <div className="space-y-3">
+              {/* ══ Reports d'audience ════════════════════════════ */}
+              <section className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                    Reports d'audience
-                  </h3>
+                  <SectionTitle>Reports d'audience</SectionTitle>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="h-7 gap-1.5 text-xs"
                     onClick={() => appendReport({ date: '', raison: '', jugement: '' })}
                   >
-                    <CalendarPlus className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Ajouter un report
+                    <Plus className="h-3 w-3" aria-hidden="true" />
+                    Ajouter
                   </Button>
                 </div>
 
                 {reportFields.length === 0 && (
-                  <p className="rounded-lg border border-dashed py-4 text-center text-sm text-muted-foreground">
-                    Aucun report enregistré.
-                  </p>
+                  <div className="rounded-lg border border-dashed border-border/60 py-5 text-center">
+                    <p className="text-xs text-muted-foreground">Aucun report enregistré</p>
+                  </div>
                 )}
 
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {reportFields.map((field, index) => (
-                    <div key={field.id} className="rounded-lg border bg-muted/20 p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium">Report #{index + 1}</p>
+                    <div
+                      key={field.id}
+                      className="group rounded-lg border border-border/60 bg-muted/20 p-4"
+                    >
+                      <div className="mb-3 flex items-center justify-between">
+                        <span className="text-xs font-semibold text-muted-foreground">
+                          Report #{index + 1}
+                        </span>
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          className="h-6 w-6 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
                           aria-label={`Supprimer le report #${index + 1}`}
                           onClick={() => removeReport(index)}
                         >
-                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                         </Button>
                       </div>
 
@@ -530,11 +545,13 @@ export default function DialogModifierDossier({ dossier, onFermer }: Props) {
                           name={`reports.${index}.date`}
                           render={({ field: f }) => (
                             <FormItem>
-                              <FormLabel>Date</FormLabel>
+                              <FormLabel className="text-xs font-medium">
+                                Date <span className="text-destructive">*</span>
+                              </FormLabel>
                               <FormControl>
-                                <Input type="date" {...f} />
+                                <Input type="date" className="h-9 w-full text-sm" {...f} />
                               </FormControl>
-                              <FormMessage />
+                              <FormMessage className="text-xs" />
                             </FormItem>
                           )}
                         />
@@ -544,11 +561,17 @@ export default function DialogModifierDossier({ dossier, onFermer }: Props) {
                           name={`reports.${index}.raison`}
                           render={({ field: f }) => (
                             <FormItem>
-                              <FormLabel>Raison</FormLabel>
+                              <FormLabel className="text-xs font-medium">
+                                Raison <span className="text-destructive">*</span>
+                              </FormLabel>
                               <FormControl>
-                                <Input placeholder="Ex : Absence de l'avocat adverse" {...f} />
+                                <Input
+                                  className="h-9 w-full text-sm"
+                                  placeholder="ex : Absence de l'avocat adverse"
+                                  {...f}
+                                />
                               </FormControl>
-                              <FormMessage />
+                              <FormMessage className="text-xs" />
                             </FormItem>
                           )}
                         />
@@ -558,14 +581,17 @@ export default function DialogModifierDossier({ dossier, onFermer }: Props) {
                           name={`reports.${index}.jugement`}
                           render={({ field: f }) => (
                             <FormItem className="sm:col-span-2">
-                              <FormLabel>
-                                Jugement{' '}
-                                <span className="font-normal text-muted-foreground">(opt.)</span>
+                              <FormLabel className="text-xs font-medium">
+                                Jugement <Opt />
                               </FormLabel>
                               <FormControl>
-                                <Input placeholder="Ex : Renvoi au 15/06/2026" {...f} />
+                                <Input
+                                  className="h-9 w-full text-sm"
+                                  placeholder="ex : Renvoi au 15/06/2026"
+                                  {...f}
+                                />
                               </FormControl>
-                              <FormMessage />
+                              <FormMessage className="text-xs" />
                             </FormItem>
                           )}
                         />
@@ -573,21 +599,41 @@ export default function DialogModifierDossier({ dossier, onFermer }: Props) {
                     </div>
                   ))}
                 </div>
-              </div>
+              </section>
             </form>
           </Form>
         </div>
 
-        {/* ── Footer fixe ── */}
-        <div className="shrink-0 border-t px-6 py-4">
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onFermer} disabled={isPending}>
-              Annuler
-            </Button>
-            <Button type="submit" form="form-modifier-dossier" disabled={isPending || !isDirty}>
-              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
-              {isPending ? 'Enregistrement…' : 'Enregistrer'}
-            </Button>
+        {/* ── Footer fixe ─────────────────────────────────────── */}
+        <div className="shrink-0 border-t bg-muted/20 px-6 py-3">
+          <div className="flex items-center justify-between">
+            <span
+              className={`text-xs text-muted-foreground transition-opacity ${isDirty ? 'opacity-100' : 'opacity-0'}`}
+            >
+              Modifications non enregistrées
+            </span>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onFermer}
+                disabled={isPending}
+              >
+                Annuler
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                form="form-modifier-dossier"
+                disabled={isPending || !isDirty}
+              >
+                {isPending && (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                )}
+                {isPending ? 'Enregistrement…' : 'Enregistrer'}
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
@@ -596,7 +642,6 @@ export default function DialogModifierDossier({ dossier, onFermer }: Props) {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function buildDefaultValues(dossier: Dossier): FormModifierDossier {
   return {
     qualiteClient: dossier.qualiteClient,

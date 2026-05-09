@@ -40,16 +40,14 @@ const schema = z.object({
     .number({ invalid_type_error: 'Montant requis' })
     .positive('Le montant doit être positif'),
   date: z.string().min(1, 'Date requise'),
-  mode: z.enum(['cash', 'virement', 'ccp'], {
-    required_error: 'Mode de paiement requis',
-  }),
+  mode: z.enum(['cash', 'virement', 'ccp'], { required_error: 'Mode de paiement requis' }),
   reference: z.string().optional(),
   note: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
 
-// ─── Helpers date ─────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function dateLocaleVersISO(dateLocale: string): string {
   if (!dateLocale) return new Date().toISOString();
   return new Date(`${dateLocale}T00:00:00.000Z`).toISOString();
@@ -58,8 +56,6 @@ function isoVersDateLocale(iso: string): string {
   if (!iso) return new Date().toISOString().split('T')[0];
   return iso.split('T')[0];
 }
-
-// ─── Helper erreur Axios ──────────────────────────────────────────────────────
 function extraireMessageErreur(err: unknown, fallback: string): string {
   if (
     err &&
@@ -118,7 +114,6 @@ export default function DialogAjouterPaiement({
     form.reset(valeursDef());
   }, [paiement]);
 
-  // ── Mutation ajout ─────────────────────────────────────────────────────────
   const { mutate: ajouter, isPending: ajoutEnCours } = useMutation({
     mutationFn: (values: FormValues) =>
       ajouterPaiement({
@@ -140,7 +135,6 @@ export default function DialogAjouterPaiement({
       toast.error(extraireMessageErreur(err, "Erreur lors de l'enregistrement")),
   });
 
-  // ── Mutation modification ──────────────────────────────────────────────────
   const { mutate: modifier, isPending: modifEnCours } = useMutation({
     mutationFn: (values: FormValues) =>
       modifierPaiement(paiement!._id, {
@@ -162,146 +156,175 @@ export default function DialogAjouterPaiement({
 
   const enCours = ajoutEnCours || modifEnCours;
   const onSubmit = (values: FormValues) => (modeModif ? modifier(values) : ajouter(values));
-
   const da = (n: number) => n.toLocaleString('fr-DZ') + ' DA';
+
+  const Opt = () => <span className="font-normal text-muted-foreground/70">(opt.)</span>;
 
   return (
     <Dialog open onOpenChange={(o) => !o && !enCours && onFermer()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
+      <DialogContent className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
+        {/* ── Header ──────────────────────────────────────────── */}
+        <DialogHeader className="shrink-0 border-b px-6 py-4">
+          <DialogTitle className="text-base">
             {modeModif ? 'Modifier le paiement' : 'Enregistrer un paiement'}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs text-muted-foreground">
             {modeModif
               ? 'Modifiez les informations du paiement.'
               : `Reste à payer : ${da(resteAPayer)}`}
           </DialogDescription>
         </DialogHeader>
 
+        {/* ── Body ────────────────────────────────────────────── */}
         <Form {...form}>
           <form
             id={`${uid}-form`}
             onSubmit={form.handleSubmit(onSubmit)}
-            className="space-y-4"
             noValidate
+            className="px-6 py-5"
           >
-            {/* ── Montant ───────────────────────────────────────── */}
-            <FormField
-              control={form.control}
-              name="montant"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Montant (DA)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="Ex : 15 000"
-                      disabled={enCours}
-                      value={field.value ?? ''}
-                      onChange={(e) =>
-                        field.onChange(e.target.value === '' ? undefined : Number(e.target.value))
-                      }
-                      // évite la modification accidentelle au scroll
-                      onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="space-y-4">
+              {/* ── Montant + Date sur la même ligne ────────────── */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="montant"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-medium">
+                        Montant (DA) <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="ex : 15 000"
+                          disabled={enCours}
+                          className="h-9 w-full text-sm"
+                          value={field.value ?? ''}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value === '' ? undefined : Number(e.target.value)
+                            )
+                          }
+                          onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
 
-            {/* ── Date ──────────────────────────────────────────── */}
-            <FormField
-              control={form.control}
-              name="date"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Date</FormLabel>
-                  <FormControl>
-                    <Input type="date" disabled={enCours} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <FormField
+                  control={form.control}
+                  name="date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-medium">
+                        Date <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          disabled={enCours}
+                          className="h-9 w-full text-sm"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-            {/* ── Mode de paiement ──────────────────────────────── */}
-            <FormField
-              control={form.control}
-              name="mode"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Mode de paiement</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} disabled={enCours}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choisir un mode" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="cash">Espèces</SelectItem>
-                      <SelectItem value="virement">Virement bancaire</SelectItem>
-                      <SelectItem value="ccp">CCP</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              {/* ── Mode de paiement — pleine largeur ───────────── */}
+              <FormField
+                control={form.control}
+                name="mode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-medium">
+                      Mode de paiement <span className="text-destructive">*</span>
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={enCours}>
+                      <FormControl>
+                        <SelectTrigger className="h-9 w-full text-sm">
+                          <SelectValue placeholder="Choisir un mode" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="cash">Espèces</SelectItem>
+                        <SelectItem value="virement">Virement bancaire</SelectItem>
+                        <SelectItem value="ccp">CCP</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
+              />
 
-            {/* ── Référence ─────────────────────────────────────── */}
-            <FormField
-              control={form.control}
-              name="reference"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Référence{' '}
-                    <span className="text-xs font-normal text-muted-foreground">(optionnelle)</span>
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="N° reçu, virement…"
-                      disabled={enCours}
-                      {...field}
-                      value={field.value ?? ''}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              {/* ── Référence + Note sur la même ligne ──────────── */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="reference"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-medium">
+                        Référence <Opt />
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="N° reçu, virement…"
+                          disabled={enCours}
+                          className="h-9 w-full text-sm"
+                          {...field}
+                          value={field.value ?? ''}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
 
-            {/* ── Note ──────────────────────────────────────────── */}
-            <FormField
-              control={form.control}
-              name="note"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Note{' '}
-                    <span className="text-xs font-normal text-muted-foreground">(optionnelle)</span>
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Remarque libre…"
-                      disabled={enCours}
-                      {...field}
-                      value={field.value ?? ''}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <FormField
+                  control={form.control}
+                  name="note"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-medium">
+                        Note <Opt />
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Remarque libre…"
+                          disabled={enCours}
+                          className="h-9 w-full text-sm"
+                          {...field}
+                          value={field.value ?? ''}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={onFermer} disabled={enCours}>
+            {/* ── Footer ──────────────────────────────────────────── */}
+            <div className="mt-5 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onFermer}
+                disabled={enCours}
+              >
                 Annuler
               </Button>
-              <Button type="submit" form={`${uid}-form`} disabled={enCours}>
-                {enCours && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+              <Button type="submit" size="sm" form={`${uid}-form`} disabled={enCours}>
+                {enCours && (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                )}
                 {enCours
                   ? modeModif
                     ? 'Modification…'

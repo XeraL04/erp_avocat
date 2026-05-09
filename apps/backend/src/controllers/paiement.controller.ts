@@ -320,7 +320,12 @@ export const listerTousPaiements = async (
         .populate({
           path: 'dossier',
           select: 'reference titre client',
-          populate: { path: 'client', select: 'nom prenom raisonSociale type' },
+          populate: {
+            path: 'client',
+            model: 'Client',
+            select: 'nom prenom raisonSociale type',
+            strictPopulate: false,
+          },
         })
         .sort({ date: -1 })
         .skip(skip)

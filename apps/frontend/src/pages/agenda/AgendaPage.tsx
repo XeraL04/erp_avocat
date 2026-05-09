@@ -73,6 +73,7 @@ import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth.store';
 
 // ─── Schéma ───────────────────────────────────────────────────────────────────
+
 const schema = z.object({
   titre: z.string().trim().min(2, 'Le titre doit contenir au moins 2 caractères'),
   type: z.enum(['audience', 'rdv', 'rappel'], { required_error: 'Le type est obligatoire' }),
@@ -82,7 +83,8 @@ const schema = z.object({
 });
 type FormValues = z.infer<typeof schema>;
 
-// ─── Config types sémantique (tokens CSS au lieu de classes hardcodées) ───────
+// ─── Config types ─────────────────────────────────────────────────────────────
+
 interface TypeConfig {
   label: string;
   icone: React.ElementType;
@@ -120,6 +122,7 @@ const TYPE_CONFIG: Record<TypeEvenement, TypeConfig> = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function isoToDatetimeLocal(iso: string): string {
   const d = parseISO(iso);
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -166,6 +169,7 @@ function appliquerFiltres(
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
+
 export default function AgendaPage() {
   const qc = useQueryClient();
   const role = useAuthStore((s) => s.utilisateur?.role);
@@ -179,6 +183,7 @@ export default function AgendaPage() {
   const [idASupprimer, setIdASupprimer] = useState<string | null>(null);
 
   // ── Query ──────────────────────────────────────────────────────────────────
+
   const { data, isLoading } = useQuery({
     queryKey: ['evenements', 'global'],
     queryFn: () => listerTousEvenements({ limit: 500 }),
@@ -191,6 +196,7 @@ export default function AgendaPage() {
   const filtresActifs = filtrePeriode !== 'a_venir' || filtreType !== 'tous';
 
   // ── Formulaire ─────────────────────────────────────────────────────────────
+
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { titre: '', type: 'audience', dateHeure: '', lieu: '', notes: '' },
@@ -221,6 +227,7 @@ export default function AgendaPage() {
   };
 
   // ── Mutations ──────────────────────────────────────────────────────────────
+
   const invalidate = () => qc.invalidateQueries({ queryKey: ['evenements'] });
 
   const mutCreer = useMutation({
@@ -269,23 +276,21 @@ export default function AgendaPage() {
   const onSubmit = (v: FormValues) => (evenementEdite ? mutModifier.mutate(v) : mutCreer.mutate(v));
   const isPending = mutCreer.isPending || mutModifier.isPending;
 
-  // ────────────────────────────────────────────────────────────────────────────
+  const Opt = () => <span className="font-normal text-muted-foreground/70">(opt.)</span>;
+
+  // ──────────────────────────────────────────────────────────────────────────
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* ── En-tête ─────────────────────────────────────────────── */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Agenda</h2>
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CalendarClock className="h-4 w-4" />
+          <h2 className="text-lg font-semibold tracking-tight">Agenda</h2>
+          <p className="flex items-center gap-2 text-xs text-muted-foreground">
+            <CalendarClock className="h-3.5 w-3.5" aria-hidden="true" />
             {tousEvenements.length} événement{tousEvenements.length > 1 ? 's' : ''}
             {nbAujourdhui > 0 && (
-              <span
-                className={cn(
-                  'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold',
-                  'bg-mode-virement-bg text-mode-virement'
-                )}
-              >
+              <span className="inline-flex items-center rounded-full bg-mode-virement-bg px-2 py-0.5 text-xs font-medium text-mode-virement">
                 {nbAujourdhui} aujourd'hui
               </span>
             )}
@@ -293,16 +298,16 @@ export default function AgendaPage() {
         </div>
         {peutModifier && (
           <Button size="sm" onClick={ouvrirCreation}>
-            <Plus className="mr-1.5 h-4 w-4" />
+            <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
             Planifier
           </Button>
         )}
       </div>
 
       {/* ── Filtres ─────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <Select value={filtrePeriode} onValueChange={(v) => setFiltrePeriode(v as FiltrePeriode)}>
-          <SelectTrigger className="w-full sm:w-44">
+          <SelectTrigger className="h-9 w-full text-sm sm:w-44">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -313,14 +318,14 @@ export default function AgendaPage() {
           </SelectContent>
         </Select>
         <Select value={filtreType} onValueChange={(v) => setFiltreType(v as FiltreType)}>
-          <SelectTrigger className="w-full sm:w-44">
+          <SelectTrigger className="h-9 w-full text-sm sm:w-44">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="tous">Tous les types</SelectItem>
-            <SelectItem value="audience">⚖️ Audiences</SelectItem>
-            <SelectItem value="rdv">👥 Rendez-vous</SelectItem>
-            <SelectItem value="rappel">🔔 Rappels</SelectItem>
+            <SelectItem value="audience">Audiences</SelectItem>
+            <SelectItem value="rdv">Rendez-vous</SelectItem>
+            <SelectItem value="rappel">Rappels</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -330,21 +335,19 @@ export default function AgendaPage() {
         <div className="space-y-5">
           {[...Array(2)].map((_, g) => (
             <div key={g}>
-              {/* Séparateur jour */}
               <div className="mb-2 flex items-center gap-2">
                 <Skeleton className="h-3 w-24" />
                 <div className="flex-1 border-t" />
                 <Skeleton className="h-3 w-10" />
               </div>
-              {/* Cartes */}
               <div className="space-y-2">
                 {[...Array(g === 0 ? 3 : 2)].map((_, i) => (
                   <div key={i} className="flex items-start gap-3 rounded-lg border p-3">
                     <Skeleton className="mt-0.5 h-4 w-4 shrink-0 rounded" />
                     <div className="flex-1 space-y-2">
                       <div className="flex items-center gap-2">
-                        <Skeleton className="h-4 w-48" />
-                        <Skeleton className="h-5 w-20 rounded-full" />
+                        <Skeleton className="h-3.5 w-48" />
+                        <Skeleton className="h-4 w-20 rounded-full" />
                       </div>
                       <Skeleton className="h-3 w-32" />
                     </div>
@@ -390,8 +393,8 @@ export default function AgendaPage() {
                 </span>
               </div>
 
-              {/* Cartes événements */}
-              <div className="space-y-2">
+              {/* Cartes */}
+              <div className="space-y-1.5">
                 {items.map((evt) => {
                   const cfg = TYPE_CONFIG[evt.type];
                   const Icone = cfg.icone;
@@ -402,24 +405,22 @@ export default function AgendaPage() {
                     <div
                       key={evt.id}
                       className={cn(
-                        'flex items-start gap-3 rounded-lg border p-3 transition-colors',
+                        'flex items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors',
                         passe ? 'bg-muted/30 opacity-60' : 'bg-card hover:bg-accent/30'
                       )}
                     >
                       {/* Icône type */}
                       <div className="mt-0.5 shrink-0">
-                        <Icone className={cn('h-4 w-4', cfg.text)} aria-hidden="true" />
+                        <Icone className={cn('h-3.5 w-3.5', cfg.text)} aria-hidden="true" />
                       </div>
 
                       {/* Contenu */}
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <span className="text-sm font-medium leading-tight">{evt.titre}</span>
-
-                          {/* Badge type sémantique */}
                           <span
                             className={cn(
-                              'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium',
+                              'inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-xs font-medium',
                               cfg.text,
                               cfg.bg,
                               cfg.border
@@ -430,13 +431,13 @@ export default function AgendaPage() {
                           </span>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                           <span className="font-medium">
                             {format(parseISO(evt.dateHeure), "HH'h'mm", { locale: fr })}
                           </span>
                           {evt.lieu && (
                             <span className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
+                              <MapPin className="h-3 w-3" aria-hidden="true" />
                               {evt.lieu}
                             </span>
                           )}
@@ -445,29 +446,30 @@ export default function AgendaPage() {
                               to={`/cabinet/dossiers/${evt.dossier.id}`}
                               className="flex items-center gap-1 transition-colors hover:text-foreground"
                             >
-                              <FolderOpen className="h-3 w-3" />
+                              <FolderOpen className="h-3 w-3" aria-hidden="true" />
                               <span className="font-mono">{evt.dossier.reference}</span>
                             </Link>
                           )}
                           {evt.notes && (
                             <span className="flex items-center gap-1">
-                              <FileText className="h-3 w-3" />
-                              <span className="max-w-45 truncate">{evt.notes}</span>
+                              <FileText className="h-3 w-3" aria-hidden="true" />
+                              <span className="max-w-44 truncate">{evt.notes}</span>
                             </span>
                           )}
                         </div>
                       </div>
 
                       {/* Actions */}
-                      <div className="flex shrink-0 items-center gap-1">
+                      <div className="flex shrink-0 items-center gap-0.5">
                         {peutModifier && (
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
+                            aria-label={`Modifier ${evt.titre}`}
                             onClick={() => ouvrirEdition(evt)}
                           >
-                            <Pencil className="h-3.5 w-3.5" />
+                            <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                           </Button>
                         )}
                         {peutSupprimer && (
@@ -475,9 +477,10 @@ export default function AgendaPage() {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 text-destructive hover:text-destructive"
+                            aria-label={`Supprimer ${evt.titre}`}
                             onClick={() => setIdASupprimer(evt.id)}
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                           </Button>
                         )}
                       </div>
@@ -492,114 +495,148 @@ export default function AgendaPage() {
 
       {/* ── Dialog Créer / Modifier ──────────────────────────────── */}
       <Dialog open={dialogOuvert} onOpenChange={(o) => !o && fermerDialog()}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
+        <DialogContent className="gap-0 p-0 sm:max-w-md">
+          <DialogHeader className="border-b px-6 py-4">
+            <DialogTitle className="text-base">
               {evenementEdite ? "Modifier l'événement" : 'Nouvel événement'}
             </DialogTitle>
-            <DialogDescription className="sr-only">
-              Formulaire de {evenementEdite ? 'modification' : 'création'} d'un événement
+            <DialogDescription className="text-xs text-muted-foreground">
+              {evenementEdite
+                ? `Modification de « ${evenementEdite.titre} »`
+                : 'Planifiez une audience, un rendez-vous ou un rappel.'}
             </DialogDescription>
           </DialogHeader>
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="titre"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Titre *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="ex : Audience correctionnelle" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-2 gap-3">
+          <div className="px-6 py-5">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                {/* Titre */}
                 <FormField
                   control={form.control}
-                  name="type"
+                  name="titre"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Type *</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="audience">⚖️ Audience</SelectItem>
-                          <SelectItem value="rdv">👥 Rendez-vous</SelectItem>
-                          <SelectItem value="rappel">🔔 Rappel</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="dateHeure"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Date & heure *</FormLabel>
+                      <FormLabel className="text-xs font-medium">
+                        Titre <span className="text-destructive">*</span>
+                      </FormLabel>
                       <FormControl>
-                        <Input type="datetime-local" {...field} />
+                        <Input
+                          className="h-9 text-sm"
+                          placeholder="ex : Audience correctionnelle"
+                          {...field}
+                        />
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-xs" />
                     </FormItem>
                   )}
                 />
-              </div>
 
-              <FormField
-                control={form.control}
-                name="lieu"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Lieu</FormLabel>
-                    <FormControl>
-                      <Input placeholder="ex : Tribunal de Constantine – Salle 3" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                {/* Type + Date */}
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-medium">
+                          Type <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger className="h-9 w-full text-sm">
+                              <SelectValue placeholder="Type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="audience">Audience</SelectItem>
+                            <SelectItem value="rdv">Rendez-vous</SelectItem>
+                            <SelectItem value="rappel">Rappel</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="dateHeure"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-medium">
+                          Date & heure <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input type="datetime-local" className="h-9 text-sm" {...field} />
+                        </FormControl>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Notes</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Informations complémentaires..."
-                        className="resize-none"
-                        rows={3}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                {/* Lieu */}
+                <FormField
+                  control={form.control}
+                  name="lieu"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-medium">
+                        Lieu <Opt />
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-9 text-sm"
+                          placeholder="ex : Tribunal de Constantine – Salle 3"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
 
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={fermerDialog} disabled={isPending}>
-                  Annuler
-                </Button>
-                <Button type="submit" disabled={isPending}>
-                  {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {evenementEdite ? 'Enregistrer' : 'Ajouter'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
+                {/* Notes */}
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-medium">
+                        Notes <Opt />
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea
+                          className="resize-none text-sm"
+                          rows={2}
+                          placeholder="Informations complémentaires…"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+
+                <DialogFooter className="pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={fermerDialog}
+                    disabled={isPending}
+                  >
+                    Annuler
+                  </Button>
+                  <Button type="submit" size="sm" disabled={isPending}>
+                    {isPending && (
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                    )}
+                    {evenementEdite ? 'Enregistrer' : 'Ajouter'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </div>
         </DialogContent>
       </Dialog>
 

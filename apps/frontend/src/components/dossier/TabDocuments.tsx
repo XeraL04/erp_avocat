@@ -19,7 +19,6 @@ import { toast } from 'sonner';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -64,55 +63,31 @@ import {
 } from '@/api/document.api';
 import type { DocumentFichier, TypeDocument } from '@/api/document.api';
 import { useAuthStore } from '@/stores/auth.store';
-import { formaterDate } from '@/lib/utils';
+import { formaterDate, cn } from '@/lib/utils';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function formaterTaille(bytes: number): string {
   if (bytes < 1024) return `${bytes} o`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
-// Tokens CSS uniquement — plus de text-green-600 / bg-blue-50 hardcodés
 function obtenirIconeFichier(nom: string) {
   const ext = nom.split('.').pop()?.toLowerCase() ?? '';
-
   if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext))
-    return {
-      Icone: ImageIcon,
-      cls: 'text-[var(--color-success)]',
-      bg: 'bg-[var(--color-success)]/10',
-    };
+    return { Icone: ImageIcon, cls: 'text-status-encours', bg: 'bg-status-encours-bg' };
   if (['xls', 'xlsx', 'csv'].includes(ext))
-    return {
-      Icone: FileSpreadsheet,
-      cls: 'text-[var(--color-success)]',
-      bg: 'bg-[var(--color-success)]/10',
-    };
+    return { Icone: FileSpreadsheet, cls: 'text-status-encours', bg: 'bg-status-encours-bg' };
   if (ext === 'pdf')
-    return {
-      Icone: FileText,
-      cls: 'text-[var(--color-notification)]',
-      bg: 'bg-[var(--color-notification)]/10',
-    };
+    return { Icone: FileText, cls: 'text-kpi-audiences', bg: 'bg-kpi-audiences-bg' };
   if (['doc', 'docx', 'txt'].includes(ext))
-    return {
-      Icone: FileText,
-      cls: 'text-[var(--color-primary)]',
-      bg: 'bg-[var(--color-primary)]/10',
-    };
-  return {
-    Icone: File,
-    cls: 'text-muted-foreground',
-    bg: 'bg-muted',
-  };
+    return { Icone: FileText, cls: 'text-kpi-dossiers', bg: 'bg-kpi-dossiers-bg' };
+  return { Icone: File, cls: 'text-muted-foreground', bg: 'bg-muted' };
 }
 
 interface ErreurAxios {
-  response?: {
-    status?: number;
-    data?: { message?: string; code?: string };
-  };
+  response?: { status?: number; data?: { message?: string; code?: string } };
 }
 
 function extraireMessageErreur(err: unknown, fallback: string): string {
@@ -127,33 +102,17 @@ function extraireMessageErreur(err: unknown, fallback: string): string {
   return fallback;
 }
 
-// ─── Config badges type — tokens CSS ─────────────────────────────────────────
-const configType: Record<TypeDocument, { label: string; className: string }> = {
-  contrat: {
-    label: 'Contrat',
-    // token primary (teal)
-    className:
-      'border-[var(--color-primary)]/40 text-[var(--color-primary)] bg-[var(--color-primary)]/8',
-  },
-  jugement: {
-    label: 'Jugement',
-    // token purple
-    className:
-      'border-[var(--color-purple)]/40 text-[var(--color-purple)] bg-[var(--color-purple)]/8',
-  },
-  piece: {
-    label: 'Pièce justificative',
-    // token warning (terra brown)
-    className:
-      'border-[var(--color-warning)]/40 text-[var(--color-warning)] bg-[var(--color-warning)]/8',
-  },
-  autre: {
-    label: 'Autre',
-    className: '',
-  },
+// ─── Config badges type ───────────────────────────────────────────────────────
+
+const configType: Record<TypeDocument, { label: string; dot: string }> = {
+  contrat: { label: 'Contrat', dot: 'bg-kpi-dossiers' },
+  jugement: { label: 'Jugement', dot: 'bg-kpi-clients' },
+  piece: { label: 'Pièce justificative', dot: 'bg-kpi-audiences' },
+  autre: { label: 'Autre', dot: 'bg-muted-foreground/40' },
 };
 
 // ─── Schéma ───────────────────────────────────────────────────────────────────
+
 const schemaUpload = z.object({
   nom: z.string().min(2, 'Minimum 2 caractères'),
   type: z.enum(['contrat', 'jugement', 'piece', 'autre'] as const),
@@ -162,11 +121,13 @@ const schemaUpload = z.object({
 type FormValues = z.infer<typeof schemaUpload>;
 
 // ─── Props ────────────────────────────────────────────────────────────────────
+
 interface Props {
   dossierId: string;
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
+
 export default function TabDocuments({ dossierId }: Props) {
   const queryClient = useQueryClient();
   const utilisateur = useAuthStore((s) => s.utilisateur);
@@ -175,7 +136,6 @@ export default function TabDocuments({ dossierId }: Props) {
   const [dialogUpload, setDialogUpload] = useState(false);
   const [documentASupprimer, setDocumentASupprimer] = useState<DocumentFichier | null>(null);
 
-  // ── Query ──────────────────────────────────────────────────────────────────
   const {
     data: documents = [],
     isLoading,
@@ -186,7 +146,6 @@ export default function TabDocuments({ dossierId }: Props) {
     throwOnError: false,
   });
 
-  // ── Mutation suppression ───────────────────────────────────────────────────
   const { mutate: effacer, isPending: suppressionEnCours } = useMutation({
     mutationFn: () => supprimerDocument(documentASupprimer!._id),
     onSuccess: () => {
@@ -198,31 +157,29 @@ export default function TabDocuments({ dossierId }: Props) {
       toast.error(extraireMessageErreur(err, 'Erreur lors de la suppression')),
   });
 
-  // ── État : chargement ──────────────────────────────────────────────────────
+  // ── Skeleton ──────────────────────────────────────────────────────────────
+
   if (isLoading) {
     return (
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 pt-4">
           <div className="flex items-center justify-between">
-            <Skeleton className="h-5 w-28" />
-            <Skeleton className="h-8 w-44 rounded-md" />
+            <Skeleton className="h-3.5 w-24" />
+            <Skeleton className="h-8 w-32 rounded-md" />
           </div>
         </CardHeader>
         <CardContent className="divide-y p-0">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4 px-6 py-4">
-              <Skeleton className="h-9 w-9 rounded-lg" />
+            <div key={i} className="flex items-center gap-3 px-5 py-3.5">
+              <Skeleton className="h-8 w-8 shrink-0 rounded-md" />
               <div className="flex-1 space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <Skeleton className="h-4 w-40" />
-                  <Skeleton className="h-5 w-24 rounded-full" />
-                </div>
-                <Skeleton className="h-3 w-52" />
+                <Skeleton className="h-3.5 w-44" />
+                <Skeleton className="h-3 w-56" />
               </div>
               <div className="flex gap-1">
-                <Skeleton className="h-8 w-8 rounded-md" />
-                <Skeleton className="h-8 w-8 rounded-md" />
-                <Skeleton className="h-8 w-8 rounded-md" />
+                <Skeleton className="h-7 w-7 rounded-md" />
+                <Skeleton className="h-7 w-7 rounded-md" />
+                <Skeleton className="h-7 w-7 rounded-md" />
               </div>
             </div>
           ))}
@@ -231,22 +188,24 @@ export default function TabDocuments({ dossierId }: Props) {
     );
   }
 
-  // ── État : erreur réseau ───────────────────────────────────────────────────
+  // ── Erreur réseau ──────────────────────────────────────────────────────────
+
   if (isError) {
     return (
       <Card>
-        <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
-            <WifiOff className="h-7 w-7 text-destructive" aria-hidden="true" />
+        <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-destructive/8">
+            <WifiOff className="h-4.5 w-4.5 text-destructive" aria-hidden="true" />
           </div>
           <div>
-            <p className="font-medium">Impossible de charger les documents</p>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="text-sm font-medium">Impossible de charger les documents</p>
+            <p className="mt-1 max-w-xs text-xs text-muted-foreground">
               Vérifiez votre connexion ou rechargez la page.
             </p>
           </div>
           <Button
             variant="outline"
+            size="sm"
             onClick={() =>
               queryClient.invalidateQueries({ queryKey: ['cabinet', 'documents', dossierId] })
             }
@@ -259,41 +218,48 @@ export default function TabDocuments({ dossierId }: Props) {
   }
 
   // ── Rendu principal ────────────────────────────────────────────────────────
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 pt-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base">
-              Documents{documents.length > 0 && ` (${documents.length})`}
+            <CardTitle className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+              Documents
+              {documents.length > 0 && (
+                <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium tabular-nums">
+                  {documents.length}
+                </span>
+              )}
             </CardTitle>
             <Button size="sm" onClick={() => setDialogUpload(true)}>
-              <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
-              Ajouter un document
+              <Upload className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+              Ajouter
             </Button>
           </div>
         </CardHeader>
 
         <CardContent className="p-0">
           {documents.length === 0 ? (
-            /* État vide */
-            <div className="flex flex-col items-center gap-3 py-14 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                <FileText className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+            /* ── État vide ─────────────────────────────────── */
+            <div className="flex flex-col items-center gap-3 py-12 text-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                <FileText className="h-4.5 w-4.5 text-muted-foreground" aria-hidden="true" />
               </div>
               <div>
-                <p className="font-medium">Aucun document</p>
-                <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+                <p className="text-sm font-medium">Aucun document</p>
+                <p className="mt-1 max-w-xs text-xs text-muted-foreground">
                   Ajoutez des contrats, jugements ou pièces justificatives à ce dossier.
                 </p>
               </div>
               <Button variant="outline" size="sm" onClick={() => setDialogUpload(true)}>
-                <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
-                Ajouter le premier document
+                <Upload className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                Premier document
               </Button>
             </div>
           ) : (
-            <div className="divide-y">
+            /* ── Liste ─────────────────────────────────────── */
+            <ul className="divide-y">
               {documents.map((doc) => {
                 const { Icone, cls, bg } = obtenirIconeFichier(doc.nom);
                 const cfg = configType[doc.type];
@@ -301,58 +267,62 @@ export default function TabDocuments({ dossierId }: Props) {
                 const urlFichier = construireUrlDocument(doc.url);
 
                 return (
-                  <div
+                  <li
                     key={doc._id}
-                    className="flex items-center gap-4 px-6 py-4 transition-colors hover:bg-muted/30"
+                    className="group flex items-center gap-3 px-5 py-3 transition-colors hover:bg-accent/40"
                   >
                     {/* Icône fichier */}
                     <div
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${bg}`}
+                      className={cn(
+                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-md',
+                        bg
+                      )}
                     >
-                      <Icone className={`h-4 w-4 ${cls}`} aria-hidden="true" />
+                      <Icone className={cn('h-4 w-4', cls)} aria-hidden="true" />
                     </div>
 
                     {/* Infos */}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <span className="truncate text-sm font-medium">{doc.nom}</span>
-                        <Badge variant="outline" className={`shrink-0 text-xs ${cfg.className}`}>
+                        <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                          <span
+                            className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)}
+                            aria-hidden="true"
+                          />
                           {cfg.label}
-                        </Badge>
+                        </span>
                       </div>
-                      <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                         <span className="font-mono uppercase">{ext}</span>
                         <span aria-hidden="true">·</span>
                         <span>{formaterTaille(doc.taille)}</span>
                         <span aria-hidden="true">·</span>
-                        <span>{formaterDate(doc.createdAt)}</span>
+                        <span className="tabular-nums">{formaterDate(doc.createdAt)}</span>
                         {doc.description && (
                           <>
                             <span aria-hidden="true">·</span>
-                            <span className="max-w-40 truncate">{doc.description}</span>
+                            <span className="max-w-40 truncate italic">{doc.description}</span>
                           </>
                         )}
                       </div>
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-1">
-                      {/* Visualiser */}
+                    <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
                         onClick={() => window.open(urlFichier, '_blank')}
                         aria-label={`Visualiser ${doc.nom}`}
                       >
-                        <Eye className="h-4 w-4" aria-hidden="true" />
+                        <Eye className="h-3.5 w-3.5" aria-hidden="true" />
                       </Button>
-
-                      {/* Télécharger */}
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
                         aria-label={`Télécharger ${doc.nom}`}
                         asChild
                       >
@@ -362,27 +332,25 @@ export default function TabDocuments({ dossierId }: Props) {
                           target="_blank"
                           rel="noopener noreferrer"
                         >
-                          <Download className="h-4 w-4" aria-hidden="true" />
+                          <Download className="h-3.5 w-3.5" aria-hidden="true" />
                         </a>
                       </Button>
-
-                      {/* Supprimer — admin uniquement */}
                       {estAdmin && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-destructive hover:bg-destructive/5 hover:text-destructive"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
                           onClick={() => setDocumentASupprimer(doc)}
                           aria-label={`Supprimer ${doc.nom}`}
                         >
-                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                         </Button>
                       )}
                     </div>
-                  </div>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           )}
         </CardContent>
       </Card>
@@ -409,17 +377,15 @@ export default function TabDocuments({ dossierId }: Props) {
             <AlertDialogTitle>Supprimer ce document ?</AlertDialogTitle>
             <AlertDialogDescription>
               Le fichier <strong>{documentASupprimer?.nom}</strong> sera définitivement supprimé du
-              serveur. Action irréversible.
+              serveur. Cette action est irréversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive hover:bg-destructive/90"
-              onClick={() => effacer()}
-              disabled={suppressionEnCours}
-            >
-              Supprimer
+            <AlertDialogCancel disabled={suppressionEnCours}>Annuler</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button variant="destructive" disabled={suppressionEnCours} onClick={() => effacer()}>
+                {suppressionEnCours ? 'Suppression…' : 'Supprimer'}
+              </Button>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -429,6 +395,7 @@ export default function TabDocuments({ dossierId }: Props) {
 }
 
 // ─── Dialog : uploader un document ───────────────────────────────────────────
+
 interface DialogUploadDocumentProps {
   dossierId: string;
   onFermer: () => void;
@@ -486,187 +453,213 @@ function DialogUploadDocument({ dossierId, onFermer, onSuccess }: DialogUploadDo
 
   return (
     <Dialog open onOpenChange={(o) => !o && !isPending && onFermer()}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Ajouter un document</DialogTitle>
-          <DialogDescription>
-            Formats acceptés : PDF, DOC, DOCX, JPG, PNG, XLS, XLSX, TXT — max {TAILLE_MAX_MO} Mo.
+      <DialogContent className="gap-0 p-0 sm:max-w-lg">
+        <DialogHeader className="border-b px-6 py-4">
+          <DialogTitle className="text-base">Ajouter un document</DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground">
+            PDF, DOC, DOCX, JPG, PNG, XLS, XLSX, TXT — max {TAILLE_MAX_MO} Mo.
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form
-            id={`${uid}-form`}
-            onSubmit={form.handleSubmit((v) => uploader(v))}
-            className="space-y-4"
-            noValidate
-          >
-            {/* ── Zone de dépôt ──────────────────────────────────── */}
-            <div
-              role="button"
-              tabIndex={0}
-              aria-label="Zone de dépôt de fichier. Cliquez ou glissez un fichier ici."
-              className={`relative flex cursor-pointer flex-col items-center justify-center gap-2
-                rounded-lg border-2 border-dashed px-6 py-8 text-center
-                transition-colors focus-visible:outline-none focus-visible:ring-2
-                focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                  dragOver
-                    ? 'border-primary bg-primary/5'
-                    : fichier
-                      ? // token success au lieu de border-green-500 bg-green-50
-                        'border-(--color-success)/60 bg-(--color-success)/5'
-                      : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30'
-                }`}
-              onClick={() => inputRef.current?.click()}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  inputRef.current?.click();
-                }
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragOver(false);
-                const f = e.dataTransfer.files?.[0];
-                if (f) validerEtSelectionner(f);
-              }}
+        <div className="px-6 py-5">
+          <Form {...form}>
+            <form
+              id={`${uid}-form`}
+              onSubmit={form.handleSubmit((v) => uploader(v))}
+              className="space-y-4"
+              noValidate
             >
-              <input
-                ref={inputRef}
-                type="file"
-                accept={EXTENSIONS_ACCEPTEES}
-                className="sr-only"
-                aria-hidden="true"
-                disabled={isPending}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
+              {/* ── Zone de dépôt ──────────────────────────── */}
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label="Zone de dépôt de fichier. Cliquez ou glissez un fichier ici."
+                className={cn(
+                  'relative flex cursor-pointer flex-col items-center justify-center gap-2',
+                  'rounded-lg border-2 border-dashed px-6 py-6 text-center',
+                  'transition-colors focus-visible:outline-none focus-visible:ring-2',
+                  'focus-visible:ring-ring focus-visible:ring-offset-2',
+                  dragOver
+                    ? 'border-primary bg-surface-accent'
+                    : fichier
+                      ? 'border-status-encours/50 bg-status-encours-bg'
+                      : 'border-border hover:border-primary/40 hover:bg-accent/30'
+                )}
+                onClick={() => inputRef.current?.click()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    inputRef.current?.click();
+                  }
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOver(false);
+                  const f = e.dataTransfer.files?.[0];
                   if (f) validerEtSelectionner(f);
                 }}
+              >
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept={EXTENSIONS_ACCEPTEES}
+                  className="sr-only"
+                  aria-hidden="true"
+                  disabled={isPending}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) validerEtSelectionner(f);
+                  }}
+                />
+
+                {fichier ? (
+                  <>
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-status-encours-bg">
+                      <FileText className="h-4 w-4 text-status-encours" aria-hidden="true" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-status-encours">{fichier.name}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {formaterTaille(fichier.size)} · Cliquer pour changer
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                      <Upload className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">
+                        Glissez un fichier ici ou{' '}
+                        <span className="text-primary underline-offset-2 hover:underline">
+                          parcourez
+                        </span>
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        PDF, DOC, JPG, XLS — max {TAILLE_MAX_MO} Mo
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {erreurFichier && (
+                <p className="text-xs text-destructive" role="alert">
+                  {erreurFichier}
+                </p>
+              )}
+
+              {/* ── Nom ─────────────────────────────────────── */}
+              <FormField
+                control={form.control}
+                name="nom"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-medium">Nom du document</FormLabel>
+                    <FormControl>
+                      <Input
+                        className="h-9 text-sm"
+                        placeholder="Ex : Contrat de mission 2026"
+                        disabled={isPending}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
               />
 
-              {fichier ? (
-                <>
-                  {/* Icône succès — token success */}
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-(--color-success)/10">
-                    <FileText className="h-5 w-5 text-(--color-success)" aria-hidden="true" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-(--color-success)">{fichier.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formaterTaille(fichier.size)} — Cliquer pour changer
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                    <Upload className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">
-                      Glissez un fichier ici ou cliquez pour parcourir
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      PDF, DOC, JPG, XLS — max {TAILLE_MAX_MO} Mo
-                    </p>
-                  </div>
-                </>
-              )}
-            </div>
-            {erreurFichier && (
-              <p className="text-xs text-destructive" role="alert">
-                {erreurFichier}
-              </p>
-            )}
-
-            {/* ── Nom ───────────────────────────────────────────── */}
-            <FormField
-              control={form.control}
-              name="nom"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nom du document</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Ex : Contrat de mission 2026"
+              {/* ── Type ────────────────────────────────────── */}
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-medium">Type</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
                       disabled={isPending}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    >
+                      <FormControl>
+                        <SelectTrigger className="h-9 w-full text-sm">
+                          <SelectValue placeholder="Sélectionner un type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Object.entries(configType).map(([val, { label, dot }]) => (
+                          <SelectItem key={val} value={val}>
+                            <span className="flex items-center gap-2">
+                              <span
+                                className={cn('h-1.5 w-1.5 rounded-full', dot)}
+                                aria-hidden="true"
+                              />
+                              {label}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
+              />
 
-            {/* ── Type ──────────────────────────────────────────── */}
-            <FormField
-              control={form.control}
-              name="type"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Type</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                    disabled={isPending}
-                  >
+              {/* ── Description ─────────────────────────────── */}
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-medium">
+                      Description{' '}
+                      <span className="font-normal text-muted-foreground/70">(opt.)</span>
+                    </FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner un type" />
-                      </SelectTrigger>
+                      <Textarea
+                        className="resize-none text-sm"
+                        rows={2}
+                        placeholder="Notes ou détails sur ce document…"
+                        disabled={isPending}
+                        {...field}
+                      />
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="contrat">Contrat</SelectItem>
-                      <SelectItem value="jugement">Jugement</SelectItem>
-                      <SelectItem value="piece">Pièce justificative</SelectItem>
-                      <SelectItem value="autre">Autre</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
+              />
 
-            {/* ── Description ───────────────────────────────────── */}
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Description{' '}
-                    <span className="text-xs font-normal text-muted-foreground">(optionnelle)</span>
-                  </FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Notes ou détails sur ce document…"
-                      className="resize-none"
-                      rows={2}
-                      disabled={isPending}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={onFermer} disabled={isPending}>
-                Annuler
-              </Button>
-              <Button type="submit" form={`${uid}-form`} disabled={isPending || !fichier}>
-                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
-                {isPending ? 'Upload en cours…' : 'Ajouter le document'}
-              </Button>
-            </div>
-          </form>
-        </Form>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onFermer}
+                  disabled={isPending}
+                >
+                  Annuler
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  form={`${uid}-form`}
+                  disabled={isPending || !fichier}
+                >
+                  {isPending && (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  )}
+                  {isPending ? 'Upload en cours…' : 'Ajouter'}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </div>
       </DialogContent>
     </Dialog>
   );

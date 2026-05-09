@@ -1,7 +1,4 @@
-// apps/frontend/src/api/facture.api.ts
-
 import apiClient from './client';
-// ↓ Importez TOUT depuis @/types, plus de définitions locales dupliquées
 import type { ApiSuccess, StatutFacture, DossierPopuleFacture, ClientPopule } from '@/types';
 import { useAuthStore } from '@/stores/auth.store';
 

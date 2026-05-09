@@ -24,6 +24,12 @@ export interface ITenant extends Document {
     dossiers: number;
     utilisateurs: number;
   };
+
+  numeroFiscal?: string;
+  rib?: string;
+  ville?: string;
+  tva?: number;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -64,6 +70,13 @@ const tenantSchema = new Schema<ITenant>(
       dossiers: { type: Number, default: 0 },
       utilisateurs: { type: Number, default: 0 },
     },
+
+    // nouveau 
+
+    numeroFiscal: { type: String, trim: true },
+    rib: { type: String, trim: true },
+    ville: { type: String, trim: true },
+    tva: { type: Number, default: 19 },
   },
   { timestamps: true }
 );
