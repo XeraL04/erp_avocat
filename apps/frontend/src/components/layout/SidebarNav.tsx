@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/utils';
 
@@ -15,8 +16,14 @@ interface SidebarNavProps {
 }
 
 export default function SidebarNav({ items, onNavigate }: SidebarNavProps) {
+  const { i18n } = useTranslation();
+  const estRTL = i18n.language === 'ar';
+
   return (
-    <nav className="flex flex-col gap-1" aria-label="Navigation principale">
+    <nav
+      className="flex flex-col gap-1"
+      aria-label={estRTL ? 'القائمة الرئيسية' : 'Navigation principale'}
+    >
       {items.map(({ label, href, icone: Icone }) => (
         <NavLink
           key={href}
@@ -57,9 +64,13 @@ export default function SidebarNav({ items, onNavigate }: SidebarNavProps) {
                 aria-hidden="true"
               />
 
+              {/* Barre indicateur active — côté start (gauche LTR, droite RTL) */}
               {isActive && (
                 <span
-                  className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-sidebar-primary-foreground/75"
+                  className={cn(
+                    'absolute inset-y-2 w-1 rounded-full bg-sidebar-primary-foreground/75',
+                    estRTL ? 'right-0 rounded-l-full' : 'left-0 rounded-r-full'
+                  )}
                   aria-hidden="true"
                 />
               )}

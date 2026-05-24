@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useDebounce } from 'use-debounce';
 import { format, parseISO } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, ar } from 'date-fns/locale';
 import {
   Files,
   Upload,
@@ -24,6 +24,7 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -109,25 +110,12 @@ function extraireMessageErreur(err: unknown, fallback: string): string {
   return fallback;
 }
 
-interface TypeDocConfig {
-  label: string;
-  text: string;
-  bg: string;
-}
-const CONFIG_TYPE: Record<TypeDocument, TypeDocConfig> = {
-  contrat: { label: 'Contrat', text: 'text-mode-virement', bg: 'bg-mode-virement-bg' },
-  jugement: { label: 'Jugement', text: 'text-status-suspendu', bg: 'bg-status-suspendu-bg' },
-  piece: { label: 'Pièce justificative', text: 'text-status-suspendu', bg: 'bg-mode-cheque-bg' },
-  autre: { label: 'Autre', text: 'text-muted-foreground', bg: 'bg-muted/60' },
-};
-
 type FiltreType = TypeDocument | 'tous';
 
-// ─── Schéma upload ────────────────────────────────────────────────────────────
 const schemaUpload = z.object({
-  nom: z.string().trim().min(2, 'Minimum 2 caractères'),
+  nom: z.string().trim().min(2),
   type: z.enum(['contrat', 'jugement', 'piece', 'autre'] as const),
-  dossierId: z.string().min(1, 'Le dossier est obligatoire'),
+  dossierId: z.string().min(1),
   description: z.string().optional(),
 });
 type FormUpload = z.infer<typeof schemaUpload>;
@@ -140,6 +128,11 @@ export default function DocumentsPage() {
   const queryClient = useQueryClient();
   const utilisateur = useAuthStore((s) => s.utilisateur);
   const estAdmin = utilisateur?.role === 'admin';
+
+  const { t, i18n } = useTranslation('documents');
+  const { t: tc } = useTranslation('common');
+  const estRTL = i18n.language === 'ar';
+  const locale = estRTL ? ar : fr;
 
   const [recherche, setRecherche] = useState('');
   const [filtreType, setFiltreType] = useState<FiltreType>('tous');
@@ -168,14 +161,28 @@ export default function DocumentsPage() {
     : documents;
   const filtresActifs = !!(recherche || filtreType !== 'tous');
 
+  // Labels types — réactifs à la langue
+  const CONFIG_TYPE_LABELS: Record<TypeDocument, string> = {
+    contrat: t('type_contrat'),
+    jugement: t('type_jugement'),
+    piece: t('type_piece'),
+    autre: t('type_autre'),
+  };
+  const CONFIG_TYPE_STYLE: Record<TypeDocument, { text: string; bg: string }> = {
+    contrat: { text: 'text-mode-virement', bg: 'bg-mode-virement-bg' },
+    jugement: { text: 'text-status-suspendu', bg: 'bg-status-suspendu-bg' },
+    piece: { text: 'text-status-suspendu', bg: 'bg-mode-cheque-bg' },
+    autre: { text: 'text-muted-foreground', bg: 'bg-muted/60' },
+  };
+
   const { mutate: effacer, isPending: suppressionEnCours } = useMutation({
     mutationFn: () => supprimerDocument(docASupprimer!._id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'documents'] });
-      toast.success('Document supprimé');
+      toast.success(t('doc_deleted'));
       setDocASupprimer(null);
     },
-    onError: (err) => toast.error(extraireMessageErreur(err, 'Erreur lors de la suppression')),
+    onError: (err) => toast.error(extraireMessageErreur(err, tc('error'))),
   });
 
   const reinitialiserFiltres = () => {
@@ -186,31 +193,33 @@ export default function DocumentsPage() {
 
   return (
     <div className="space-y-5">
-      {/* ── En-tête ─────────────────────────────────────────────── */}
+      {/* ── En-tête ── */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">Documents</h2>
+          <h2 className="text-lg font-semibold tracking-tight">{t('title')}</h2>
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Files className="h-3.5 w-3.5" aria-hidden="true" />
-            {meta ? `${meta.total} document${meta.total > 1 ? 's' : ''}` : 'Chargement…'}
+            {meta
+              ? `${meta.total} ${meta.total > 1 ? t('documents_plural') : t('document_singular')}`
+              : tc('loading')}
           </p>
         </div>
         <Button size="sm" onClick={() => setDialogUpload(true)}>
-          <Upload className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-          Ajouter un document
+          <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+          {t('add_document')}
         </Button>
       </div>
 
-      {/* ── Filtres ─────────────────────────────────────────────── */}
+      {/* ── Filtres ── */}
       <div className="flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
           <Search
-            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground ${estRTL ? 'right-3' : 'left-3'}`}
             aria-hidden="true"
           />
           <Input
-            placeholder="Rechercher par nom…"
-            className="h-9 pl-9 text-sm"
+            placeholder={t('search_placeholder')}
+            className={`h-9 text-sm ${estRTL ? 'pr-9' : 'pl-9'}`}
             value={recherche}
             onChange={(e) => {
               setRecherche(e.target.value);
@@ -229,22 +238,22 @@ export default function DocumentsPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="tous">Tous les types</SelectItem>
-            <SelectItem value="contrat">Contrats</SelectItem>
-            <SelectItem value="jugement">Jugements</SelectItem>
-            <SelectItem value="piece">Pièces justificatives</SelectItem>
-            <SelectItem value="autre">Autres</SelectItem>
+            <SelectItem value="tous">{t('all_types')}</SelectItem>
+            <SelectItem value="contrat">{t('type_contrats')}</SelectItem>
+            <SelectItem value="jugement">{t('type_jugements')}</SelectItem>
+            <SelectItem value="piece">{t('type_pieces')}</SelectItem>
+            <SelectItem value="autre">{t('type_autres')}</SelectItem>
           </SelectContent>
         </Select>
         {filtresActifs && (
           <Button variant="ghost" size="sm" onClick={reinitialiserFiltres} className="shrink-0">
-            <X className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-            Réinitialiser
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+            {estRTL ? 'إعادة ضبط' : 'Réinitialiser'}
           </Button>
         )}
       </div>
 
-      {/* ── Erreur réseau ───────────────────────────────────────── */}
+      {/* ── Erreur réseau ── */}
       {isError && (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-14 text-center">
@@ -252,10 +261,8 @@ export default function DocumentsPage() {
               <WifiOff className="h-6 w-6 text-destructive" aria-hidden="true" />
             </div>
             <div>
-              <p className="text-sm font-medium">Impossible de charger les documents</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Vérifiez votre connexion ou rechargez la page.
-              </p>
+              <p className="text-sm font-medium">{t('load_error')}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t('load_error_desc')}</p>
             </div>
             <Button
               variant="outline"
@@ -264,13 +271,13 @@ export default function DocumentsPage() {
                 queryClient.invalidateQueries({ queryKey: ['cabinet', 'documents', 'global'] })
               }
             >
-              Réessayer
+              {estRTL ? 'إعادة المحاولة' : 'Réessayer'}
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* ── Skeleton ────────────────────────────────────────────── */}
+      {/* ── Skeleton ── */}
       {isLoading && (
         <Card>
           <CardContent className="p-0">
@@ -279,25 +286,20 @@ export default function DocumentsPage() {
         </Card>
       )}
 
-      {/* ── Contenu ─────────────────────────────────────────────── */}
+      {/* ── Contenu ── */}
       {!isLoading && !isError && (
         <>
-          {/* Empty state */}
           {documentsFiltres.length === 0 && (
             <Card>
               <CardContent className="p-0">
                 <EmptyState
                   icone={Files}
-                  titre={filtresActifs ? 'Aucun document trouvé' : 'Aucun document'}
-                  description={
-                    filtresActifs
-                      ? 'Aucun document ne correspond à vos critères. Modifiez ou réinitialisez les filtres.'
-                      : 'Ajoutez votre premier document depuis un dossier ou depuis cette page.'
-                  }
+                  titre={filtresActifs ? t('no_docs_filtered') : t('no_docs')}
+                  description={filtresActifs ? t('no_docs_filtered_desc') : t('no_docs_desc')}
                   action={
                     !filtresActifs
                       ? {
-                          label: 'Ajouter un document',
+                          label: t('add_document'),
                           onClick: () => setDialogUpload(true),
                           icone: Upload,
                         }
@@ -308,14 +310,14 @@ export default function DocumentsPage() {
             </Card>
           )}
 
-          {/* Liste */}
           {documentsFiltres.length > 0 && (
             <Card>
               <CardContent className="p-0">
                 <div className="divide-y">
                   {documentsFiltres.map((doc) => {
                     const { Icone, text, bg } = obtenirIconeFichier(doc.nom);
-                    const cfg = CONFIG_TYPE[doc.type];
+                    const cfgStyle = CONFIG_TYPE_STYLE[doc.type];
+                    const cfgLabel = CONFIG_TYPE_LABELS[doc.type];
                     const ext = (doc.nom.split('.').pop() ?? '').toUpperCase();
                     const urlFichier = construireUrlDocument(doc.url);
 
@@ -324,7 +326,6 @@ export default function DocumentsPage() {
                         key={doc._id}
                         className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30 sm:gap-4 sm:px-5"
                       >
-                        {/* Icône fichier */}
                         <div
                           className={cn(
                             'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
@@ -334,18 +335,17 @@ export default function DocumentsPage() {
                           <Icone className={cn('h-4 w-4', text)} aria-hidden="true" />
                         </div>
 
-                        {/* Infos */}
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className="truncate text-sm font-medium">{doc.nom}</span>
                             <span
                               className={cn(
                                 'shrink-0 inline-flex items-center rounded-full px-1.5 py-px text-xs font-medium',
-                                cfg.text,
-                                cfg.bg
+                                cfgStyle.text,
+                                cfgStyle.bg
                               )}
                             >
-                              {cfg.label}
+                              {cfgLabel}
                             </span>
                           </div>
                           <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
@@ -353,9 +353,7 @@ export default function DocumentsPage() {
                             <span aria-hidden="true">·</span>
                             <span>{formaterTaille(doc.taille)}</span>
                             <span aria-hidden="true">·</span>
-                            <span>
-                              {format(parseISO(doc.createdAt), 'd MMM yyyy', { locale: fr })}
-                            </span>
+                            <span>{format(parseISO(doc.createdAt), 'd MMM yyyy', { locale })}</span>
                             {doc.dossier && (
                               <>
                                 <span aria-hidden="true">·</span>
@@ -382,14 +380,13 @@ export default function DocumentsPage() {
                           </div>
                         </div>
 
-                        {/* Actions */}
                         <div className="flex shrink-0 items-center gap-0.5">
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
-                            aria-label="Visualiser"
-                            title="Visualiser"
+                            aria-label={t('action_preview')}
+                            title={t('action_preview')}
                             onClick={() => window.open(urlFichier, '_blank')}
                           >
                             <Eye className="h-3.5 w-3.5" />
@@ -404,8 +401,8 @@ export default function DocumentsPage() {
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7"
-                              aria-label="Télécharger"
-                              title="Télécharger"
+                              aria-label={t('action_download')}
+                              title={t('action_download')}
                             >
                               <Download className="h-3.5 w-3.5" />
                             </Button>
@@ -415,8 +412,8 @@ export default function DocumentsPage() {
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 text-destructive hover:text-destructive"
-                              aria-label="Supprimer"
-                              title="Supprimer"
+                              aria-label={tc('delete')}
+                              title={tc('delete')}
                               onClick={() => setDocASupprimer(doc)}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -432,8 +429,8 @@ export default function DocumentsPage() {
                 {meta && meta.totalPages > 1 && (
                   <div className="flex items-center justify-between border-t px-5 py-3">
                     <p className="text-xs text-muted-foreground">
-                      Page {meta.page} / {meta.totalPages} — {meta.total} document
-                      {meta.total > 1 ? 's' : ''}
+                      {tc('page')} {meta.page} / {meta.totalPages} — {meta.total}{' '}
+                      {meta.total > 1 ? t('documents_plural') : t('document_singular')}
                     </p>
                     <div className="flex gap-1.5">
                       <Button
@@ -442,7 +439,7 @@ export default function DocumentsPage() {
                         disabled={page <= 1}
                         onClick={() => setPage((p) => p - 1)}
                       >
-                        Précédent
+                        {tc('previous')}
                       </Button>
                       <Button
                         variant="outline"
@@ -450,7 +447,7 @@ export default function DocumentsPage() {
                         disabled={page >= meta.totalPages}
                         onClick={() => setPage((p) => p + 1)}
                       >
-                        Suivant
+                        {tc('next')}
                       </Button>
                     </div>
                   </div>
@@ -461,7 +458,7 @@ export default function DocumentsPage() {
         </>
       )}
 
-      {/* ── Dialog upload ────────────────────────────────────────── */}
+      {/* ── Dialog upload ── */}
       {dialogUpload && (
         <DialogUploadGlobal
           onFermer={() => setDialogUpload(false)}
@@ -472,27 +469,27 @@ export default function DocumentsPage() {
         />
       )}
 
-      {/* ── Confirmation suppression ─────────────────────────────── */}
+      {/* ── Confirmation suppression ── */}
       <AlertDialog open={!!docASupprimer} onOpenChange={(o) => !o && setDocASupprimer(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent dir={estRTL ? 'rtl' : 'ltr'}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer ce document ?</AlertDialogTitle>
+            <AlertDialogTitle>{t('delete_title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Le fichier <strong>{docASupprimer?.nom}</strong> sera définitivement supprimé. Cette
-              action est irréversible.
+              {t('delete_desc_prefix')} <strong>{docASupprimer?.nom}</strong>{' '}
+              {t('delete_desc_suffix')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>{tc('cancel')}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
               onClick={() => effacer()}
               disabled={suppressionEnCours}
             >
               {suppressionEnCours && (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
               )}
-              Supprimer
+              {tc('delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -508,6 +505,10 @@ interface DialogUploadGlobalProps {
 }
 
 function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
+  const { t, i18n } = useTranslation('documents');
+  const { t: tc } = useTranslation('common');
+  const estRTL = i18n.language === 'ar';
+
   const [fichier, setFichier] = useState<File | null>(null);
   const [erreurFichier, setErreurFichier] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -545,23 +546,21 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
         description: values.description || undefined,
       }),
     onSuccess: () => {
-      toast.success('Document ajouté avec succès');
+      toast.success(t('doc_added'));
       onSuccess();
     },
-    onError: (err: unknown) => toast.error(extraireMessageErreur(err, "Erreur lors de l'upload")),
+    onError: (err: unknown) => toast.error(extraireMessageErreur(err, t('upload_error'))),
   });
 
   function validerEtSelectionner(f: File) {
     setErreurFichier(null);
     const ext = '.' + (f.name.split('.').pop()?.toLowerCase() ?? '');
     if (!EXTENSIONS_ACCEPTEES.split(',').includes(ext)) {
-      setErreurFichier(
-        'Extension non autorisée. Acceptées : PDF, DOC, DOCX, JPG, PNG, XLS, XLSX, TXT'
-      );
+      setErreurFichier(t('file_ext_error'));
       return;
     }
     if (f.size > TAILLE_MAX_MO * 1024 * 1024) {
-      setErreurFichier(`Le fichier dépasse ${TAILLE_MAX_MO} Mo.`);
+      setErreurFichier(`${t('file_size_error')} ${TAILLE_MAX_MO} Mo.`);
       return;
     }
     setFichier(f);
@@ -570,24 +569,25 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
 
   return (
     <Dialog open onOpenChange={(o) => !o && onFermer()}>
-      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
-        {/* ── Header ──────────────────────────────────────────── */}
+      <DialogContent
+        className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg"
+        dir={estRTL ? 'rtl' : 'ltr'}
+      >
         <DialogHeader className="shrink-0 border-b px-6 py-4">
-          <DialogTitle className="text-base">Ajouter un document</DialogTitle>
+          <DialogTitle className="text-base">{t('upload_title')}</DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
-            Formats : PDF, DOC, DOCX, JPG, PNG, XLS, XLSX, TXT — max {TAILLE_MAX_MO} Mo.
+            {t('upload_formats')} {TAILLE_MAX_MO} Mo.
           </DialogDescription>
         </DialogHeader>
 
-        {/* ── Body scrollable ─────────────────────────────────── */}
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <Form {...form}>
             <form onSubmit={form.handleSubmit((v) => uploader(v))} className="space-y-4">
-              {/* ── Zone drag & drop ─────────────────────────── */}
+              {/* Zone drag & drop */}
               <div
                 role="button"
                 tabIndex={0}
-                aria-label="Sélectionner un fichier"
+                aria-label={t('dropzone_label')}
                 className={cn(
                   'relative flex cursor-pointer flex-col items-center justify-center gap-2',
                   'rounded-lg border-2 border-dashed px-6 py-8 text-center transition-colors',
@@ -628,7 +628,7 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
                     <div>
                       <p className="text-sm font-medium text-status-actif">{fichier.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {formaterTaille(fichier.size)} — Cliquer pour changer
+                        {formaterTaille(fichier.size)} — {t('click_to_change')}
                       </p>
                     </div>
                   </>
@@ -637,9 +637,7 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
                     <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted">
                       <Upload className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                     </div>
-                    <p className="text-sm font-medium">
-                      Glissez un fichier ou cliquez pour parcourir
-                    </p>
+                    <p className="text-sm font-medium">{t('dropzone_hint')}</p>
                     <p className="text-xs text-muted-foreground">
                       PDF, DOC, JPG, XLS — max {TAILLE_MAX_MO} Mo
                     </p>
@@ -652,7 +650,7 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
                 </p>
               )}
 
-              {/* ── Dossier + Type sur la même ligne ─────────── */}
+              {/* Dossier + Type */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {/* Sélecteur dossier */}
                 <FormField
@@ -661,7 +659,7 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
                   render={({ field }) => (
                     <FormItem className="sm:col-span-2">
                       <FormLabel className="text-xs font-medium">
-                        Dossier <span className="text-destructive">*</span>
+                        {t('form_dossier')} <span className="text-destructive">*</span>
                       </FormLabel>
                       <div ref={selectorRef} className="relative">
                         {dossierSelectionne ? (
@@ -679,7 +677,7 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
                               variant="ghost"
                               size="icon"
                               className="h-6 w-6 shrink-0"
-                              aria-label="Désélectionner le dossier"
+                              aria-label={t('deselect_dossier')}
                               onClick={() => {
                                 setDossierSelectionne(null);
                                 field.onChange('');
@@ -691,12 +689,12 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
                         ) : (
                           <div className="relative">
                             <Search
-                              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                              className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground ${estRTL ? 'right-3' : 'left-3'}`}
                               aria-hidden="true"
                             />
                             <Input
-                              placeholder="Rechercher un dossier…"
-                              className="h-9 pl-9 text-sm"
+                              placeholder={t('search_dossier_placeholder')}
+                              className={`h-9 text-sm ${estRTL ? 'pr-9' : 'pl-9'}`}
                               value={rechercheDossier}
                               onChange={(e) => {
                                 setRechercheDossier(e.target.value);
@@ -719,9 +717,7 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
                               </div>
                             ) : dossiers.length === 0 ? (
                               <p className="p-4 text-center text-sm text-muted-foreground">
-                                {rechercheDossier
-                                  ? 'Aucun dossier trouvé'
-                                  : 'Tapez pour rechercher'}
+                                {rechercheDossier ? t('no_dossier_found') : t('type_to_search')}
                               </p>
                             ) : (
                               <ul className="max-h-52 overflow-y-auto py-1">
@@ -759,19 +755,19 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
                   )}
                 />
 
-                {/* Nom — col 1 */}
+                {/* Nom */}
                 <FormField
                   control={form.control}
                   name="nom"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-xs font-medium">
-                        Nom du document <span className="text-destructive">*</span>
+                        {t('form_name')} <span className="text-destructive">*</span>
                       </FormLabel>
                       <FormControl>
                         <Input
                           className="h-9 text-sm"
-                          placeholder="Ex : Contrat de mission 2026"
+                          placeholder={t('form_name_placeholder')}
                           {...field}
                         />
                       </FormControl>
@@ -780,14 +776,14 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
                   )}
                 />
 
-                {/* Type — col 2 */}
+                {/* Type */}
                 <FormField
                   control={form.control}
                   name="type"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-xs font-medium">
-                        Type <span className="text-destructive">*</span>
+                        {t('form_type')} <span className="text-destructive">*</span>
                       </FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
@@ -796,10 +792,10 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="contrat">Contrat</SelectItem>
-                          <SelectItem value="jugement">Jugement</SelectItem>
-                          <SelectItem value="piece">Pièce justificative</SelectItem>
-                          <SelectItem value="autre">Autre</SelectItem>
+                          <SelectItem value="contrat">{t('type_contrat')}</SelectItem>
+                          <SelectItem value="jugement">{t('type_jugement')}</SelectItem>
+                          <SelectItem value="piece">{t('type_piece')}</SelectItem>
+                          <SelectItem value="autre">{t('type_autre')}</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage className="text-xs" />
@@ -815,12 +811,14 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs font-medium">
-                      Description{' '}
-                      <span className="font-normal text-muted-foreground/70">(opt.)</span>
+                      {t('form_description')}{' '}
+                      <span className="font-normal text-muted-foreground/70">
+                        ({tc('optional')})
+                      </span>
                     </FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Notes ou détails sur ce document…"
+                        placeholder={t('form_description_placeholder')}
                         className="resize-none text-sm"
                         rows={2}
                         {...field}
@@ -834,7 +832,6 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
           </Form>
         </div>
 
-        {/* ── Footer ──────────────────────────────────────────── */}
         <div className="shrink-0 border-t px-6 py-4">
           <div className="flex justify-end gap-2">
             <Button
@@ -844,17 +841,15 @@ function DialogUploadGlobal({ onFermer, onSuccess }: DialogUploadGlobalProps) {
               onClick={onFermer}
               disabled={isPending}
             >
-              Annuler
+              {tc('cancel')}
             </Button>
             <Button
               size="sm"
               onClick={form.handleSubmit((v) => uploader(v))}
               disabled={isPending || !fichier}
             >
-              {isPending && (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-              )}
-              {isPending ? 'Upload en cours…' : 'Ajouter'}
+              {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+              {isPending ? t('uploading') : t('add_button')}
             </Button>
           </div>
         </div>

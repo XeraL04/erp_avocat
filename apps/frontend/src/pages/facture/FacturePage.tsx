@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDebounce } from 'use-debounce';
+import { useTranslation } from 'react-i18next';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -56,7 +57,6 @@ import { useAuthStore } from '@/stores/auth.store';
 import { DialogCreerFacture } from '@/components/facture/DialogCreerFacture';
 import { DialogModifierFacture } from '@/components/facture/DialogModifierFacture';
 
-// Helper local — nom client depuis l'objet embarqué dans Facture
 function nomClientFacture(f: Facture): string {
   if (typeof f.client !== 'object' || f.client === null) return '—';
   if (f.client.type === 'morale') return f.client.raisonSociale ?? '—';
@@ -68,6 +68,10 @@ export default function FacturesPage() {
   const queryClient = useQueryClient();
   const utilisateur = useAuthStore((s) => s.utilisateur);
   const estAdmin = utilisateur?.role === 'admin';
+
+  const { t, i18n } = useTranslation('factures');
+  const { t: tc } = useTranslation('common');
+  const estRTL = i18n.language === 'ar';
 
   // ─── Filtres ──────────────────────────────────────────────────────
   const [filtreStatut, setFiltreStatut] = useState<StatutFacture | 'tous'>('tous');
@@ -109,10 +113,10 @@ export default function FacturesPage() {
     mutationFn: () => supprimerFacture(factureASupprimer!.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'factures'] });
-      toast.success('Facture supprimée avec succès');
+      toast.success(t('invoice_deleted'));
       setFactureASupprimer(null);
     },
-    onError: () => toast.error('Impossible de supprimer cette facture'),
+    onError: () => toast.error(t('invoice_delete_error')),
   });
 
   // ─── Téléchargement PDF ───────────────────────────────────────────
@@ -120,9 +124,9 @@ export default function FacturesPage() {
     setTelechargementsEnCours((prev) => new Set(prev).add(facture.id));
     try {
       await telechargerFacturePDF(facture.id, facture.numero);
-      toast.success(`${facture.numero}.pdf téléchargé`);
+      toast.success(`${facture.numero}.pdf ${t('pdf_downloaded')}`);
     } catch {
-      toast.error('Erreur lors du téléchargement du PDF');
+      toast.error(t('pdf_download_error'));
     } finally {
       setTelechargementsEnCours((prev) => {
         const next = new Set(prev);
@@ -134,29 +138,33 @@ export default function FacturesPage() {
 
   return (
     <div className="space-y-6">
-      {/* ── En-tête ─────────────────────────────────────────────── */}
+      {/* ── En-tête ── */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Factures</h2>
+          <h2 className="text-2xl font-bold tracking-tight">{t('title')}</h2>
           <p className="text-sm text-muted-foreground">
             {meta
-              ? `${meta.total} facture${meta.total > 1 ? 's' : ''} au total`
-              : 'Gestion de la facturation'}
+              ? estRTL
+                ? `${meta.total} ${meta.total > 1 ? 'فواتير' : 'فاتورة'} في المجموع`
+                : `${meta.total} facture${meta.total > 1 ? 's' : ''} au total`
+              : t('subtitle')}
           </p>
         </div>
         <Button onClick={() => setDialogCreer(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nouvelle facture
+          <Plus className="h-4 w-4" />
+          {t('new_invoice')}
         </Button>
       </div>
 
-      {/* ── Filtres ─────────────────────────────────────────────── */}
+      {/* ── Filtres ── */}
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search
+            className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground ${estRTL ? 'right-3' : 'left-3'}`}
+          />
           <Input
-            placeholder="Rechercher par numéro, client, dossier…"
-            className="pl-9"
+            placeholder={t('search_placeholder')}
+            className={estRTL ? 'pr-9' : 'pl-9'}
             value={recherche}
             onChange={(e) => {
               setRecherche(e.target.value);
@@ -175,44 +183,37 @@ export default function FacturesPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="tous">Tous les statuts</SelectItem>
-            <SelectItem value="brouillon">Brouillon</SelectItem>
-            <SelectItem value="emise">Émise</SelectItem>
-            <SelectItem value="payee">Payée</SelectItem>
+            <SelectItem value="tous">{t('all_statuses')}</SelectItem>
+            <SelectItem value="brouillon">{t('status_draft')}</SelectItem>
+            <SelectItem value="emise">{t('status_issued')}</SelectItem>
+            <SelectItem value="payee">{t('status_paid')}</SelectItem>
           </SelectContent>
         </Select>
         {filtresActifs && (
           <Button variant="ghost" onClick={reinitialiserFiltres}>
-            Réinitialiser
+            {estRTL ? 'إعادة ضبط' : 'Réinitialiser'}
           </Button>
         )}
       </div>
 
-      {/* ── Liste ───────────────────────────────────────────────── */}
+      {/* ── Liste ── */}
       <Card>
         <CardContent className="p-0">
-          {/* Skeleton */}
           {isLoading && <SkeletonTable lignes={5} avecAvatar={true} avecBadge={true} />}
 
-          {/* Empty state */}
           {!isLoading && factures.length === 0 && (
             <EmptyState
               icone={Receipt}
-              titre={filtresActifs ? 'Aucune facture trouvée' : 'Aucune facture pour le moment'}
-              description={
-                filtresActifs
-                  ? 'Aucune facture ne correspond à vos critères. Modifiez ou réinitialisez les filtres.'
-                  : 'Créez votre première facture pour commencer la facturation.'
-              }
+              titre={filtresActifs ? t('no_invoices_filtered') : t('no_invoices')}
+              description={filtresActifs ? t('no_invoices_filtered_desc') : t('no_invoices_desc')}
               action={
                 !filtresActifs
-                  ? { label: 'Nouvelle facture', onClick: () => setDialogCreer(true), icone: Plus }
+                  ? { label: t('new_invoice'), onClick: () => setDialogCreer(true), icone: Plus }
                   : undefined
               }
             />
           )}
 
-          {/* Liste */}
           {!isLoading && factures.length > 0 && (
             <div className="divide-y">
               {factures.map((facture) => {
@@ -253,7 +254,7 @@ export default function FacturesPage() {
                       {formaterMontantDA(facture.montant)}
                     </p>
 
-                    {/* Badge statut sémantique */}
+                    {/* Badge statut */}
                     <span
                       className={cn(
                         'hidden sm:inline-flex items-center gap-1.5 shrink-0',
@@ -275,19 +276,20 @@ export default function FacturesPage() {
                           size="icon"
                           className="h-8 w-8 shrink-0"
                           onClick={(e) => e.stopPropagation()}
+                          aria-label={`${tc('actions')} ${facture.numero}`}
                         >
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
+                      <DropdownMenuContent align={estRTL ? 'start' : 'end'}>
                         <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation();
                             navigate(`/cabinet/factures/${facture.id}`);
                           }}
                         >
-                          <FileCheck className="mr-2 h-4 w-4" />
-                          Voir le détail
+                          <FileCheck className="h-4 w-4" />
+                          {t('action_view')}
                         </DropdownMenuItem>
                         {facture.statut !== 'payee' && (
                           <DropdownMenuItem
@@ -296,8 +298,10 @@ export default function FacturesPage() {
                               setFactureAModifier(facture);
                             }}
                           >
-                            <Pencil className="mr-2 h-4 w-4" />
-                            {facture.statut === 'brouillon' ? 'Modifier' : 'Changer le statut'}
+                            <Pencil className="h-4 w-4" />
+                            {facture.statut === 'brouillon'
+                              ? tc('edit')
+                              : t('action_change_status')}
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuItem
@@ -307,10 +311,10 @@ export default function FacturesPage() {
                             handleTelechargement(facture);
                           }}
                         >
-                          <Download className="mr-2 h-4 w-4" />
+                          <Download className="h-4 w-4" />
                           {telechargementsEnCours.has(facture.id)
-                            ? 'Téléchargement…'
-                            : 'Télécharger PDF'}
+                            ? t('downloading')
+                            : t('action_download_pdf')}
                         </DropdownMenuItem>
                         {facture.statut === 'brouillon' && estAdmin && (
                           <>
@@ -322,8 +326,8 @@ export default function FacturesPage() {
                                 setFactureASupprimer(facture);
                               }}
                             >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Supprimer
+                              <Trash2 className="h-4 w-4" />
+                              {tc('delete')}
                             </DropdownMenuItem>
                           </>
                         )}
@@ -339,7 +343,14 @@ export default function FacturesPage() {
           {meta && meta.totalPages > 1 && (
             <div className="flex items-center justify-between border-t px-4 py-3">
               <p className="text-xs text-muted-foreground">
-                Page {meta.page} sur {meta.totalPages} · {meta.total} factures
+                {tc('page')} {meta.page} {estRTL ? 'من' : 'sur'} {meta.totalPages}
+                {' · '}
+                {meta.total}{' '}
+                {estRTL
+                  ? meta.total > 1
+                    ? 'فواتير'
+                    : 'فاتورة'
+                  : `facture${meta.total > 1 ? 's' : ''}`}
               </p>
               <div className="flex gap-2">
                 <Button
@@ -348,7 +359,7 @@ export default function FacturesPage() {
                   disabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
                 >
-                  Précédent
+                  {tc('previous')}
                 </Button>
                 <Button
                   variant="outline"
@@ -356,7 +367,7 @@ export default function FacturesPage() {
                   disabled={page >= meta.totalPages}
                   onClick={() => setPage((p) => p + 1)}
                 >
-                  Suivant
+                  {tc('next')}
                 </Button>
               </div>
             </div>
@@ -364,7 +375,7 @@ export default function FacturesPage() {
         </CardContent>
       </Card>
 
-      {/* ── Dialogs ─────────────────────────────────────────────── */}
+      {/* ── Dialogs ── */}
       <DialogCreerFacture ouvert={dialogCreer} onFermer={() => setDialogCreer(false)} />
       {factureAModifier && (
         <DialogModifierFacture
@@ -377,22 +388,21 @@ export default function FacturesPage() {
         open={!!factureASupprimer}
         onOpenChange={(o) => !o && setFactureASupprimer(null)}
       >
-        <AlertDialogContent>
+        <AlertDialogContent dir={estRTL ? 'rtl' : 'ltr'}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer cette facture ?</AlertDialogTitle>
+            <AlertDialogTitle>{t('delete_title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{factureASupprimer?.numero}</strong> sera définitivement supprimée. Seules les
-              factures en brouillon peuvent être supprimées.
+              <strong>{factureASupprimer?.numero}</strong> {t('delete_desc')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>{tc('cancel')}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
               onClick={() => supprimer()}
               disabled={suppression}
             >
-              Supprimer
+              {tc('delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

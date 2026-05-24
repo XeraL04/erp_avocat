@@ -1,0 +1,12 @@
+{
+  "my_profile": "Mon profil",
+  "profile_updated_toast": "Profil mis à jour",
+  "form_fullname": "Nom complet",
+  "form_fullname_placeholder": "Maître Benali",
+  "change_password": "Changer le mot de passe",
+  "form_old_password": "Ancien mot de passe",
+  "form_new_password_short": "Nouveau",
+  "form_confirm_password": "Confirmer",
+  "error_wrong_password": "Ancien mot de passe incorrect",
+  "error_email_used": "Cet email est déjà utilisé"
+}

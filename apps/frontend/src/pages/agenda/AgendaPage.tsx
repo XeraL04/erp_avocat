@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, isToday, isTomorrow, isThisWeek, isPast, isFuture, parseISO } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, ar } from 'date-fns/locale';
 import {
   CalendarClock,
   Plus,
@@ -21,6 +21,7 @@ import {
   FolderOpen,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -75,9 +76,9 @@ import { useAuthStore } from '@/stores/auth.store';
 // ─── Schéma ───────────────────────────────────────────────────────────────────
 
 const schema = z.object({
-  titre: z.string().trim().min(2, 'Le titre doit contenir au moins 2 caractères'),
-  type: z.enum(['audience', 'rdv', 'rappel'], { required_error: 'Le type est obligatoire' }),
-  dateHeure: z.string().min(1, 'La date et heure sont obligatoires'),
+  titre: z.string().trim().min(2),
+  type: z.enum(['audience', 'rdv', 'rappel'], { required_error: 'required' }),
+  dateHeure: z.string().min(1),
   lieu: z.string().trim().optional(),
   notes: z.string().trim().optional(),
 });
@@ -86,7 +87,6 @@ type FormValues = z.infer<typeof schema>;
 // ─── Config types ─────────────────────────────────────────────────────────────
 
 interface TypeConfig {
-  label: string;
   icone: React.ElementType;
   text: string;
   bg: string;
@@ -96,7 +96,6 @@ interface TypeConfig {
 
 const TYPE_CONFIG: Record<TypeEvenement, TypeConfig> = {
   audience: {
-    label: 'Audience',
     icone: Scale,
     text: 'text-mode-virement',
     bg: 'bg-mode-virement-bg',
@@ -104,7 +103,6 @@ const TYPE_CONFIG: Record<TypeEvenement, TypeConfig> = {
     dot: 'bg-mode-virement',
   },
   rdv: {
-    label: 'Rendez-vous',
     icone: Users,
     text: 'text-status-actif',
     bg: 'bg-status-actif-bg',
@@ -112,7 +110,6 @@ const TYPE_CONFIG: Record<TypeEvenement, TypeConfig> = {
     dot: 'bg-status-actif',
   },
   rappel: {
-    label: 'Rappel',
     icone: Bell,
     text: 'text-status-suspendu',
     bg: 'bg-status-suspendu-bg',
@@ -131,14 +128,6 @@ function isoToDatetimeLocal(iso: string): string {
 
 function datetimeLocalToISO(local: string): string {
   return new Date(local).toISOString();
-}
-
-function etiquetteDate(dateHeure: string): string {
-  const d = parseISO(dateHeure);
-  if (isToday(d)) return "Aujourd'hui";
-  if (isTomorrow(d)) return 'Demain';
-  if (isThisWeek(d, { locale: fr })) return format(d, 'EEEE', { locale: fr });
-  return format(d, 'd MMMM yyyy', { locale: fr });
 }
 
 function grouperParJour(evenements: Evenement[]): Map<string, Evenement[]> {
@@ -176,11 +165,26 @@ export default function AgendaPage() {
   const peutModifier = role === 'admin' || role === 'assistant';
   const peutSupprimer = role === 'admin';
 
+  const { t, i18n } = useTranslation('agenda');
+  const { t: tc } = useTranslation('common');
+  const estRTL = i18n.language === 'ar';
+  const locale = estRTL ? ar : fr;
+
   const [filtrePeriode, setFiltrePeriode] = useState<FiltrePeriode>('a_venir');
   const [filtreType, setFiltreType] = useState<FiltreType>('tous');
   const [dialogOuvert, setDialogOuvert] = useState(false);
   const [evenementEdite, setEvenementEdite] = useState<Evenement | null>(null);
   const [idASupprimer, setIdASupprimer] = useState<string | null>(null);
+
+  // ── Helpers de date localisés ──────────────────────────────────────────────
+
+  const etiquetteDate = (dateHeure: string): string => {
+    const d = parseISO(dateHeure);
+    if (isToday(d)) return t('today');
+    if (isTomorrow(d)) return t('tomorrow');
+    if (isThisWeek(d, { locale })) return format(d, 'EEEE', { locale });
+    return format(d, 'd MMMM yyyy', { locale });
+  };
 
   // ── Query ──────────────────────────────────────────────────────────────────
 
@@ -242,9 +246,9 @@ export default function AgendaPage() {
     onSuccess: () => {
       invalidate();
       fermerDialog();
-      toast.success('Événement ajouté');
+      toast.success(t('event_added'));
     },
-    onError: () => toast.error("Impossible d'ajouter l'événement"),
+    onError: () => toast.error(t('event_add_error')),
   });
 
   const mutModifier = useMutation({
@@ -259,78 +263,87 @@ export default function AgendaPage() {
     onSuccess: () => {
       invalidate();
       fermerDialog();
-      toast.success('Événement modifié');
+      toast.success(t('event_updated'));
     },
-    onError: () => toast.error('Impossible de modifier'),
+    onError: () => toast.error(tc('error')),
   });
 
   const mutSupprimer = useMutation({
     mutationFn: (id: string) => supprimerEvenement(id),
     onSuccess: () => {
       invalidate();
-      toast.success('Événement supprimé');
+      toast.success(t('event_deleted'));
     },
-    onError: () => toast.error('Une erreur est survenue'),
+    onError: () => toast.error(tc('error')),
   });
 
   const onSubmit = (v: FormValues) => (evenementEdite ? mutModifier.mutate(v) : mutCreer.mutate(v));
   const isPending = mutCreer.isPending || mutModifier.isPending;
 
-  const Opt = () => <span className="font-normal text-muted-foreground/70">(opt.)</span>;
+  const Opt = () => <span className="font-normal text-muted-foreground/70">({t('optional')})</span>;
 
-  // ──────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Labels types traduits — réactifs au changement de langue
+  const labelType: Record<TypeEvenement, string> = {
+    audience: t('type_audience'),
+    rdv: t('type_rdv'),
+    rappel: t('type_rappel'),
+  };
 
   return (
     <div className="space-y-5">
-      {/* ── En-tête ─────────────────────────────────────────────── */}
+      {/* ── En-tête ── */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">Agenda</h2>
+          <h2 className="text-lg font-semibold tracking-tight">{t('title')}</h2>
           <p className="flex items-center gap-2 text-xs text-muted-foreground">
             <CalendarClock className="h-3.5 w-3.5" aria-hidden="true" />
-            {tousEvenements.length} événement{tousEvenements.length > 1 ? 's' : ''}
+            {tousEvenements.length}{' '}
+            {tousEvenements.length > 1 ? t('events_plural') : t('event_singular')}
             {nbAujourdhui > 0 && (
               <span className="inline-flex items-center rounded-full bg-mode-virement-bg px-2 py-0.5 text-xs font-medium text-mode-virement">
-                {nbAujourdhui} aujourd'hui
+                {nbAujourdhui} {t('today')}
               </span>
             )}
           </p>
         </div>
         {peutModifier && (
           <Button size="sm" onClick={ouvrirCreation}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-            Planifier
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            {t('schedule')}
           </Button>
         )}
       </div>
 
-      {/* ── Filtres ─────────────────────────────────────────────── */}
+      {/* ── Filtres ── */}
       <div className="flex flex-col gap-2 sm:flex-row">
         <Select value={filtrePeriode} onValueChange={(v) => setFiltrePeriode(v as FiltrePeriode)}>
           <SelectTrigger className="h-9 w-full text-sm sm:w-44">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="a_venir">À venir</SelectItem>
-            <SelectItem value="aujourd_hui">Aujourd'hui</SelectItem>
-            <SelectItem value="cette_semaine">Cette semaine</SelectItem>
-            <SelectItem value="tous">Tout l'historique</SelectItem>
+            <SelectItem value="a_venir">{t('filter_upcoming')}</SelectItem>
+            <SelectItem value="aujourd_hui">{t('filter_today')}</SelectItem>
+            <SelectItem value="cette_semaine">{t('filter_this_week')}</SelectItem>
+            <SelectItem value="tous">{t('filter_all')}</SelectItem>
           </SelectContent>
         </Select>
+
         <Select value={filtreType} onValueChange={(v) => setFiltreType(v as FiltreType)}>
           <SelectTrigger className="h-9 w-full text-sm sm:w-44">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="tous">Tous les types</SelectItem>
-            <SelectItem value="audience">Audiences</SelectItem>
-            <SelectItem value="rdv">Rendez-vous</SelectItem>
-            <SelectItem value="rappel">Rappels</SelectItem>
+            <SelectItem value="tous">{t('all_types')}</SelectItem>
+            <SelectItem value="audience">{t('type_audience_plural')}</SelectItem>
+            <SelectItem value="rdv">{t('type_rdv_plural')}</SelectItem>
+            <SelectItem value="rappel">{t('type_rappel_plural')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      {/* ── Skeleton ────────────────────────────────────────────── */}
+      {/* ── Skeleton ── */}
       {isLoading && (
         <div className="space-y-5">
           {[...Array(2)].map((_, g) => (
@@ -359,25 +372,21 @@ export default function AgendaPage() {
         </div>
       )}
 
-      {/* ── Empty state ─────────────────────────────────────────── */}
+      {/* ── Empty state ── */}
       {!isLoading && evenements.length === 0 && (
         <EmptyState
           icone={CalendarX}
-          titre={filtrePeriode === 'a_venir' ? 'Aucun événement à venir' : 'Aucun événement'}
-          description={
-            filtrePeriode === 'a_venir'
-              ? 'Planifiez vos audiences et rendez-vous depuis les dossiers ou ici.'
-              : 'Modifiez les filtres pour afficher plus de résultats.'
-          }
+          titre={filtrePeriode === 'a_venir' ? t('no_upcoming') : t('no_events')}
+          description={filtrePeriode === 'a_venir' ? t('no_upcoming_desc') : t('no_events_desc')}
           action={
             peutModifier && !filtresActifs
-              ? { label: 'Planifier un événement', onClick: ouvrirCreation, icone: Plus }
+              ? { label: t('schedule_event'), onClick: ouvrirCreation, icone: Plus }
               : undefined
           }
         />
       )}
 
-      {/* ── Liste groupée par jour ───────────────────────────────── */}
+      {/* ── Liste groupée par jour ── */}
       {!isLoading && evenements.length > 0 && (
         <div className="space-y-5">
           {[...groupes.entries()].map(([cle, items]) => (
@@ -389,7 +398,7 @@ export default function AgendaPage() {
                 </span>
                 <div className="flex-1 border-t" />
                 <span className="text-xs text-muted-foreground">
-                  {items.length} evt{items.length > 1 ? 's' : ''}
+                  {items.length} {items.length > 1 ? t('events_short_plural') : t('events_short')}
                 </span>
               </div>
 
@@ -427,13 +436,13 @@ export default function AgendaPage() {
                             )}
                           >
                             <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
-                            {cfg.label}
+                            {labelType[evt.type]}
                           </span>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                           <span className="font-medium">
-                            {format(parseISO(evt.dateHeure), "HH'h'mm", { locale: fr })}
+                            {format(parseISO(evt.dateHeure), "HH'h'mm", { locale })}
                           </span>
                           {evt.lieu && (
                             <span className="flex items-center gap-1">
@@ -466,7 +475,7 @@ export default function AgendaPage() {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
-                            aria-label={`Modifier ${evt.titre}`}
+                            aria-label={`${tc('edit')} ${evt.titre}`}
                             onClick={() => ouvrirEdition(evt)}
                           >
                             <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
@@ -477,7 +486,7 @@ export default function AgendaPage() {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 text-destructive hover:text-destructive"
-                            aria-label={`Supprimer ${evt.titre}`}
+                            aria-label={`${tc('delete')} ${evt.titre}`}
                             onClick={() => setIdASupprimer(evt.id)}
                           >
                             <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -493,17 +502,15 @@ export default function AgendaPage() {
         </div>
       )}
 
-      {/* ── Dialog Créer / Modifier ──────────────────────────────── */}
+      {/* ── Dialog Créer / Modifier ── */}
       <Dialog open={dialogOuvert} onOpenChange={(o) => !o && fermerDialog()}>
-        <DialogContent className="gap-0 p-0 sm:max-w-md">
+        <DialogContent className="gap-0 p-0 sm:max-w-md" dir={estRTL ? 'rtl' : 'ltr'}>
           <DialogHeader className="border-b px-6 py-4">
             <DialogTitle className="text-base">
-              {evenementEdite ? "Modifier l'événement" : 'Nouvel événement'}
+              {evenementEdite ? t('edit_event') : t('new_event')}
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              {evenementEdite
-                ? `Modification de « ${evenementEdite.titre} »`
-                : 'Planifiez une audience, un rendez-vous ou un rappel.'}
+              {evenementEdite ? `${t('editing')} « ${evenementEdite.titre} »` : t('new_event_desc')}
             </DialogDescription>
           </DialogHeader>
 
@@ -517,12 +524,12 @@ export default function AgendaPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-xs font-medium">
-                        Titre <span className="text-destructive">*</span>
+                        {t('form_title')} <span className="text-destructive">*</span>
                       </FormLabel>
                       <FormControl>
                         <Input
                           className="h-9 text-sm"
-                          placeholder="ex : Audience correctionnelle"
+                          placeholder={t('form_title_placeholder')}
                           {...field}
                         />
                       </FormControl>
@@ -539,18 +546,18 @@ export default function AgendaPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-xs font-medium">
-                          Type <span className="text-destructive">*</span>
+                          {t('form_type')} <span className="text-destructive">*</span>
                         </FormLabel>
                         <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
                             <SelectTrigger className="h-9 w-full text-sm">
-                              <SelectValue placeholder="Type" />
+                              <SelectValue placeholder={t('form_type')} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="audience">Audience</SelectItem>
-                            <SelectItem value="rdv">Rendez-vous</SelectItem>
-                            <SelectItem value="rappel">Rappel</SelectItem>
+                            <SelectItem value="audience">{t('type_audience')}</SelectItem>
+                            <SelectItem value="rdv">{t('type_rdv')}</SelectItem>
+                            <SelectItem value="rappel">{t('type_rappel')}</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage className="text-xs" />
@@ -563,7 +570,7 @@ export default function AgendaPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-xs font-medium">
-                          Date & heure <span className="text-destructive">*</span>
+                          {t('form_datetime')} <span className="text-destructive">*</span>
                         </FormLabel>
                         <FormControl>
                           <Input type="datetime-local" className="h-9 text-sm" {...field} />
@@ -581,12 +588,12 @@ export default function AgendaPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-xs font-medium">
-                        Lieu <Opt />
+                        {t('form_location')} <Opt />
                       </FormLabel>
                       <FormControl>
                         <Input
                           className="h-9 text-sm"
-                          placeholder="ex : Tribunal de Constantine – Salle 3"
+                          placeholder={t('form_location_placeholder')}
                           {...field}
                         />
                       </FormControl>
@@ -602,13 +609,13 @@ export default function AgendaPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-xs font-medium">
-                        Notes <Opt />
+                        {t('form_notes')} <Opt />
                       </FormLabel>
                       <FormControl>
                         <Textarea
                           className="resize-none text-sm"
                           rows={2}
-                          placeholder="Informations complémentaires…"
+                          placeholder={t('form_notes_placeholder')}
                           {...field}
                         />
                       </FormControl>
@@ -625,13 +632,13 @@ export default function AgendaPage() {
                     onClick={fermerDialog}
                     disabled={isPending}
                   >
-                    Annuler
+                    {tc('cancel')}
                   </Button>
                   <Button type="submit" size="sm" disabled={isPending}>
                     {isPending && (
-                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
                     )}
-                    {evenementEdite ? 'Enregistrer' : 'Ajouter'}
+                    {evenementEdite ? tc('save') : t('add_button')}
                   </Button>
                 </DialogFooter>
               </form>
@@ -640,15 +647,15 @@ export default function AgendaPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Alert suppression ───────────────────────────────────── */}
+      {/* ── Alert suppression ── */}
       <AlertDialog open={!!idASupprimer} onOpenChange={(o) => !o && setIdASupprimer(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent dir={estRTL ? 'rtl' : 'ltr'}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer cet événement ?</AlertDialogTitle>
-            <AlertDialogDescription>Cette action est irréversible.</AlertDialogDescription>
+            <AlertDialogTitle>{t('delete_title')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('delete_warning')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>{tc('cancel')}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
               onClick={() => {
@@ -656,7 +663,7 @@ export default function AgendaPage() {
                 setIdASupprimer(null);
               }}
             >
-              Supprimer
+              {tc('delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

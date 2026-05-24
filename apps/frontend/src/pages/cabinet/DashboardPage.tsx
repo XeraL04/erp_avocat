@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,6 @@ import type { DashboardCabinetData, StatsCabinet } from '@/api/cabinet.api';
 import { libellePlan, formaterDateCourte } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth.store';
 import { nomAffiche, LABELS_SPECIALITE, LABELS_TYPE_AFFAIRE, LABELS_INSTITUTION } from '@/types';
-// import { cn } from '@/lib/utils';
 
 // ─── Hook compteur animé ──────────────────────────────────────────────────────
 function useCountUp(valeurCible: number, actif: boolean, duree = 800): number {
@@ -35,7 +35,6 @@ function useCountUp(valeurCible: number, actif: boolean, duree = 800): number {
     const animer = (maintenant: number) => {
       const elapsed = maintenant - debut;
       const progress = Math.min(elapsed / duree, 1);
-      // easing ease-out cubic
       const eased = 1 - Math.pow(1 - progress, 3);
       setValeur(Math.round(eased * valeurCible));
       if (progress < 1) rafRef.current = requestAnimationFrame(animer);
@@ -47,85 +46,61 @@ function useCountUp(valeurCible: number, actif: boolean, duree = 800): number {
   return valeur;
 }
 
-// ─── Config cartes KPI ────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface CarteStat {
   cle: keyof StatsCabinet;
-  label: string;
+  labelKey: string;
+  descKey: string;
   icone: React.ElementType;
   varCouleur: string;
   varBg: string;
-  description: string;
 }
 
-const carteStats: CarteStat[] = [
+// Config statique — les labels sont des clés i18n résolues dans le composant
+const CARTE_STATS_CONFIG: CarteStat[] = [
   {
     cle: 'totalDossiers',
-    label: 'Total dossiers',
+    labelKey: 'dashboard:total_dossiers',
+    descKey: 'dashboard:desc_total_dossiers',
     icone: FolderOpen,
     varCouleur: 'var(--kpi-dossiers)',
     varBg: 'var(--kpi-dossiers-bg)',
-    description: 'Tous statuts confondus',
   },
   {
     cle: 'dossiersEnCours',
-    label: 'En cours',
+    labelKey: 'dashboard:active_dossiers',
+    descKey: 'dashboard:desc_active_dossiers',
     icone: Clock,
     varCouleur: 'var(--status-encours)',
     varBg: 'var(--status-encours-bg)',
-    description: 'Dossiers actifs',
   },
   {
     cle: 'dossiersSuspendus',
-    label: 'Suspendus',
+    labelKey: 'dashboard:suspended_dossiers',
+    descKey: 'dashboard:desc_suspended_dossiers',
     icone: PauseCircle,
     varCouleur: 'var(--status-suspendu)',
     varBg: 'var(--status-suspendu-bg)',
-    description: 'En attente',
   },
   {
     cle: 'dossiersClotures',
-    label: 'Clôturés',
+    labelKey: 'dashboard:closed_dossiers',
+    descKey: 'dashboard:desc_closed_dossiers',
     icone: CheckCircle,
     varCouleur: 'var(--status-cloture)',
     varBg: 'var(--status-cloture-bg)',
-    description: 'Affaires terminées',
   },
   {
     cle: 'totalUtilisateurs',
-    label: 'Utilisateurs',
+    labelKey: 'dashboard:total_users',
+    descKey: 'dashboard:desc_total_users',
     icone: Users,
     varCouleur: 'var(--kpi-clients)',
     varBg: 'var(--kpi-clients-bg)',
-    description: 'Membres du cabinet',
   },
 ];
 
-// ─── Config badges statut dossier ─────────────────────────────────────────────
-const STATUT_DOSSIER_CONFIG: Record<
-  string,
-  { label: string; varCouleur: string; varBg: string; varBorder: string }
-> = {
-  encours: {
-    label: 'En cours',
-    varCouleur: 'var(--status-encours)',
-    varBg: 'var(--status-encours-bg)',
-    varBorder: 'var(--status-encours-border)',
-  },
-  suspendu: {
-    label: 'Suspendu',
-    varCouleur: 'var(--status-suspendu)',
-    varBg: 'var(--status-suspendu-bg)',
-    varBorder: 'var(--status-suspendu-border)',
-  },
-  cloture: {
-    label: 'Clôturé',
-    varCouleur: 'var(--status-cloture)',
-    varBg: 'var(--status-cloture-bg)',
-    varBorder: 'var(--status-cloture-border)',
-  },
-};
-
-// ─── Carte KPI avec count-up ──────────────────────────────────────────────────
+// ─── Carte KPI ────────────────────────────────────────────────────────────────
 interface CarteKPIProps {
   config: CarteStat;
   valeur: number;
@@ -135,7 +110,8 @@ interface CarteKPIProps {
 }
 
 function CarteKPI({ config, valeur, isLoading, index, actif }: CarteKPIProps) {
-  const { label, icone: Icone, varCouleur, varBg, description } = config;
+  const { t } = useTranslation();
+  const { icone: Icone, varCouleur, varBg, labelKey, descKey } = config;
   const valeurAnimee = useCountUp(valeur, actif && !isLoading);
 
   return (
@@ -147,15 +123,14 @@ function CarteKPI({ config, valeur, isLoading, index, actif }: CarteKPIProps) {
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-muted-foreground">{label}</p>
+              <p className="text-xs font-medium text-muted-foreground">{t(labelKey)}</p>
               {isLoading ? (
                 <Skeleton className="mt-2 h-7 w-12" />
               ) : (
                 <p className="mt-1 text-2xl font-bold tabular-nums leading-none">{valeurAnimee}</p>
               )}
-              <p className="mt-1.5 text-[11px] text-muted-foreground">{description}</p>
+              <p className="mt-1.5 text-[11px] text-muted-foreground">{t(descKey)}</p>
             </div>
-
             <div
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-110"
               style={{ backgroundColor: varBg }}
@@ -171,6 +146,10 @@ function CarteKPI({ config, valeur, isLoading, index, actif }: CarteKPIProps) {
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 export default function CabinetDashboardPage() {
+  const { t, i18n } = useTranslation();
+  const { t: td } = useTranslation('dashboard');
+  const estRTL = i18n.language === 'ar';
+
   const utilisateur = useAuthStore((s) => s.utilisateur);
   const [compteurActif, setCompteurActif] = useState(false);
 
@@ -179,11 +158,10 @@ export default function CabinetDashboardPage() {
     queryFn: getDashboardCabinet,
   });
 
-  // Lance les compteurs dès que les données arrivent
   useEffect(() => {
     if (!isLoading && data) {
-      const t = setTimeout(() => setCompteurActif(true), 200);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => setCompteurActif(true), 200);
+      return () => clearTimeout(timer);
     }
   }, [isLoading, data]);
 
@@ -201,22 +179,59 @@ export default function CabinetDashboardPage() {
       ? Math.min(((stats?.totalUtilisateurs ?? 0) / cabinet.limites.maxUtilisateurs) * 100, 100)
       : 0;
 
+  // Config statut dossier traduite
+  const STATUT_DOSSIER_CONFIG: Record<
+    string,
+    { label: string; varCouleur: string; varBg: string; varBorder: string }
+  > = {
+    encours: {
+      label: td('status_actif'),
+      varCouleur: 'var(--status-encours)',
+      varBg: 'var(--status-encours-bg)',
+      varBorder: 'var(--status-encours-border)',
+    },
+    suspendu: {
+      label: td('status_essai'),
+      varCouleur: 'var(--status-suspendu)',
+      varBg: 'var(--status-suspendu-bg)',
+      varBorder: 'var(--status-suspendu-border)',
+    },
+    cloture: {
+      label: td('status_expire'),
+      varCouleur: 'var(--status-cloture)',
+      varBg: 'var(--status-cloture-bg)',
+      varBorder: 'var(--status-cloture-border)',
+    },
+  };
+
   const prenom = utilisateur?.nom?.split(' ')[0] ?? '';
+
+  // Accès rapides traduits
+  const accesRapides = [
+    { to: '/cabinet/clients', icone: Users, label: t('common:clients') },
+    { to: '/cabinet/dossiers', icone: FolderOpen, label: t('common:dossiers') },
+    { to: '/cabinet/agenda', icone: Clock, label: t('common:agenda') },
+    { to: '/cabinet/documents', icone: Layers, label: t('common:documents') },
+  ];
 
   return (
     <div className="space-y-6 px-1">
-      {/* ── En-tête ──────────────────────────────────────────── */}
+      {/* ── En-tête ── */}
       <div
         className="animate-fade-up opacity-0 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
         style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}
       >
         <div className="space-y-0.5">
-          <h2 className="text-xl font-semibold tracking-tight">Bonjour, {prenom}</h2>
+          <h2 className="text-xl font-semibold tracking-tight">
+            {td('welcome')}, {prenom}
+          </h2>
           <p className="text-sm text-muted-foreground">
             {isLoading ? (
               <Skeleton className="mt-1 h-4 w-48" />
             ) : (
-              <>Tableau de bord — {cabinet?.nom}</>
+              <>
+                {td('overview')} — {cabinet?.nom}
+              </>
             )}
           </p>
         </div>
@@ -224,22 +239,22 @@ export default function CabinetDashboardPage() {
         <div className="flex shrink-0 gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link to="/cabinet/clients">
-              <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-              Nouveau client
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              {estRTL ? 'عميل جديد' : 'Nouveau client'}
             </Link>
           </Button>
           <Button size="sm" asChild>
             <Link to="/cabinet/dossiers">
-              <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-              Nouveau dossier
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              {estRTL ? 'ملف جديد' : 'Nouveau dossier'}
             </Link>
           </Button>
         </div>
       </div>
 
-      {/* ── Cartes KPI ──────────────────────────────────────── */}
+      {/* ── Cartes KPI ── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-        {carteStats.map((cfg, i) => (
+        {CARTE_STATS_CONFIG.map((cfg, i) => (
           <CarteKPI
             key={cfg.cle}
             config={cfg}
@@ -251,7 +266,7 @@ export default function CabinetDashboardPage() {
         ))}
       </div>
 
-      {/* ── Contenu principal ────────────────────────────────── */}
+      {/* ── Contenu principal ── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Derniers dossiers */}
         <div
@@ -260,11 +275,11 @@ export default function CabinetDashboardPage() {
         >
           <Card>
             <CardHeader className="flex flex-row items-center justify-between border-b pb-3 pt-4">
-              <CardTitle className="text-sm font-semibold">Derniers dossiers</CardTitle>
+              <CardTitle className="text-sm font-semibold">{td('recent_dossiers')}</CardTitle>
               <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
                 <Link to="/cabinet/dossiers">
-                  Voir tout
-                  <ArrowRight className="ml-1 h-3 w-3" aria-hidden="true" />
+                  {estRTL ? 'عرض الكل' : 'Voir tout'}
+                  <ArrowRight className="h-3 w-3" aria-hidden="true" />
                 </Link>
               </Button>
             </CardHeader>
@@ -289,15 +304,17 @@ export default function CabinetDashboardPage() {
                     <FolderOpen className="h-6 w-6 text-muted-foreground/50" aria-hidden="true" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">Aucun dossier</p>
+                    <p className="text-sm font-medium">{t('common:no_data')}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      Créez votre premier dossier pour commencer
+                      {estRTL
+                        ? 'افتح أول ملف قانوني للبدء'
+                        : 'Créez votre premier dossier pour commencer'}
                     </p>
                   </div>
                   <Button size="sm" asChild>
                     <Link to="/cabinet/dossiers">
-                      <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                      Créer un dossier
+                      <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                      {estRTL ? 'فتح ملف' : 'Créer un dossier'}
                     </Link>
                   </Button>
                 </div>
@@ -356,7 +373,7 @@ export default function CabinetDashboardPage() {
                         </div>
 
                         <span
-                          className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium transition-opacity duration-150 group-hover:opacity-90"
+                          className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium"
                           style={{
                             color: cfg.varCouleur,
                             backgroundColor: cfg.varBg,
@@ -374,7 +391,7 @@ export default function CabinetDashboardPage() {
           </Card>
         </div>
 
-        {/* ── Colonne droite ─────────────────────────────────── */}
+        {/* ── Colonne droite ── */}
         <div
           className="animate-fade-up opacity-0 space-y-4"
           style={{ animationDelay: '460ms', animationFillMode: 'forwards' }}
@@ -383,7 +400,9 @@ export default function CabinetDashboardPage() {
           <Card>
             <CardHeader className="border-b pb-3 pt-4">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-semibold">Plan actuel</CardTitle>
+                <CardTitle className="text-sm font-semibold">
+                  {estRTL ? 'الخطة الحالية' : 'Plan actuel'}
+                </CardTitle>
                 {!isLoading && cabinet && (
                   <span
                     className="rounded-full px-2 py-0.5 text-[11px] font-medium"
@@ -409,33 +428,37 @@ export default function CabinetDashboardPage() {
               ) : (
                 <>
                   <BarreProgression
-                    label="Dossiers"
+                    label={t('common:dossiers')}
                     valeur={stats?.totalDossiers ?? 0}
                     max={cabinet?.limites.maxDossiers}
                     pourcentage={pourcentageDossiers}
                     critique={pourcentageDossiers >= 90}
                     alerte={pourcentageDossiers >= 70}
                     actif={compteurActif}
+                    illimiteLabel={estRTL ? 'غير محدود' : 'Illimité'}
                   />
 
                   <BarreProgression
-                    label="Utilisateurs"
+                    label={estRTL ? 'المستخدمون' : 'Utilisateurs'}
                     valeur={stats?.totalUtilisateurs ?? 0}
                     max={cabinet?.limites.maxUtilisateurs}
                     pourcentage={pourcentageUtilisateurs}
                     critique={false}
                     alerte={false}
                     actif={compteurActif}
+                    illimiteLabel={estRTL ? 'غير محدود' : 'Illimité'}
                   />
 
                   <Separator />
 
                   <p className="text-xs text-muted-foreground">
-                    Stockage :{' '}
+                    {estRTL ? 'التخزين' : 'Stockage'} :{' '}
                     <span className="font-medium text-foreground">
                       {cabinet?.limites.maxDocuments === 99999
-                        ? 'Illimité'
-                        : `${cabinet?.limites.maxDocuments ?? '—'} documents`}
+                        ? estRTL
+                          ? 'غير محدود'
+                          : 'Illimité'
+                        : `${cabinet?.limites.maxDocuments ?? '—'} ${estRTL ? 'مستند' : 'documents'}`}
                     </span>
                   </p>
                 </>
@@ -446,15 +469,12 @@ export default function CabinetDashboardPage() {
           {/* Accès rapides */}
           <Card>
             <CardHeader className="border-b pb-3 pt-4">
-              <CardTitle className="text-sm font-semibold">Accès rapides</CardTitle>
+              <CardTitle className="text-sm font-semibold">
+                {estRTL ? 'وصول سريع' : 'Accès rapides'}
+              </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-1.5 p-3">
-              {[
-                { to: '/cabinet/clients', icone: Users, label: 'Gérer les clients' },
-                { to: '/cabinet/dossiers', icone: FolderOpen, label: 'Gérer les dossiers' },
-                { to: '/cabinet/agenda', icone: Clock, label: "Voir l'agenda" },
-                { to: '/cabinet/documents', icone: Layers, label: 'Documents' },
-              ].map(({ to, icone: Icone, label }, i) => (
+              {accesRapides.map(({ to, icone: Icone, label }, i) => (
                 <Button
                   key={to}
                   variant="ghost"
@@ -492,6 +512,7 @@ interface BarreProgressionProps {
   critique: boolean;
   alerte: boolean;
   actif: boolean;
+  illimiteLabel: string;
 }
 
 function BarreProgression({
@@ -502,15 +523,15 @@ function BarreProgression({
   critique,
   alerte,
   actif,
+  illimiteLabel,
 }: BarreProgressionProps) {
   const maxAffiche = !max || max === 99999 ? '∞' : max;
   const [largeur, setLargeur] = useState(0);
 
-  // Remplit la barre de 0 → cible avec un léger délai
   useEffect(() => {
     if (!actif) return;
-    const t = setTimeout(() => setLargeur(pourcentage), 100);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setLargeur(pourcentage), 100);
+    return () => clearTimeout(timer);
   }, [actif, pourcentage]);
 
   const couleurBarre = critique
@@ -524,7 +545,7 @@ function BarreProgression({
       <div className="flex items-center justify-between text-xs">
         <span className="text-muted-foreground">{label}</span>
         <span className="tabular-nums text-foreground/80">
-          {valeur} / {maxAffiche}
+          {valeur} / {maxAffiche === '∞' ? illimiteLabel : maxAffiche}
         </span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-muted">
@@ -535,7 +556,7 @@ function BarreProgression({
           aria-valuenow={pourcentage}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label={`${label} : ${valeur} sur ${maxAffiche}`}
+          aria-label={`${label} : ${valeur} / ${maxAffiche}`}
         />
       </div>
     </div>

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDebounce } from 'use-debounce';
+import { useTranslation } from 'react-i18next';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -53,24 +54,27 @@ import type { Client, TypeClient } from '@/types';
 import DialogCreerClient from '@/components/admin/DialogCreerClient';
 import DialogModifierClient from '@/components/admin/DialogModifierClient';
 
-// ─── Config badge type client ─────────────────────────────────────────────────
-const TYPE_CLIENT_CONFIG: Record<string, { label: string; varCouleur: string; varBg: string }> = {
-  physique: {
-    label: 'Physique',
-    varCouleur: 'var(--status-essai)',
-    varBg: 'var(--status-essai-bg)',
-  },
-  morale: {
-    label: 'Morale',
-    varCouleur: 'var(--plan-pro)',
-    varBg: 'var(--plan-pro-bg)',
-  },
-};
-
 // ─── Composant principal ──────────────────────────────────────────────────────
 export default function ClientsPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation('clients');
+  const { t: tc } = useTranslation('common');
+  const estRTL = i18n.language === 'ar';
+
+  // Config badge type client — traduite
+  const TYPE_CLIENT_CONFIG: Record<string, { label: string; varCouleur: string; varBg: string }> = {
+    physique: {
+      label: t('natural_person'),
+      varCouleur: 'var(--status-essai)',
+      varBg: 'var(--status-essai-bg)',
+    },
+    morale: {
+      label: t('legal_person'),
+      varCouleur: 'var(--plan-pro)',
+      varBg: 'var(--plan-pro-bg)',
+    },
+  };
 
   // ─── Filtres ────────────────────────────────────────────────────
   const [recherche, setRecherche] = useState('');
@@ -104,10 +108,10 @@ export default function ClientsPage() {
     mutationFn: () => supprimerClient(clientASupprimer!._id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'clients'] });
-      toast.success('Client archivé avec succès');
+      toast.success(t('archived'));
       setClientASupprimer(null);
     },
-    onError: () => toast.error('Erreur lors de la suppression'),
+    onError: () => toast.error(tc('error')),
   });
 
   const reinitialiserFiltres = useCallback(() => {
@@ -118,26 +122,30 @@ export default function ClientsPage() {
 
   return (
     <div className="space-y-6 px-1">
-      {/* ── En-tête ────────────────────────────────────────────── */}
+      {/* ── En-tête ── */}
       <div
         className="animate-fade-up opacity-0 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
         style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}
       >
         <div className="space-y-0.5">
-          <h2 className="text-xl font-semibold tracking-tight">Clients</h2>
+          <h2 className="text-xl font-semibold tracking-tight">{t('title')}</h2>
           <p className="text-sm text-muted-foreground">
             {meta
-              ? `${meta.total} client${meta.total > 1 ? 's' : ''} au total`
-              : 'Gestion de votre clientèle'}
+              ? estRTL
+                ? `${meta.total} ${meta.total > 1 ? 'عملاء' : 'عميل'} في المجموع`
+                : `${meta.total} client${meta.total > 1 ? 's' : ''} au total`
+              : estRTL
+                ? 'إدارة قائمة عملائك'
+                : 'Gestion de votre clientèle'}
           </p>
         </div>
         <Button size="sm" onClick={() => setDialogCreer(true)}>
-          <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-          Nouveau client
+          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+          {t('new_client')}
         </Button>
       </div>
 
-      {/* ── Filtres ────────────────────────────────────────────── */}
+      {/* ── Filtres ── */}
       <div
         className="animate-fade-up opacity-0 flex flex-col gap-2 sm:flex-row sm:items-center"
         style={{ animationDelay: '60ms', animationFillMode: 'forwards' }}
@@ -145,12 +153,12 @@ export default function ClientsPage() {
         {/* Champ recherche */}
         <div className="relative flex-1">
           <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+            className={`pointer-events-none absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground ${estRTL ? 'right-3' : 'left-3'}`}
             aria-hidden="true"
           />
           <Input
-            placeholder="Rechercher par nom, raison sociale…"
-            className="h-9 pl-8.5 pr-9 text-sm"
+            placeholder={t('search_placeholder')}
+            className={`h-9 text-sm ${estRTL ? 'pr-8.5 pl-9' : 'pl-8.5 pr-9'}`}
             value={recherche}
             onChange={(e) => {
               setRecherche(e.target.value);
@@ -163,8 +171,8 @@ export default function ClientsPage() {
                 setRecherche('');
                 setPage(1);
               }}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
-              aria-label="Effacer la recherche"
+              className={`absolute top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground ${estRTL ? 'left-2.5' : 'right-2.5'}`}
+              aria-label={estRTL ? 'مسح البحث' : 'Effacer la recherche'}
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -183,9 +191,9 @@ export default function ClientsPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="tous">Tous les types</SelectItem>
-            <SelectItem value="physique">Personne physique</SelectItem>
-            <SelectItem value="morale">Personne morale</SelectItem>
+            <SelectItem value="tous">{t('all_types')}</SelectItem>
+            <SelectItem value="physique">{t('natural_person')}</SelectItem>
+            <SelectItem value="morale">{t('legal_person')}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -197,41 +205,34 @@ export default function ClientsPage() {
             className="h-9 shrink-0 text-muted-foreground hover:text-foreground"
             onClick={reinitialiserFiltres}
           >
-            <X className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-            Réinitialiser
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+            {estRTL ? 'إعادة ضبط' : 'Réinitialiser'}
           </Button>
         )}
       </div>
 
-      {/* ── Liste ──────────────────────────────────────────────── */}
+      {/* ── Liste ── */}
       <div
         className="animate-fade-up opacity-0"
         style={{ animationDelay: '120ms', animationFillMode: 'forwards' }}
       >
         <Card>
           <CardContent className="p-0">
-            {/* Skeleton */}
             {isLoading && <SkeletonTable />}
 
-            {/* Empty state */}
             {!isLoading && clients.length === 0 && (
               <EmptyState
                 icone={Users}
-                titre={filtresActifs ? 'Aucun client trouvé' : 'Aucun client pour le moment'}
-                description={
-                  filtresActifs
-                    ? 'Aucun client ne correspond à vos critères. Modifiez ou réinitialisez les filtres.'
-                    : 'Ajoutez votre premier client pour commencer à gérer votre clientèle.'
-                }
+                titre={filtresActifs ? t('no_clients_filtered') : t('no_clients')}
+                description={filtresActifs ? t('no_clients_filtered_desc') : t('no_clients_desc')}
                 action={
                   !filtresActifs
-                    ? { label: 'Nouveau client', onClick: () => setDialogCreer(true), icone: Plus }
+                    ? { label: t('new_client'), onClick: () => setDialogCreer(true), icone: Plus }
                     : undefined
                 }
               />
             )}
 
-            {/* Rows */}
             {!isLoading && clients.length > 0 && (
               <div className="divide-y divide-border">
                 {clients.map((client, i) => {
@@ -277,10 +278,7 @@ export default function ClientsPage() {
                       {/* Badge type */}
                       <span
                         className="hidden shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium sm:inline-flex"
-                        style={{
-                          color: cfgType.varCouleur,
-                          backgroundColor: cfgType.varBg,
-                        }}
+                        style={{ color: cfgType.varCouleur, backgroundColor: cfgType.varBg }}
                       >
                         {cfgType.label}
                       </span>
@@ -293,20 +291,20 @@ export default function ClientsPage() {
                             size="icon"
                             className="h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
                             onClick={(e) => e.stopPropagation()}
-                            aria-label={`Actions pour ${nomAffiche(client)}`}
+                            aria-label={`${tc('actions')} ${nomAffiche(client)}`}
                           >
                             <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuContent align={estRTL ? 'start' : 'end'} className="w-40">
                           <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
                               setClientAModifier(client);
                             }}
                           >
-                            <Pencil className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
-                            Modifier
+                            <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                            {tc('edit')}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
@@ -316,8 +314,8 @@ export default function ClientsPage() {
                               setClientASupprimer(client);
                             }}
                           >
-                            <Trash2 className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
-                            Archiver
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            {estRTL ? 'أرشفة' : 'Archiver'}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -332,9 +330,14 @@ export default function ClientsPage() {
           {meta && meta.totalPages > 1 && (
             <div className="flex items-center justify-between border-t px-4 py-3">
               <p className="text-xs text-muted-foreground">
-                Page {meta.page} / {meta.totalPages}
+                {tc('page')} {meta.page} {tc('of')} {meta.totalPages}
                 <span className="mx-1.5 text-muted-foreground/40">·</span>
-                {meta.total} client{meta.total > 1 ? 's' : ''}
+                {meta.total}{' '}
+                {estRTL
+                  ? meta.total > 1
+                    ? 'عملاء'
+                    : 'عميل'
+                  : `client${meta.total > 1 ? 's' : ''}`}
               </p>
               <div className="flex items-center gap-1">
                 <Button
@@ -343,9 +346,13 @@ export default function ClientsPage() {
                   className="h-7 w-7"
                   disabled={page === 1}
                   onClick={() => setPage((p) => p - 1)}
-                  aria-label="Page précédente"
+                  aria-label={estRTL ? 'الصفحة السابقة' : 'Page précédente'}
                 >
-                  <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                  {estRTL ? (
+                    <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  ) : (
+                    <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                  )}
                 </Button>
                 <Button
                   variant="outline"
@@ -353,9 +360,13 @@ export default function ClientsPage() {
                   className="h-7 w-7"
                   disabled={page >= meta.totalPages}
                   onClick={() => setPage((p) => p + 1)}
-                  aria-label="Page suivante"
+                  aria-label={estRTL ? 'الصفحة التالية' : 'Page suivante'}
                 >
-                  <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  {estRTL ? (
+                    <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  )}
                 </Button>
               </div>
             </div>
@@ -363,27 +374,34 @@ export default function ClientsPage() {
         </Card>
       </div>
 
-      {/* ── Dialogs ────────────────────────────────────────────── */}
+      {/* ── Dialogs ── */}
       <DialogCreerClient ouvert={dialogCreer} onFermer={() => setDialogCreer(false)} />
 
       {clientAModifier && (
         <DialogModifierClient client={clientAModifier} onFermer={() => setClientAModifier(null)} />
       )}
 
+      {/* AlertDialog suppression */}
       <AlertDialog open={!!clientASupprimer} onOpenChange={(o) => !o && setClientASupprimer(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent dir={estRTL ? 'rtl' : 'ltr'}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Archiver ce client ?</AlertDialogTitle>
+            <AlertDialogTitle>{t('delete_confirm')}</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{clientASupprimer && nomAffiche(clientASupprimer)}</strong> sera archivé. Ses
-              dossiers restent accessibles mais il n'apparaîtra plus dans la liste active.
+              <strong>{clientASupprimer && nomAffiche(clientASupprimer)}</strong>{' '}
+              {t('delete_warning')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={suppression}>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={suppression}>{tc('cancel')}</AlertDialogCancel>
             <AlertDialogAction asChild>
               <Button variant="destructive" disabled={suppression} onClick={() => supprimer()}>
-                {suppression ? 'Archivage\u2026' : 'Archiver'}
+                {suppression
+                  ? estRTL
+                    ? 'جاري الأرشفة…'
+                    : 'Archivage…'
+                  : estRTL
+                    ? 'أرشفة'
+                    : 'Archiver'}
               </Button>
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -20,6 +20,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 import {
   obtenirFacture,
@@ -30,7 +31,6 @@ import {
 import { useAuthStore } from '@/stores/auth.store';
 import { nomAffiche } from '@/types';
 import type { StatutFacture, ClientPopule, DossierPopuleFacture } from '@/types';
-
 import {
   formaterDate,
   formaterMontantDA,
@@ -71,30 +71,28 @@ import {
 
 // ─── Schéma ───────────────────────────────────────────────────────────────────
 const schemaModifier = z.object({
-  montant: z
-    .number({ invalid_type_error: 'Montant invalide' })
-    .positive('Le montant doit être positif'),
+  montant: z.number({ invalid_type_error: 'invalid' }).positive('positive'),
 });
 type FormModifier = z.infer<typeof schemaModifier>;
 
 // ─── WorkflowStatut ───────────────────────────────────────────────────────────
-const etapes: { statut: StatutFacture; label: string; Icon: React.ElementType }[] = [
-  { statut: 'brouillon', label: 'Brouillon', Icon: FileText },
-  { statut: 'emise', label: 'Émise', Icon: Send },
-  { statut: 'payee', label: 'Payée', Icon: CheckCircle },
-];
-
 const ordreStatut: Record<StatutFacture, number> = {
   brouillon: 0,
   emise: 1,
   payee: 2,
 };
 
-function WorkflowStatut({ statut }: { statut: StatutFacture }) {
+function WorkflowStatut({ statut, t }: { statut: StatutFacture; t: (k: string) => string }) {
   const indexActuel = ordreStatut[statut];
 
+  const etapes: { statut: StatutFacture; labelKey: string; Icon: React.ElementType }[] = [
+    { statut: 'brouillon', labelKey: 'status_draft', Icon: FileText },
+    { statut: 'emise', labelKey: 'status_issued', Icon: Send },
+    { statut: 'payee', labelKey: 'status_paid', Icon: CheckCircle },
+  ];
+
   return (
-    <div className="flex items-center gap-0" role="list" aria-label="Progression de la facture">
+    <div className="flex items-center gap-0" role="list" aria-label={t('workflow_label')}>
       {etapes.map((etape, index) => {
         const estActif = index === indexActuel;
         const estPasse = index < indexActuel;
@@ -107,29 +105,20 @@ function WorkflowStatut({ statut }: { statut: StatutFacture }) {
             role="listitem"
             aria-current={estActif ? 'step' : undefined}
           >
-            {/* Connecteur entre étapes */}
             {index > 0 && (
               <div
-                // token primary quand passé, border sinon — plus de couleur hardcodée
-                className={`h-px w-12 transition-colors ${
-                  estPasse ? 'bg-(--color-primary)' : 'bg-border'
-                }`}
+                className={`h-px w-12 transition-colors ${estPasse ? 'bg-(--color-primary)' : 'bg-border'}`}
                 aria-hidden="true"
               />
             )}
-
-            {/* Cercle d'étape */}
             <div className="flex flex-col items-center gap-1.5">
               <div
                 className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all ${
                   estActif
-                    ? // Actif : fond primary + ring
-                      'border-(--color-primary) bg-(--color-primary) text-white ring-2 ring-(--color-primary) ring-offset-2'
+                    ? 'border-(--color-primary) bg-(--color-primary) text-white ring-2 ring-(--color-primary) ring-offset-2'
                     : estPasse
-                      ? // Passé : fond primary/10, texte primary
-                        'border-(--color-primary) bg-(--color-primary)/10 text-(--color-primary)'
-                      : // Futur : surface muted
-                        'border-border bg-muted text-muted-foreground'
+                      ? 'border-(--color-primary) bg-(--color-primary)/10 text-(--color-primary)'
+                      : 'border-border bg-muted text-muted-foreground'
                 }`}
               >
                 <Icon className="h-4 w-4" aria-hidden="true" />
@@ -143,7 +132,7 @@ function WorkflowStatut({ statut }: { statut: StatutFacture }) {
                       : 'text-muted-foreground'
                 }`}
               >
-                {etape.label}
+                {t(etape.labelKey)}
               </span>
             </div>
           </div>
@@ -161,6 +150,10 @@ export default function FactureDetailPage() {
   const uid = useId();
   const utilisateur = useAuthStore((s) => s.utilisateur);
   const estAdmin = utilisateur?.role === 'admin';
+
+  const { t, i18n } = useTranslation('factures');
+  const { t: tc } = useTranslation('common');
+  const estRTL = i18n.language === 'ar';
 
   const [dialogModifier, setDialogModifier] = useState(false);
   const [confirmerSupprimer, setConfirmerSupprimer] = useState(false);
@@ -180,13 +173,15 @@ export default function FactureDetailPage() {
     enabled: !!id,
   });
 
-  // ── Formulaire modification montant ───────────────────────────────────────
+  // ── Formulaire ─────────────────────────────────────────────────────────────
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<FormModifier>({ resolver: zodResolver(schemaModifier) });
+  } = useForm<FormModifier>({
+    resolver: zodResolver(schemaModifier),
+  });
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const { mutate: sauvegarderModif, isPending: enregistrementEnCours } = useMutation({
@@ -194,10 +189,10 @@ export default function FactureDetailPage() {
     onSuccess: (factureMAJ) => {
       queryClient.setQueryData(['cabinet', 'facture', id], factureMAJ);
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'factures'] });
-      toast.success('Montant mis à jour');
+      toast.success(t('amount_updated'));
       setDialogModifier(false);
     },
-    onError: () => toast.error('Erreur lors de la modification'),
+    onError: () => toast.error(tc('error')),
   });
 
   const { mutate: changerStatut, isPending: changementEnCours } = useMutation({
@@ -205,37 +200,36 @@ export default function FactureDetailPage() {
     onSuccess: (factureMAJ) => {
       queryClient.setQueryData(['cabinet', 'facture', id], factureMAJ);
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'factures'] });
-      toast.success(`Facture passée en « ${libelleStatutFacture(factureMAJ.statut)} »`);
+      toast.success(`${t('status_changed')} « ${libelleStatutFacture(factureMAJ.statut)} »`);
       setConfirmerStatut(null);
     },
-    onError: () => toast.error('Erreur lors du changement de statut'),
+    onError: () => toast.error(tc('error')),
   });
 
   const { mutate: effacer, isPending: suppressionEnCours } = useMutation({
     mutationFn: () => supprimerFacture(id!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'factures'] });
-      toast.success('Facture supprimée');
+      toast.success(t('invoice_deleted'));
       navigate('/cabinet/factures');
     },
-    onError: () => toast.error('Erreur lors de la suppression'),
+    onError: () => toast.error(tc('error')),
   });
 
-  // ── Téléchargement PDF ─────────────────────────────────────────────────────
+  // ── PDF ────────────────────────────────────────────────────────────────────
   async function handleTelechargerPDF() {
     if (!facture) return;
     setTelechargementEnCours(true);
     try {
       await telechargerFacturePDF(facture.id, facture.numero);
-      toast.success('PDF téléchargé');
+      toast.success(t('pdf_downloaded'));
     } catch {
-      toast.error('Erreur lors du téléchargement du PDF');
+      toast.error(t('pdf_download_error'));
     } finally {
       setTelechargementEnCours(false);
     }
   }
 
-  // ── Visualisation PDF ──────────────────────────────────────────────────────
   async function handleVisualiserPDF() {
     if (!facture) return;
     setVisualisationEnCours(true);
@@ -249,7 +243,7 @@ export default function FactureDetailPage() {
       const blob = await response.blob();
       setVisualisationUrl(URL.createObjectURL(blob));
     } catch {
-      toast.error('Impossible de charger la prévisualisation');
+      toast.error(t('pdf_preview_error'));
     } finally {
       setVisualisationEnCours(false);
     }
@@ -301,7 +295,7 @@ export default function FactureDetailPage() {
     return facture.dossier;
   }
 
-  // ── État : chargement ──────────────────────────────────────────────────────
+  // ── Chargement ─────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="space-y-6 p-6">
@@ -322,18 +316,16 @@ export default function FactureDetailPage() {
     );
   }
 
-  // ── État : erreur ──────────────────────────────────────────────────────────
+  // ── Erreur ─────────────────────────────────────────────────────────────────
   if (isError || !facture) {
     return (
       <div className="flex flex-col items-center gap-4 py-24 text-center">
         <FileText className="h-12 w-12 text-muted-foreground/30" aria-hidden="true" />
-        <p className="font-medium">Facture introuvable</p>
-        <p className="text-sm text-muted-foreground">
-          Cette facture n'existe pas ou vous n'y avez pas accès.
-        </p>
+        <p className="font-medium">{t('not_found')}</p>
+        <p className="text-sm text-muted-foreground">{t('not_found_desc')}</p>
         <Button variant="outline" onClick={() => navigate('/cabinet/factures')}>
-          <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
-          Retour aux factures
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          {t('back_to_invoices')}
         </Button>
       </div>
     );
@@ -342,16 +334,16 @@ export default function FactureDetailPage() {
   const dossier = dossierPopule();
   const estBrouillon = facture.statut === 'brouillon';
 
-  // ── Rendu principal ────────────────────────────────────────────────────────
+  // ── Rendu ──────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
       <nav
-        aria-label="Fil d'Ariane"
+        aria-label={t('breadcrumb_label')}
         className="flex items-center gap-1 text-sm text-muted-foreground"
       >
         <Link to="/cabinet/factures" className="transition-colors hover:text-foreground">
-          Factures
+          {t('title')}
         </Link>
         <ChevronRight className="h-4 w-4" aria-hidden="true" />
         <span className="font-mono font-medium text-foreground" aria-current="page">
@@ -361,7 +353,6 @@ export default function FactureDetailPage() {
 
       {/* En-tête */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        {/* Gauche : numéro + badge + montant */}
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <h1 className="font-mono text-2xl font-bold tracking-tight">{facture.numero}</h1>
@@ -373,67 +364,67 @@ export default function FactureDetailPage() {
             {formaterMontantDA(facture.montant)}
           </p>
           <p className="text-sm text-muted-foreground">
-            Émise le {formaterDate(facture.dateEmission)}
+            {t('issued_on')} {formaterDate(facture.dateEmission)}
           </p>
         </div>
 
-        {/* Droite : actions */}
+        {/* Actions */}
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" onClick={handleVisualiserPDF} disabled={visualisationEnCours}>
             {visualisationEnCours ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             ) : (
-              <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
+              <Eye className="h-4 w-4" aria-hidden="true" />
             )}
-            Prévisualiser
+            {t('action_preview')}
           </Button>
 
           <Button variant="outline" onClick={handleTelechargerPDF} disabled={telechargementEnCours}>
             {telechargementEnCours ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             ) : (
-              <Download className="mr-2 h-4 w-4" aria-hidden="true" />
+              <Download className="h-4 w-4" aria-hidden="true" />
             )}
-            Télécharger PDF
+            {t('action_download_pdf')}
           </Button>
 
           {estBrouillon && (
             <Button variant="outline" onClick={ouvrirDialogModifier}>
-              <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
-              Modifier
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+              {tc('edit')}
             </Button>
           )}
 
           {estAdmin && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" aria-label="Actions supplémentaires">
+                <Button variant="outline" size="icon" aria-label={tc('actions')}>
                   <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align={estRTL ? 'start' : 'end'} className="w-52">
                 {facture.statut !== 'emise' && facture.statut !== 'payee' && (
                   <DropdownMenuItem onClick={() => setConfirmerStatut('emise')}>
-                    <Send className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Passer en Émise
+                    <Send className="h-4 w-4" aria-hidden="true" />
+                    {t('action_mark_issued')}
                   </DropdownMenuItem>
                 )}
                 {facture.statut === 'emise' && (
                   <>
                     <DropdownMenuItem onClick={() => setConfirmerStatut('brouillon')}>
-                      <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
-                      Repasser en Brouillon
+                      <FileText className="h-4 w-4" aria-hidden="true" />
+                      {t('action_revert_draft')}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setConfirmerStatut('payee')}>
-                      <CheckCircle className="mr-2 h-4 w-4" aria-hidden="true" />
-                      Marquer comme Payée
+                      <CheckCircle className="h-4 w-4" aria-hidden="true" />
+                      {t('action_mark_paid')}
                     </DropdownMenuItem>
                   </>
                 )}
                 {facture.statut === 'payee' && (
                   <DropdownMenuItem onClick={() => setConfirmerStatut('emise')}>
-                    <Send className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Repasser en Émise
+                    <Send className="h-4 w-4" aria-hidden="true" />
+                    {t('action_revert_issued')}
                   </DropdownMenuItem>
                 )}
                 {estBrouillon && (
@@ -443,8 +434,8 @@ export default function FactureDetailPage() {
                       className="text-destructive focus:text-destructive"
                       onClick={() => setConfirmerSupprimer(true)}
                     >
-                      <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
-                      Supprimer
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      {tc('delete')}
                     </DropdownMenuItem>
                   </>
                 )}
@@ -457,7 +448,7 @@ export default function FactureDetailPage() {
       {/* Workflow visuel */}
       <Card>
         <CardContent className="flex items-center justify-center py-6">
-          <WorkflowStatut statut={facture.statut} />
+          <WorkflowStatut statut={facture.statut} t={t} />
         </CardContent>
       </Card>
 
@@ -471,12 +462,12 @@ export default function FactureDetailPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
                   <User className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 </div>
-                <CardTitle className="text-base">Client</CardTitle>
+                <CardTitle className="text-base">{t('card_client')}</CardTitle>
               </div>
               <Button variant="ghost" size="sm" asChild>
                 <Link to={`/cabinet/clients/${clientId()}`}>
-                  Voir la fiche
-                  <ChevronRight className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
+                  {t('view_client')}
+                  <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </Link>
               </Button>
             </div>
@@ -486,16 +477,16 @@ export default function FactureDetailPage() {
               <>
                 <p className="font-semibold">{nomClient()}</p>
                 {telephoneClient() && (
-                  <p className="text-sm text-muted-foreground">Tél. {telephoneClient()}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {estRTL ? 'هاتف' : 'Tél.'} {telephoneClient()}
+                  </p>
                 )}
                 {adresseClient() && (
                   <p className="text-sm text-muted-foreground">{adresseClient()}</p>
                 )}
               </>
             ) : (
-              <p className="text-sm italic text-muted-foreground">
-                Informations client non disponibles
-              </p>
+              <p className="text-sm italic text-muted-foreground">{t('client_unavailable')}</p>
             )}
           </CardContent>
         </Card>
@@ -508,12 +499,12 @@ export default function FactureDetailPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
                   <FolderOpen className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 </div>
-                <CardTitle className="text-base">Dossier</CardTitle>
+                <CardTitle className="text-base">{t('card_dossier')}</CardTitle>
               </div>
               <Button variant="ghost" size="sm" asChild>
                 <Link to={`/cabinet/dossiers/${dossierId()}`}>
-                  Voir le dossier
-                  <ChevronRight className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
+                  {t('view_dossier')}
+                  <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </Link>
               </Button>
             </div>
@@ -531,17 +522,15 @@ export default function FactureDetailPage() {
                   </Badge>
                   <Badge variant="secondary" className="text-xs">
                     {dossier.statut === 'encours'
-                      ? 'En cours'
+                      ? t('dossier_encours')
                       : dossier.statut === 'suspendu'
-                        ? 'Suspendu'
-                        : 'Clôturé'}
+                        ? t('dossier_suspendu')
+                        : t('dossier_cloture')}
                   </Badge>
                 </div>
               </>
             ) : (
-              <p className="text-sm italic text-muted-foreground">
-                Informations dossier non disponibles
-              </p>
+              <p className="text-sm italic text-muted-foreground">{t('dossier_unavailable')}</p>
             )}
           </CardContent>
         </Card>
@@ -559,11 +548,11 @@ export default function FactureDetailPage() {
               disabled={telechargementEnCours}
             >
               {telechargementEnCours ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
               ) : (
-                <Download className="mr-2 h-4 w-4" aria-hidden="true" />
+                <Download className="h-4 w-4" aria-hidden="true" />
               )}
-              Télécharger
+              {t('action_download_pdf')}
             </Button>
           </DialogHeader>
           <div className="min-h-0 flex-1">
@@ -571,7 +560,7 @@ export default function FactureDetailPage() {
               <iframe
                 src={visualisationUrl}
                 className="h-full w-full"
-                title={`Prévisualisation ${facture.numero}`}
+                title={`${t('action_preview')} ${facture.numero}`}
               />
             )}
           </div>
@@ -583,9 +572,9 @@ export default function FactureDetailPage() {
         open={dialogModifier}
         onOpenChange={(open) => !open && !enregistrementEnCours && setDialogModifier(false)}
       >
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-sm" dir={estRTL ? 'rtl' : 'ltr'}>
           <DialogHeader>
-            <DialogTitle>Modifier la facture</DialogTitle>
+            <DialogTitle>{t('edit_invoice_title')}</DialogTitle>
           </DialogHeader>
           <form
             id={`${uid}-form-modifier`}
@@ -594,19 +583,19 @@ export default function FactureDetailPage() {
             noValidate
           >
             <div className="space-y-2">
-              <Label htmlFor={`${uid}-montant`}>Montant (DA)</Label>
+              <Label htmlFor={`${uid}-montant`}>{t('form_amount')}</Label>
               <Input
                 id={`${uid}-montant`}
                 type="number"
                 step="0.01"
                 min="1"
-                placeholder="Ex. 150000"
+                placeholder={t('form_amount_placeholder')}
                 disabled={enregistrementEnCours}
                 {...register('montant', { valueAsNumber: true })}
               />
               {errors.montant && (
                 <p className="text-sm text-destructive" role="alert">
-                  {errors.montant.message}
+                  {t('form_amount_error')}
                 </p>
               )}
             </div>
@@ -617,13 +606,13 @@ export default function FactureDetailPage() {
               onClick={() => setDialogModifier(false)}
               disabled={enregistrementEnCours}
             >
-              Annuler
+              {tc('cancel')}
             </Button>
             <Button type="submit" form={`${uid}-form-modifier`} disabled={enregistrementEnCours}>
               {enregistrementEnCours && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
               )}
-              Enregistrer
+              {tc('save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -634,38 +623,36 @@ export default function FactureDetailPage() {
         open={!!confirmerStatut}
         onOpenChange={(open) => !open && setConfirmerStatut(null)}
       >
-        <AlertDialogContent>
+        <AlertDialogContent dir={estRTL ? 'rtl' : 'ltr'}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmer le changement de statut</AlertDialogTitle>
+            <AlertDialogTitle>{t('confirm_status_title')}</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div>
                 <span>
-                  Voulez-vous passer la facture{' '}
-                  <span className="font-mono font-semibold">{facture.numero}</span> en{' '}
+                  {t('confirm_status_desc')}{' '}
+                  <span className="font-mono font-semibold">{facture.numero}</span>{' '}
+                  {estRTL ? 'إلى' : 'en'}{' '}
                   <span className="font-semibold">
                     « {confirmerStatut ? libelleStatutFacture(confirmerStatut) : ''} »
                   </span>{' '}
                   ?
                 </span>
-                {/* token warning au lieu de text-amber-600 */}
                 {confirmerStatut === 'emise' && (
                   <span className="mt-2 block text-sm text-(--color-warning)">
-                    Une fois émise, le montant ne pourra plus être modifié.
+                    {t('confirm_status_warning_emise')}
                   </span>
                 )}
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={changementEnCours}>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={changementEnCours}>{tc('cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => confirmerStatut && changerStatut(confirmerStatut)}
               disabled={changementEnCours}
             >
-              {changementEnCours && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-              )}
-              Confirmer
+              {changementEnCours && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+              {tc('confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -673,26 +660,26 @@ export default function FactureDetailPage() {
 
       {/* AlertDialog : supprimer */}
       <AlertDialog open={confirmerSupprimer} onOpenChange={setConfirmerSupprimer}>
-        <AlertDialogContent>
+        <AlertDialogContent dir={estRTL ? 'rtl' : 'ltr'}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer la facture</AlertDialogTitle>
+            <AlertDialogTitle>{t('delete_title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action est irréversible. La facture{' '}
-              <span className="font-mono font-semibold">{facture.numero}</span> sera définitivement
-              supprimée.
+              {t('delete_detail_desc')}{' '}
+              <span className="font-mono font-semibold">{facture.numero}</span>{' '}
+              {t('delete_irreversible')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={suppressionEnCours}>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={suppressionEnCours}>{tc('cancel')}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => effacer()}
               disabled={suppressionEnCours}
             >
               {suppressionEnCours && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
               )}
-              Supprimer
+              {tc('delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

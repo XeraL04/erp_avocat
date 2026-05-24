@@ -2,8 +2,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
-import { Loader2, Building2 } from 'lucide-react';
+import { Loader2, Building2, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 import {
   Dialog,
@@ -26,7 +27,7 @@ import { Separator } from '@/components/ui/separator';
 import { modifierMonCabinet, type Cabinet } from '@/api/utilisateur.api';
 
 const schema = z.object({
-  nom: z.string().trim().min(2, 'Minimum 2 caractères').optional(),
+  nom: z.string().trim().min(2).optional(),
   telephone: z.string().optional(),
   adresse: z.string().optional(),
   ville: z.string().optional(),
@@ -44,6 +45,10 @@ interface Props {
 }
 
 export default function DialogModifierMonCabinet({ cabinet, onFermer, onSuccess }: Props) {
+  const { t, i18n } = useTranslation('cabinet');
+  const { t: tc } = useTranslation('common');
+  const estRTL = i18n.language === 'ar';
+
   const form = useForm<Champs>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -60,33 +65,47 @@ export default function DialogModifierMonCabinet({ cabinet, onFermer, onSuccess 
   const { mutate, isPending } = useMutation({
     mutationFn: (valeurs: Champs) => modifierMonCabinet(valeurs),
     onSuccess: (c) => {
-      toast.success('Informations du cabinet mises à jour');
+      toast.success(t('cabinet_updated_toast'));
       onSuccess(c);
     },
-    onError: () => toast.error('Erreur lors de la mise à jour'),
+    onError: () => toast.error(tc('error')),
   });
 
   return (
     <Dialog open onOpenChange={(o) => !o && onFermer()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg" dir={estRTL ? 'rtl' : 'ltr'} showCloseButton={false}>
+        {/* X custom — inset-inline-end s'adapte RTL/LTR automatiquement */}
+        <button
+          onClick={() => !isPending && onFermer()}
+          disabled={isPending}
+          aria-label={tc('close')}
+          className="absolute z-10 rounded-sm opacity-70 ring-offset-background
+            transition-opacity hover:opacity-100 focus:outline-none focus:ring-2
+            focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+          style={{ insetInlineEnd: '1rem', insetBlockStart: '1rem' }}
+        >
+          <X className="h-4 w-4" />
+          <span className="sr-only">{tc('close')}</span>
+        </button>
+
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5 text-primary" />
-            Informations du cabinet
+            {t('cabinet_info_title')}
           </DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit((v) => mutate(v))} className="space-y-4">
-            {/* ── Identité ───────────────────────────────────────── */}
+            {/* ── Identité ── */}
             <FormField
               control={form.control}
               name="nom"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nom du cabinet</FormLabel>
+                  <FormLabel>{t('form_cabinet_name')}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Cabinet Maître Benali" {...field} />
+                    <Input placeholder={t('form_cabinet_name_placeholder')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -99,7 +118,7 @@ export default function DialogModifierMonCabinet({ cabinet, onFermer, onSuccess 
                 name="telephone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Téléphone</FormLabel>
+                    <FormLabel>{tc('phone')}</FormLabel>
                     <FormControl>
                       <Input placeholder="0555 123 456" {...field} />
                     </FormControl>
@@ -112,9 +131,9 @@ export default function DialogModifierMonCabinet({ cabinet, onFermer, onSuccess 
                 name="ville"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Ville</FormLabel>
+                    <FormLabel>{t('form_city')}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Alger" {...field} />
+                      <Input placeholder={t('form_city_placeholder')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -127,9 +146,9 @@ export default function DialogModifierMonCabinet({ cabinet, onFermer, onSuccess 
               name="adresse"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Adresse</FormLabel>
+                  <FormLabel>{tc('address')}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Rue Didouche Mourad, Alger" {...field} />
+                    <Input placeholder={t('form_address_placeholder')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -138,8 +157,8 @@ export default function DialogModifierMonCabinet({ cabinet, onFermer, onSuccess 
 
             <Separator />
 
-            {/* ── Infos fiscales ─────────────────────────────────── */}
-            <p className="text-sm font-medium text-muted-foreground">Informations fiscales</p>
+            {/* ── Infos fiscales ── */}
+            <p className="text-sm font-medium text-muted-foreground">{t('section_fiscal')}</p>
 
             <div className="grid grid-cols-2 gap-3">
               <FormField
@@ -147,7 +166,7 @@ export default function DialogModifierMonCabinet({ cabinet, onFermer, onSuccess 
                 name="numeroFiscal"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Numéro fiscal</FormLabel>
+                    <FormLabel>{t('form_fiscal_number')}</FormLabel>
                     <FormControl>
                       <Input placeholder="NIF / NIS" {...field} />
                     </FormControl>
@@ -160,7 +179,7 @@ export default function DialogModifierMonCabinet({ cabinet, onFermer, onSuccess 
                 name="tva"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>TVA (%)</FormLabel>
+                    <FormLabel>{t('form_tva')}</FormLabel>
                     <FormControl>
                       <Input type="number" min={0} max={100} placeholder="19" {...field} />
                     </FormControl>
@@ -175,7 +194,7 @@ export default function DialogModifierMonCabinet({ cabinet, onFermer, onSuccess 
               name="rib"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>RIB bancaire</FormLabel>
+                  <FormLabel>{t('form_rib')}</FormLabel>
                   <FormControl>
                     <Input placeholder="00200 01234 12345678901 23" {...field} />
                   </FormControl>
@@ -186,11 +205,11 @@ export default function DialogModifierMonCabinet({ cabinet, onFermer, onSuccess 
 
             <DialogFooter className="pt-2">
               <Button type="button" variant="outline" onClick={onFermer} disabled={isPending}>
-                Annuler
+                {tc('cancel')}
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Enregistrer
+                {isPending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                {isPending ? tc('saving') : tc('save')}
               </Button>
             </DialogFooter>
           </form>
@@ -199,3 +218,205 @@ export default function DialogModifierMonCabinet({ cabinet, onFermer, onSuccess 
     </Dialog>
   );
 }
+
+// import { useForm } from 'react-hook-form';
+// import { zodResolver } from '@hookform/resolvers/zod';
+// import { z } from 'zod';
+// import { useMutation } from '@tanstack/react-query';
+// import { Loader2, Building2 } from 'lucide-react';
+// import { toast } from 'sonner';
+
+// import {
+//   Dialog,
+//   DialogContent,
+//   DialogHeader,
+//   DialogTitle,
+//   DialogFooter,
+// } from '@/components/ui/dialog';
+// import {
+//   Form,
+//   FormControl,
+//   FormField,
+//   FormItem,
+//   FormLabel,
+//   FormMessage,
+// } from '@/components/ui/form';
+// import { Input } from '@/components/ui/input';
+// import { Button } from '@/components/ui/button';
+// import { Separator } from '@/components/ui/separator';
+// import { modifierMonCabinet, type Cabinet } from '@/api/utilisateur.api';
+
+// const schema = z.object({
+//   nom: z.string().trim().min(2, 'Minimum 2 caractères').optional(),
+//   telephone: z.string().optional(),
+//   adresse: z.string().optional(),
+//   ville: z.string().optional(),
+//   numeroFiscal: z.string().optional(),
+//   rib: z.string().optional(),
+//   tva: z.coerce.number().min(0).max(100).optional(),
+// });
+
+// type Champs = z.infer<typeof schema>;
+
+// interface Props {
+//   cabinet: Cabinet;
+//   onFermer: () => void;
+//   onSuccess: (c: Cabinet) => void;
+// }
+
+// export default function DialogModifierMonCabinet({ cabinet, onFermer, onSuccess }: Props) {
+//   const form = useForm<Champs>({
+//     resolver: zodResolver(schema),
+//     defaultValues: {
+//       nom: cabinet.nom ?? '',
+//       telephone: cabinet.telephone ?? '',
+//       adresse: cabinet.adresse ?? '',
+//       ville: cabinet.ville ?? '',
+//       numeroFiscal: cabinet.numeroFiscal ?? '',
+//       rib: cabinet.rib ?? '',
+//       tva: cabinet.tva ?? 19,
+//     },
+//   });
+
+//   const { mutate, isPending } = useMutation({
+//     mutationFn: (valeurs: Champs) => modifierMonCabinet(valeurs),
+//     onSuccess: (c) => {
+//       toast.success('Informations du cabinet mises à jour');
+//       onSuccess(c);
+//     },
+//     onError: () => toast.error('Erreur lors de la mise à jour'),
+//   });
+
+//   return (
+//     <Dialog open onOpenChange={(o) => !o && onFermer()}>
+//       <DialogContent className="sm:max-w-lg">
+//         <DialogHeader>
+//           <DialogTitle className="flex items-center gap-2">
+//             <Building2 className="h-5 w-5 text-primary" />
+//             Informations du cabinet
+//           </DialogTitle>
+//         </DialogHeader>
+
+//         <Form {...form}>
+//           <form onSubmit={form.handleSubmit((v) => mutate(v))} className="space-y-4">
+//             {/* ── Identité ───────────────────────────────────────── */}
+//             <FormField
+//               control={form.control}
+//               name="nom"
+//               render={({ field }) => (
+//                 <FormItem>
+//                   <FormLabel>Nom du cabinet</FormLabel>
+//                   <FormControl>
+//                     <Input placeholder="Cabinet Maître Benali" {...field} />
+//                   </FormControl>
+//                   <FormMessage />
+//                 </FormItem>
+//               )}
+//             />
+
+//             <div className="grid grid-cols-2 gap-3">
+//               <FormField
+//                 control={form.control}
+//                 name="telephone"
+//                 render={({ field }) => (
+//                   <FormItem>
+//                     <FormLabel>Téléphone</FormLabel>
+//                     <FormControl>
+//                       <Input placeholder="0555 123 456" {...field} />
+//                     </FormControl>
+//                     <FormMessage />
+//                   </FormItem>
+//                 )}
+//               />
+//               <FormField
+//                 control={form.control}
+//                 name="ville"
+//                 render={({ field }) => (
+//                   <FormItem>
+//                     <FormLabel>Ville</FormLabel>
+//                     <FormControl>
+//                       <Input placeholder="Alger" {...field} />
+//                     </FormControl>
+//                     <FormMessage />
+//                   </FormItem>
+//                 )}
+//               />
+//             </div>
+
+//             <FormField
+//               control={form.control}
+//               name="adresse"
+//               render={({ field }) => (
+//                 <FormItem>
+//                   <FormLabel>Adresse</FormLabel>
+//                   <FormControl>
+//                     <Input placeholder="Rue Didouche Mourad, Alger" {...field} />
+//                   </FormControl>
+//                   <FormMessage />
+//                 </FormItem>
+//               )}
+//             />
+
+//             <Separator />
+
+//             {/* ── Infos fiscales ─────────────────────────────────── */}
+//             <p className="text-sm font-medium text-muted-foreground">Informations fiscales</p>
+
+//             <div className="grid grid-cols-2 gap-3">
+//               <FormField
+//                 control={form.control}
+//                 name="numeroFiscal"
+//                 render={({ field }) => (
+//                   <FormItem>
+//                     <FormLabel>Numéro fiscal</FormLabel>
+//                     <FormControl>
+//                       <Input placeholder="NIF / NIS" {...field} />
+//                     </FormControl>
+//                     <FormMessage />
+//                   </FormItem>
+//                 )}
+//               />
+//               <FormField
+//                 control={form.control}
+//                 name="tva"
+//                 render={({ field }) => (
+//                   <FormItem>
+//                     <FormLabel>TVA (%)</FormLabel>
+//                     <FormControl>
+//                       <Input type="number" min={0} max={100} placeholder="19" {...field} />
+//                     </FormControl>
+//                     <FormMessage />
+//                   </FormItem>
+//                 )}
+//               />
+//             </div>
+
+//             <FormField
+//               control={form.control}
+//               name="rib"
+//               render={({ field }) => (
+//                 <FormItem>
+//                   <FormLabel>RIB bancaire</FormLabel>
+//                   <FormControl>
+//                     <Input placeholder="00200 01234 12345678901 23" {...field} />
+//                   </FormControl>
+//                   <FormMessage />
+//                 </FormItem>
+//               )}
+//             />
+
+//             <DialogFooter className="pt-2">
+//               <Button type="button" variant="outline" onClick={onFermer} disabled={isPending}>
+//                 Annuler
+//               </Button>
+//               <Button type="submit" disabled={isPending}>
+//                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+//                 Enregistrer
+//               </Button>
+//             </DialogFooter>
+//           </form>
+//         </Form>
+//       </DialogContent>
+//     </Dialog>
+//   );
+// }

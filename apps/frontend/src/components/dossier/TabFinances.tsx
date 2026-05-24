@@ -16,6 +16,8 @@ import {
   Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +40,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+
 import { obtenirHonoraire, supprimerHonoraire } from '@/api/honoraire.api';
 import { listerPaiements, supprimerPaiement } from '@/api/paiement.api';
 import { listerFacturesDossier, supprimerFacture, modifierFacture } from '@/api/facture.api';
@@ -50,39 +53,19 @@ import DialogAjouterPaiement from './DialogAjouterPaiement';
 import { DialogCreerFacture } from '../facture/DialogCreerFacture';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
-
 interface Props {
   dossierId: string;
   clientId: string;
 }
 
-// ─── Constantes ───────────────────────────────────────────────────────────────
-
-const LIBELLE_TYPE_HONORAIRE: Record<string, string> = {
-  forfait: 'Forfait global',
-  echelonne: 'Échelonné',
-};
-
-const LIBELLE_MODE: Record<string, string> = {
-  cash: 'Espèces',
-  virement: 'Virement',
-  ccp: 'CCP',
-};
-
+// ─── Statut facture classes ───────────────────────────────────────────────────
 const STATUT_FACTURE_CLASSES: Record<StatutFacture, string> = {
   brouillon: 'bg-facture-brouillon-bg text-facture-brouillon border-transparent',
   emise: 'bg-facture-emise-bg     text-facture-emise     border-transparent',
   payee: 'bg-facture-payee-bg     text-facture-payee     border-transparent',
 };
 
-const LIBELLE_STATUT_FACTURE: Record<StatutFacture, string> = {
-  brouillon: 'Brouillon',
-  emise: 'Émise',
-  payee: 'Payée',
-};
-
 // ─── Helper ───────────────────────────────────────────────────────────────────
-
 function refDossierFacture(facture: Facture): string {
   if (typeof facture.dossier === 'object' && facture.dossier !== null)
     return (facture.dossier as { reference: string }).reference ?? '';
@@ -90,12 +73,33 @@ function refDossierFacture(facture: Facture): string {
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
-
 export default function TabFinances({ dossierId, clientId }: Props) {
   const queryClient = useQueryClient();
   const utilisateur = useAuthStore((s) => s.utilisateur);
   const token = useAuthStore((s) => s.accessToken);
   const estAdmin = utilisateur?.role === 'admin';
+
+  const { t, i18n } = useTranslation('finances');
+  const { t: th } = useTranslation('honoraires');
+  const { t: tp } = useTranslation('paiements');
+  const { t: tc } = useTranslation('common');
+  const estRTL = i18n.language === 'ar';
+
+  // Les libellés dépendent de la langue → calculés au render
+  const libelleTypeHonoraire: Record<string, string> = {
+    forfait: th('type_forfait'),
+    echelonne: th('type_echelonne'),
+  };
+  const libelleMode: Record<string, string> = {
+    cash: tp('mode_cash'),
+    virement: tp('mode_virement'),
+    ccp: tp('mode_ccp'),
+  };
+  const libelleStatutFacture: Record<StatutFacture, string> = {
+    brouillon: t('statut_brouillon'),
+    emise: t('statut_emise'),
+    payee: t('statut_payee'),
+  };
 
   const [dialogHonoraire, setDialogHonoraire] = useState(false);
   const [dialogPaiement, setDialogPaiement] = useState(false);
@@ -109,7 +113,6 @@ export default function TabFinances({ dossierId, clientId }: Props) {
   const [pdfEnChargement, setPdfEnChargement] = useState<string | null>(null);
 
   // ── Queries ────────────────────────────────────────────────────────────────
-
   const {
     data: reponseHonoraire,
     isLoading: chargementHonoraire,
@@ -138,7 +141,6 @@ export default function TabFinances({ dossierId, clientId }: Props) {
   });
 
   // ── Calculs ────────────────────────────────────────────────────────────────
-
   const paiements = reponsePaiements?.paiements ?? [];
   const meta = reponsePaiements?.meta ?? null;
   const montantTotal = meta?.montantTotal ?? honoraire?.montantTotal ?? 0;
@@ -150,43 +152,37 @@ export default function TabFinances({ dossierId, clientId }: Props) {
   const da = (n: number) => n.toLocaleString('fr-DZ') + ' DA';
 
   // ── Mutations honoraire ────────────────────────────────────────────────────
-
   const { mutate: effacerHonoraire, isPending: suppressionHonoraire } = useMutation({
     mutationFn: () => supprimerHonoraire(dossierId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'honoraire', dossierId] });
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'paiements', dossierId] });
-      toast.success('Honoraire supprimé');
+      toast.success(th('honoraire_deleted_toast'));
       setConfirmerSupprimerHonoraire(false);
     },
-    onError: () => toast.error('Erreur lors de la suppression'),
+    onError: () => toast.error(tc('error')),
   });
 
   // ── Mutations paiement ─────────────────────────────────────────────────────
-
   const { mutate: effacerPaiement, isPending: suppressionPaiement } = useMutation({
     mutationFn: () => supprimerPaiement(paiementASupprimer!.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'paiements', dossierId] });
-      toast.success('Paiement supprimé');
+      toast.success(tp('payment_deleted_toast'));
       setPaiementASupprimer(null);
     },
-    onError: () => toast.error('Erreur lors de la suppression'),
+    onError: () => toast.error(tc('error')),
   });
 
   // ── Mutations facture ──────────────────────────────────────────────────────
-
   const { mutate: effacerFacture, isPending: suppressionFacture } = useMutation({
     mutationFn: () => supprimerFacture(factureASupprimer!.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'factures', dossierId] });
-      toast.success('Facture supprimée');
+      toast.success(t('facture_deleted_toast'));
       setFactureASupprimer(null);
     },
-    onError: () =>
-      toast.error(
-        'Impossible de supprimer (seules les factures brouillon peuvent être supprimées)'
-      ),
+    onError: () => toast.error(t('facture_delete_error')),
   });
 
   const { mutate: changerStatutFacture } = useMutation({
@@ -194,13 +190,12 @@ export default function TabFinances({ dossierId, clientId }: Props) {
       modifierFacture(id, { statut }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'factures', dossierId] });
-      toast.success('Statut mis à jour');
+      toast.success(t('statut_updated_toast'));
     },
-    onError: () => toast.error('Erreur lors de la mise à jour'),
+    onError: () => toast.error(tc('error')),
   });
 
   // ── PDF helpers ────────────────────────────────────────────────────────────
-
   async function fetchPdfAvecAuth(factureId: string): Promise<string> {
     const response = await fetch(`/api/cabinet/factures/${factureId}/pdf`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -217,7 +212,7 @@ export default function TabFinances({ dossierId, clientId }: Props) {
       const url = await fetchPdfAvecAuth(factureId);
       setPdfBlobUrl(url);
     } catch {
-      toast.error('Impossible de charger la prévisualisation');
+      toast.error(t('pdf_preview_error'));
     } finally {
       setPdfEnChargement(null);
     }
@@ -233,7 +228,7 @@ export default function TabFinances({ dossierId, clientId }: Props) {
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch {
-      toast.error('Erreur lors de la génération du PDF');
+      toast.error(t('pdf_download_error'));
     } finally {
       setTelechargementsEnCours((prev) => {
         const next = new Set(prev);
@@ -249,7 +244,6 @@ export default function TabFinances({ dossierId, clientId }: Props) {
   }
 
   // ── États globaux ──────────────────────────────────────────────────────────
-
   if (chargementHonoraire) {
     return (
       <div className="space-y-3">
@@ -268,10 +262,8 @@ export default function TabFinances({ dossierId, clientId }: Props) {
             <WifiOff className="h-4 w-4 text-destructive" aria-hidden="true" />
           </div>
           <div>
-            <p className="text-sm font-medium">Impossible de charger les données financières</p>
-            <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-              Vérifiez votre connexion ou rechargez la page.
-            </p>
+            <p className="text-sm font-medium">{t('error_load_title')}</p>
+            <p className="mt-1 max-w-xs text-xs text-muted-foreground">{t('error_load_desc')}</p>
           </div>
           <Button
             variant="outline"
@@ -280,7 +272,7 @@ export default function TabFinances({ dossierId, clientId }: Props) {
               queryClient.invalidateQueries({ queryKey: ['cabinet', 'honoraire', dossierId] })
             }
           >
-            Réessayer
+            {tc('retry')}
           </Button>
         </CardContent>
       </Card>
@@ -296,15 +288,15 @@ export default function TabFinances({ dossierId, clientId }: Props) {
               <DollarSign className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             </div>
             <div>
-              <p className="text-sm font-medium">Aucun honoraire défini</p>
+              <p className="text-sm font-medium">{th('no_honoraire_title')}</p>
               <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-                Définissez les honoraires pour commencer à enregistrer paiements et factures.
+                {th('no_honoraire_desc')}
               </p>
             </div>
             {estAdmin && (
               <Button size="sm" onClick={() => setDialogHonoraire(true)}>
-                <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                Définir l'honoraire
+                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                {th('define_button')}
               </Button>
             )}
           </CardContent>
@@ -322,19 +314,18 @@ export default function TabFinances({ dossierId, clientId }: Props) {
   }
 
   // ── Rendu principal ────────────────────────────────────────────────────────
-
   return (
-    <div className="space-y-3">
-      {/* ── SECTION 1 — HONORAIRES ─────────────────────────────── */}
+    <div className="space-y-3" dir={estRTL ? 'rtl' : 'ltr'}>
+      {/* ── SECTION 1 — HONORAIRES ── */}
       <Card>
         <CardHeader className="pb-3 pt-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Honoraires
+                {tc('honoraires')}
               </CardTitle>
               <Badge variant="secondary" className="text-xs font-normal">
-                {LIBELLE_TYPE_HONORAIRE[honoraire.type] ?? honoraire.type}
+                {libelleTypeHonoraire[honoraire.type] ?? honoraire.type}
               </Badge>
             </div>
             {estAdmin && (
@@ -344,7 +335,7 @@ export default function TabFinances({ dossierId, clientId }: Props) {
                   size="icon"
                   className="h-7 w-7 text-muted-foreground hover:text-foreground"
                   onClick={() => setDialogHonoraire(true)}
-                  aria-label="Modifier l'honoraire"
+                  aria-label={th('edit_honoraire_title')}
                 >
                   <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                 </Button>
@@ -353,7 +344,7 @@ export default function TabFinances({ dossierId, clientId }: Props) {
                   size="icon"
                   className="h-7 w-7 text-muted-foreground hover:text-destructive"
                   onClick={() => setConfirmerSupprimerHonoraire(true)}
-                  aria-label="Supprimer l'honoraire"
+                  aria-label={t('delete_honoraire_aria')}
                 >
                   <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                 </Button>
@@ -366,11 +357,11 @@ export default function TabFinances({ dossierId, clientId }: Props) {
           {/* KPIs 3 colonnes */}
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-md bg-muted/40 px-3 py-2.5">
-              <p className="text-xs text-muted-foreground">Total</p>
+              <p className="text-xs text-muted-foreground">{tc('total')}</p>
               <p className="mt-0.5 text-sm font-semibold tabular-nums">{da(montantTotal)}</p>
             </div>
             <div className="rounded-md bg-status-encours-bg px-3 py-2.5">
-              <p className="text-xs text-muted-foreground">Payé</p>
+              <p className="text-xs text-muted-foreground">{t('paid')}</p>
               <p className="mt-0.5 text-sm font-semibold tabular-nums text-status-encours">
                 {da(totalPaye)}
               </p>
@@ -381,7 +372,7 @@ export default function TabFinances({ dossierId, clientId }: Props) {
                 resteAPayer > 0 ? 'bg-status-suspendu-bg' : 'bg-muted/40'
               )}
             >
-              <p className="text-xs text-muted-foreground">Reste</p>
+              <p className="text-xs text-muted-foreground">{t('remaining')}</p>
               <p
                 className={cn(
                   'mt-0.5 text-sm font-semibold tabular-nums',
@@ -396,17 +387,16 @@ export default function TabFinances({ dossierId, clientId }: Props) {
           {/* Barre de progression */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Progression</span>
+              <span className="text-xs text-muted-foreground">{t('progress')}</span>
               <span className="text-xs font-medium tabular-nums">{pourcentagePaye}%</span>
             </div>
             <Progress value={pourcentagePaye} className="h-1.5" />
           </div>
 
-          {/* Intégralement réglé */}
           {resteAPayer === 0 && totalPaye > 0 && (
             <div className="flex items-center gap-1.5 rounded-md bg-status-encours-bg px-3 py-2 text-xs text-status-encours">
               <TrendingUp className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              Honoraires intégralement réglés
+              {t('fully_paid')}
             </div>
           )}
 
@@ -416,12 +406,12 @@ export default function TabFinances({ dossierId, clientId }: Props) {
         </CardContent>
       </Card>
 
-      {/* ── SECTION 2 — PAIEMENTS ──────────────────────────────── */}
+      {/* ── SECTION 2 — PAIEMENTS ── */}
       <Card>
         <CardHeader className="pb-3 pt-4">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-              Paiements
+              {tc('payments')}
               {paiements.length > 0 && (
                 <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium tabular-nums">
                   {paiements.length}
@@ -430,8 +420,8 @@ export default function TabFinances({ dossierId, clientId }: Props) {
             </CardTitle>
             {resteAPayer > 0 && (
               <Button size="sm" onClick={() => setDialogPaiement(true)}>
-                <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                Ajouter
+                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                {tc('add')}
               </Button>
             )}
           </div>
@@ -447,11 +437,11 @@ export default function TabFinances({ dossierId, clientId }: Props) {
           ) : paiements.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-10 text-center">
               <AlertCircle className="h-7 w-7 text-muted-foreground/25" aria-hidden="true" />
-              <p className="text-xs text-muted-foreground">Aucun paiement enregistré</p>
+              <p className="text-xs text-muted-foreground">{tp('no_payments')}</p>
               {resteAPayer > 0 && (
                 <Button variant="outline" size="sm" onClick={() => setDialogPaiement(true)}>
-                  <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                  Premier paiement
+                  <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                  {tp('first_payment')}
                 </Button>
               )}
             </div>
@@ -462,7 +452,6 @@ export default function TabFinances({ dossierId, clientId }: Props) {
                   key={p.id}
                   className="group flex items-center gap-3 px-5 py-2.5 transition-colors hover:bg-accent/40"
                 >
-                  {/* Dot mode paiement */}
                   <span
                     className={cn(
                       'h-2 w-2 shrink-0 rounded-full',
@@ -472,12 +461,11 @@ export default function TabFinances({ dossierId, clientId }: Props) {
                     )}
                     aria-hidden="true"
                   />
-
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold tabular-nums">{da(p.montant)}</span>
                       <span className="text-xs text-muted-foreground">
-                        {LIBELLE_MODE[p.mode] ?? p.mode}
+                        {libelleMode[p.mode] ?? p.mode}
                       </span>
                     </div>
                     <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -496,14 +484,13 @@ export default function TabFinances({ dossierId, clientId }: Props) {
                       )}
                     </div>
                   </div>
-
                   <div className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-muted-foreground hover:text-foreground"
                       onClick={() => setPaiementAModifier(p)}
-                      aria-label="Modifier le paiement"
+                      aria-label={tp('edit_payment_title')}
                     >
                       <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                     </Button>
@@ -513,7 +500,7 @@ export default function TabFinances({ dossierId, clientId }: Props) {
                         size="icon"
                         className="h-7 w-7 text-muted-foreground hover:text-destructive"
                         onClick={() => setPaiementASupprimer(p)}
-                        aria-label="Supprimer le paiement"
+                        aria-label={t('delete_payment_aria')}
                       >
                         <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                       </Button>
@@ -526,12 +513,12 @@ export default function TabFinances({ dossierId, clientId }: Props) {
         </CardContent>
       </Card>
 
-      {/* ── SECTION 3 — FACTURES ───────────────────────────────── */}
+      {/* ── SECTION 3 — FACTURES ── */}
       <Card>
         <CardHeader className="pb-3 pt-4">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-              Factures
+              {t('invoices')}
               {factures.length > 0 && (
                 <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium tabular-nums">
                   {factures.length}
@@ -539,8 +526,8 @@ export default function TabFinances({ dossierId, clientId }: Props) {
               )}
             </CardTitle>
             <Button size="sm" onClick={() => setDialogFacture(true)}>
-              <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-              Créer
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              {tc('create')}
             </Button>
           </div>
         </CardHeader>
@@ -555,10 +542,10 @@ export default function TabFinances({ dossierId, clientId }: Props) {
           ) : factures.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-10 text-center">
               <FileText className="h-7 w-7 text-muted-foreground/25" aria-hidden="true" />
-              <p className="text-xs text-muted-foreground">Aucune facture générée</p>
+              <p className="text-xs text-muted-foreground">{t('no_invoices')}</p>
               <Button variant="outline" size="sm" onClick={() => setDialogFacture(true)}>
-                <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                Première facture
+                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                {t('first_invoice')}
               </Button>
             </div>
           ) : (
@@ -577,7 +564,7 @@ export default function TabFinances({ dossierId, clientId }: Props) {
                           STATUT_FACTURE_CLASSES[f.statut]
                         )}
                       >
-                        {LIBELLE_STATUT_FACTURE[f.statut]}
+                        {libelleStatutFacture[f.statut]}
                       </span>
                     </div>
                     <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -592,14 +579,13 @@ export default function TabFinances({ dossierId, clientId }: Props) {
                       )}
                     </div>
                   </div>
-
                   <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                     {estAdmin && f.statut === 'brouillon' && (
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 text-muted-foreground hover:text-primary"
-                        aria-label="Passer en émise"
+                        aria-label={t('mark_emise_aria')}
                         onClick={() => changerStatutFacture({ id: f.id, statut: 'emise' })}
                       >
                         <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
@@ -609,7 +595,7 @@ export default function TabFinances({ dossierId, clientId }: Props) {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                      aria-label="Prévisualiser la facture"
+                      aria-label={t('preview_aria')}
                       disabled={pdfEnChargement === f.id}
                       onClick={() => handlePrevisualiser(f.id)}
                     >
@@ -623,7 +609,7 @@ export default function TabFinances({ dossierId, clientId }: Props) {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                      aria-label="Télécharger le PDF"
+                      aria-label={t('download_pdf_aria')}
                       disabled={telechargementsEnCours.has(f.id)}
                       onClick={() => handleTelechargePDF(f)}
                     >
@@ -638,7 +624,7 @@ export default function TabFinances({ dossierId, clientId }: Props) {
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                        aria-label="Supprimer la facture"
+                        aria-label={t('delete_invoice_aria')}
                         onClick={() => setFactureASupprimer(f)}
                       >
                         <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -652,7 +638,7 @@ export default function TabFinances({ dossierId, clientId }: Props) {
         </CardContent>
       </Card>
 
-      {/* ── DIALOGS MÉTIER ─────────────────────────────────────── */}
+      {/* ── DIALOGS MÉTIER ── */}
       {dialogHonoraire && (
         <DialogDefinirHonoraire
           dossierId={dossierId}
@@ -683,18 +669,19 @@ export default function TabFinances({ dossierId, clientId }: Props) {
         />
       )}
 
-      {/* Prévisualisation PDF */}
+      {/* ── Prévisualisation PDF ── */}
       <Dialog open={!!pdfBlobUrl} onOpenChange={(o) => !o && fermerPrevisualisation()}>
         <DialogContent
           className="flex h-[90vh] max-w-4xl flex-col gap-0 p-0 [&>button]:hidden"
           aria-describedby={undefined}
+          dir={estRTL ? 'rtl' : 'ltr'}
         >
           <DialogHeader className="shrink-0 border-b px-5 py-3">
             <div className="flex items-center justify-between">
               <div>
-                <DialogTitle className="text-sm font-medium">Prévisualisation</DialogTitle>
+                <DialogTitle className="text-sm font-medium">{t('preview_title')}</DialogTitle>
                 <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
-                  Visualisation avant téléchargement.
+                  {t('preview_desc')}
                 </DialogDescription>
               </div>
               <Button
@@ -702,7 +689,7 @@ export default function TabFinances({ dossierId, clientId }: Props) {
                 size="icon"
                 className="h-7 w-7"
                 onClick={fermerPrevisualisation}
-                aria-label="Fermer la prévisualisation"
+                aria-label={tc('close')}
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </Button>
@@ -713,88 +700,86 @@ export default function TabFinances({ dossierId, clientId }: Props) {
               <iframe
                 src={pdfBlobUrl}
                 className="h-full w-full border-0"
-                title="Prévisualisation PDF"
+                title={t('preview_title')}
               />
             )}
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* ── Suppression honoraire ──────────────────────────────── */}
+      {/* ── Suppression honoraire ── */}
       <AlertDialog open={confirmerSupprimerHonoraire} onOpenChange={setConfirmerSupprimerHonoraire}>
-        <AlertDialogContent>
+        <AlertDialogContent dir={estRTL ? 'rtl' : 'ltr'}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer l'honoraire ?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tous les paiements liés seront également supprimés. Cette action est irréversible.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('delete_honoraire_title')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('delete_honoraire_desc')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={suppressionHonoraire}>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={suppressionHonoraire}>{tc('cancel')}</AlertDialogCancel>
             <AlertDialogAction asChild>
               <Button
                 variant="destructive"
                 disabled={suppressionHonoraire}
                 onClick={() => effacerHonoraire()}
               >
-                {suppressionHonoraire ? 'Suppression…' : 'Supprimer'}
+                {suppressionHonoraire ? tc('deleting') : tc('delete')}
               </Button>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ── Suppression paiement ───────────────────────────────── */}
+      {/* ── Suppression paiement ── */}
       <AlertDialog
         open={!!paiementASupprimer}
         onOpenChange={(o) => !o && setPaiementASupprimer(null)}
       >
-        <AlertDialogContent>
+        <AlertDialogContent dir={estRTL ? 'rtl' : 'ltr'}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer ce paiement ?</AlertDialogTitle>
+            <AlertDialogTitle>{t('delete_payment_title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Le paiement de <strong>{da(paiementASupprimer?.montant ?? 0)}</strong> du{' '}
-              {paiementASupprimer ? formaterDate(paiementASupprimer.date) : ''} sera définitivement
-              supprimé.
+              {t('delete_payment_desc', {
+                montant: da(paiementASupprimer?.montant ?? 0),
+                date: paiementASupprimer ? formaterDate(paiementASupprimer.date) : '',
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={suppressionPaiement}>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={suppressionPaiement}>{tc('cancel')}</AlertDialogCancel>
             <AlertDialogAction asChild>
               <Button
                 variant="destructive"
                 disabled={suppressionPaiement}
                 onClick={() => effacerPaiement()}
               >
-                {suppressionPaiement ? 'Suppression…' : 'Supprimer'}
+                {suppressionPaiement ? tc('deleting') : tc('delete')}
               </Button>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ── Suppression facture ────────────────────────────────── */}
+      {/* ── Suppression facture ── */}
       <AlertDialog
         open={!!factureASupprimer}
         onOpenChange={(o) => !o && setFactureASupprimer(null)}
       >
-        <AlertDialogContent>
+        <AlertDialogContent dir={estRTL ? 'rtl' : 'ltr'}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer la facture {factureASupprimer?.numero} ?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Seules les factures en statut <strong>brouillon</strong> peuvent être supprimées.
-              Cette action est irréversible.
-            </AlertDialogDescription>
+            <AlertDialogTitle>
+              {t('delete_invoice_title', { numero: factureASupprimer?.numero })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>{t('delete_invoice_desc')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={suppressionFacture}>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={suppressionFacture}>{tc('cancel')}</AlertDialogCancel>
             <AlertDialogAction asChild>
               <Button
                 variant="destructive"
                 disabled={suppressionFacture}
                 onClick={() => effacerFacture()}
               >
-                {suppressionFacture ? 'Suppression…' : 'Supprimer'}
+                {suppressionFacture ? tc('deleting') : tc('delete')}
               </Button>
             </AlertDialogAction>
           </AlertDialogFooter>

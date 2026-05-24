@@ -1,0 +1,67 @@
+{
+  "common": {
+    "error": "Erreur",
+    "retry": "Réessayer",
+    "notAvailable": "—"
+  },
+  "status": {
+    "active": "Actif",
+    "inactive": "Inactif"
+  },
+  "roles": {
+    "superadmin": "Super administrateur",
+    "admin": "Administrateur",
+    "assistant": "Assistant"
+  },
+  "profile": {
+    "title": "Mon profil",
+    "subtitle": "Consultez les informations du compte connecté.",
+    "loadError": "Impossible de charger les informations du profil.",
+    "refresh": "Actualiser",
+    "changePassword": "Changer le mot de passe",
+    "personalInfo": "Informations personnelles",
+    "personalInfoDescription": "Données du compte actuellement connecté.",
+    "fields": {
+      "name": "Nom",
+      "email": "Email",
+      "role": "Rôle",
+      "status": "Statut",
+      "tenantId": "Identifiant du cabinet",
+      "createdAt": "Date de création"
+    },
+    "accountCard": {
+      "title": "Compte",
+      "description": "Résumé rapide de votre accès actuel.",
+      "connectedAs": "Connecté en tant que",
+      "accessLevel": "Niveau d'accès"
+    },
+    "security": {
+      "title": "Sécurité",
+      "description": "Paramètres liés à la sécurité du compte.",
+      "passwordTitle": "Mot de passe",
+      "passwordDescription": "Modifiez régulièrement votre mot de passe pour renforcer la sécurité de votre compte."
+    },
+    "passwordModal": {
+      "title": "Changer le mot de passe",
+      "description": "Mettez à jour votre mot de passe pour sécuriser votre compte.",
+      "successMessage": "Le mot de passe a été modifié avec succès.",
+      "fields": {
+        "currentPassword": "Mot de passe actuel",
+        "newPassword": "Nouveau mot de passe",
+        "confirmPassword": "Confirmer le nouveau mot de passe"
+      },
+      "actions": {
+        "cancel": "Annuler",
+        "submit": "Mettre à jour le mot de passe",
+        "showPassword": "Afficher le mot de passe",
+        "hidePassword": "Masquer le mot de passe"
+      },
+      "validation": {
+        "currentPasswordRequired": "Le mot de passe actuel est requis.",
+        "newPasswordMin": "Le nouveau mot de passe doit contenir au moins 6 caractères.",
+        "confirmPasswordRequired": "La confirmation du mot de passe est requise.",
+        "passwordsMismatch": "Les mots de passe ne correspondent pas."
+      }
+    }
+  }
+}

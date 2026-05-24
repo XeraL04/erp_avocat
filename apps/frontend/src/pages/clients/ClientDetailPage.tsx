@@ -19,7 +19,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, ar } from 'date-fns/locale';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -152,6 +153,13 @@ export default function ClientDetailPage() {
   const queryClient = useQueryClient();
   const [kpisActifs, setKpisActifs] = useState(false);
 
+  const { t, i18n } = useTranslation('clients');
+  const { t: tc } = useTranslation('common');
+  const estRTL = i18n.language === 'ar';
+
+  // Locale date-fns selon la langue
+  const localeDate = estRTL ? ar : fr;
+
   const [dialogModifier, setDialogModifier] = useState(false);
   const [confirmerArchivage, setConfirmerArchivage] = useState(false);
   const [dialogCreerDossier, setDialogCreerDossier] = useState(false);
@@ -187,8 +195,8 @@ export default function ClientDetailPage() {
 
   useEffect(() => {
     if (!chargementClient && client) {
-      const t = setTimeout(() => setKpisActifs(true), 150);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => setKpisActifs(true), 150);
+      return () => clearTimeout(timer);
     }
   }, [chargementClient, client]);
 
@@ -197,13 +205,13 @@ export default function ClientDetailPage() {
     mutationFn: () => supprimerClient(id!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'clients'] });
-      toast.success('Client archivé avec succès');
+      toast.success(t('archived'));
       navigate('/cabinet/clients');
     },
-    onError: () => toast.error("Erreur lors de l'archivage"),
+    onError: () => toast.error(tc('error')),
   });
 
-  // ── Skeleton ───────────────────────────────────────────────────────────────
+  // ── Skeleton chargement ────────────────────────────────────────────────────
   if (chargementClient) {
     return (
       <div className="space-y-6">
@@ -228,6 +236,7 @@ export default function ClientDetailPage() {
     );
   }
 
+  // ── Client introuvable ─────────────────────────────────────────────────────
   if (!client) {
     return (
       <div className="flex flex-col items-center gap-4 py-20 text-center">
@@ -235,14 +244,20 @@ export default function ClientDetailPage() {
           <Users className="h-8 w-8 text-muted-foreground/40" aria-hidden="true" />
         </div>
         <div>
-          <p className="font-semibold">Client introuvable</p>
+          <p className="font-semibold">{estRTL ? 'العميل غير موجود' : 'Client introuvable'}</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Ce client n'existe pas ou a été supprimé.
+            {estRTL
+              ? 'هذا العميل غير موجود أو تم حذفه.'
+              : "Ce client n'existe pas ou a été supprimé."}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => navigate('/cabinet/clients')}>
-          <ChevronRight className="mr-1.5 h-3.5 w-3.5 rotate-180" aria-hidden="true" />
-          Retour à la liste
+          {estRTL ? (
+            <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+          ) : (
+            <ChevronRight className="mr-1.5 h-3.5 w-3.5 rotate-180" aria-hidden="true" />
+          )}
+          {tc('back')}
         </Button>
       </div>
     );
@@ -252,9 +267,22 @@ export default function ClientDetailPage() {
   const estMorale = c.type === 'morale';
   const nomClient = nomAffiche(c);
 
+  // Pluriel dossiers / paiements selon la langue
+  const labelDossiers = estRTL
+    ? dossiers.length === 1
+      ? 'ملف'
+      : 'ملفات'
+    : `Dossier${dossiers.length > 1 ? 's' : ''}`;
+
+  const labelPaiements = estRTL
+    ? paiements.length === 1
+      ? 'دفعة'
+      : 'دفعات'
+    : `Paiement${paiements.length > 1 ? 's' : ''}`;
+
   return (
     <div className="space-y-6 px-1">
-      {/* ── En-tête ──────────────────────────────────────────────── */}
+      {/* ── En-tête ── */}
       <div
         className="animate-fade-up opacity-0"
         style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}
@@ -265,16 +293,15 @@ export default function ClientDetailPage() {
             onClick={() => navigate('/cabinet/clients')}
             className="transition-colors hover:text-foreground"
           >
-            Clients
+            {t('title')}
           </button>
-          <ChevronRight className="h-3 w-3" aria-hidden="true" />
+          <ChevronRight className={`h-3 w-3 ${estRTL ? 'rotate-180' : ''}`} aria-hidden="true" />
           <span className="max-w-48 truncate font-medium text-foreground">{nomClient}</span>
         </div>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           {/* Identité */}
           <div className="flex items-center gap-4">
-            {/* Avatar initiales */}
             <div
               className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-base font-bold text-primary-foreground shadow-sm"
               style={{ backgroundColor: 'var(--primary)' }}
@@ -293,11 +320,12 @@ export default function ClientDetailPage() {
                     backgroundColor: estMorale ? 'var(--plan-pro-bg)' : 'var(--status-essai-bg)',
                   }}
                 >
-                  {estMorale ? 'Personne morale' : 'Personne physique'}
+                  {estMorale ? t('legal_person') : t('natural_person')}
                 </span>
               </div>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                Client depuis le {format(new Date(c.createdAt), 'dd MMMM yyyy', { locale: fr })}
+                {estRTL ? 'عميل منذ' : 'Client depuis le'}{' '}
+                {format(new Date(c.createdAt), 'dd MMMM yyyy', { locale: localeDate })}
               </p>
             </div>
           </div>
@@ -305,12 +333,12 @@ export default function ClientDetailPage() {
           {/* Actions */}
           <div className="flex shrink-0 flex-wrap gap-2">
             <Button size="sm" onClick={() => setDialogCreerDossier(true)}>
-              <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-              Nouveau dossier
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              {estRTL ? 'ملف جديد' : 'Nouveau dossier'}
             </Button>
             <Button variant="outline" size="sm" onClick={() => setDialogModifier(true)}>
-              <Pencil className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-              Modifier
+              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+              {tc('edit')}
             </Button>
             <Button
               variant="outline"
@@ -318,18 +346,18 @@ export default function ClientDetailPage() {
               className="border-destructive/30 text-destructive hover:border-destructive/50 hover:bg-destructive/5"
               onClick={() => setConfirmerArchivage(true)}
             >
-              <Trash2 className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-              Archiver
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+              {estRTL ? 'أرشفة' : 'Archiver'}
             </Button>
           </div>
         </div>
       </div>
 
-      {/* ── KPIs strip ───────────────────────────────────────────── */}
+      {/* ── KPIs ── */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <KpiBloc
           icone={FolderOpen}
-          label={`Dossier${dossiers.length > 1 ? 's' : ''}`}
+          label={labelDossiers}
           valeur={dossiers.length}
           varCouleur="var(--kpi-dossiers)"
           varBg="var(--kpi-dossiers-bg)"
@@ -338,7 +366,7 @@ export default function ClientDetailPage() {
         />
         <KpiBloc
           icone={CreditCard}
-          label={`Paiement${paiements.length > 1 ? 's' : ''}`}
+          label={labelPaiements}
           valeur={paiements.length}
           varCouleur="var(--facture-payee)"
           varBg="var(--facture-payee-bg)"
@@ -347,17 +375,17 @@ export default function ClientDetailPage() {
         />
         <KpiBloc
           icone={BadgeCheck}
-          label="Total encaissé"
+          label={estRTL ? 'إجمالي المقبوضات' : 'Total encaissé'}
           valeur={totalPaye}
           varCouleur="var(--kpi-revenus)"
           varBg="var(--kpi-revenus-bg)"
           actif={kpisActifs}
-          suffixe="DA"
+          suffixe={tc('currency')}
           index={2}
         />
       </div>
 
-      {/* ── Corps — fiche + onglets ───────────────────────────────── */}
+      {/* ── Corps — fiche + onglets ── */}
       <div className="grid gap-5 lg:grid-cols-3">
         {/* Fiche client */}
         <div
@@ -366,7 +394,9 @@ export default function ClientDetailPage() {
         >
           <Card>
             <CardHeader className="border-b pb-3 pt-4">
-              <CardTitle className="text-sm font-semibold">Fiche client</CardTitle>
+              <CardTitle className="text-sm font-semibold">
+                {estRTL ? 'بطاقة العميل' : 'Fiche client'}
+              </CardTitle>
             </CardHeader>
             <CardContent className="divide-y divide-border px-4 py-0">
               {!estMorale && c.cin && <LigneInfo icone={FileText} label="NIN" valeur={c.cin} />}
@@ -374,29 +404,29 @@ export default function ClientDetailPage() {
               {estMorale && (
                 <>
                   {c.representantLegal && (
-                    <LigneInfo
-                      icone={Users}
-                      label="Représentant légal"
-                      valeur={c.representantLegal}
-                    />
+                    <LigneInfo icone={Users} label={t('legal_rep')} valeur={c.representantLegal} />
                   )}
-                  {c.nifRc && <LigneInfo icone={BadgeCheck} label="NIF / RC" valeur={c.nifRc} />}
+                  {c.nifRc && <LigneInfo icone={BadgeCheck} label={t('nif_rc')} valeur={c.nifRc} />}
                 </>
               )}
 
-              <LigneInfo icone={Phone} label="Téléphone principal" valeur={c.telephone} />
+              <LigneInfo
+                icone={Phone}
+                label={estRTL ? 'الهاتف الرئيسي' : 'Téléphone principal'}
+                valeur={c.telephone}
+              />
 
               {c.telephoneSecondaire && (
                 <LigneInfo
                   icone={Phone}
-                  label="Téléphone secondaire"
+                  label={estRTL ? 'الهاتف الثانوي' : 'Téléphone secondaire'}
                   valeur={c.telephoneSecondaire}
                 />
               )}
 
-              {c.email && <LigneInfo icone={Mail} label="Email" valeur={c.email} />}
+              {c.email && <LigneInfo icone={Mail} label={t('email')} valeur={c.email} />}
 
-              {c.adresse && <LigneInfo icone={MapPin} label="Adresse" valeur={c.adresse} />}
+              {c.adresse && <LigneInfo icone={MapPin} label={t('address')} valeur={c.adresse} />}
 
               {c.notes && (
                 <div className="py-2.5">
@@ -409,7 +439,7 @@ export default function ClientDetailPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
-                        Notes
+                        {t('notes')}
                       </p>
                       <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
                         {c.notes}
@@ -430,7 +460,7 @@ export default function ClientDetailPage() {
           <Tabs defaultValue="dossiers" className="flex flex-col">
             <TabsList className="h-9 w-full rounded-xl p-1">
               <TabsTrigger value="dossiers" className="flex-1 gap-2 text-xs">
-                Dossiers
+                {t('see_dossiers').split(' ')[0]}
                 {dossiers.length > 0 && (
                   <span
                     className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none"
@@ -444,7 +474,7 @@ export default function ClientDetailPage() {
                 )}
               </TabsTrigger>
               <TabsTrigger value="paiements" className="flex-1 gap-2 text-xs">
-                Paiements
+                {estRTL ? 'المدفوعات' : 'Paiements'}
                 {paiements.length > 0 && (
                   <span
                     className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none"
@@ -485,20 +515,21 @@ export default function ClientDetailPage() {
                         />
                       </div>
                       <div>
-                        <p className="text-sm font-medium">Aucun dossier</p>
+                        <p className="text-sm font-medium">{tc('no_data')}</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                          Aucun dossier n'est associé à ce client
+                          {estRTL
+                            ? 'لا توجد ملفات مرتبطة بهذا العميل'
+                            : "Aucun dossier n'est associé à ce client"}
                         </p>
                       </div>
                       <Button size="sm" onClick={() => setDialogCreerDossier(true)}>
-                        <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                        Créer un dossier
+                        <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                        {estRTL ? 'فتح ملف' : 'Créer un dossier'}
                       </Button>
                     </div>
                   ) : (
                     <div className="divide-y divide-border">
                       {dossiers.map((dossier: DossierResume, i) => {
-                        // const cfg = styleStatutDossier(dossier.statut as any);
                         const cfg = styleStatutDossier(dossier.statut as StatutDossier);
                         return (
                           <button
@@ -560,9 +591,11 @@ export default function ClientDetailPage() {
                         />
                       </div>
                       <div>
-                        <p className="text-sm font-medium">Aucun paiement</p>
+                        <p className="text-sm font-medium">{tc('no_data')}</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                          Aucun paiement enregistré pour ce client
+                          {estRTL
+                            ? 'لا توجد مدفوعات مسجلة لهذا العميل'
+                            : 'Aucun paiement enregistré pour ce client'}
                         </p>
                       </div>
                     </div>
@@ -593,11 +626,12 @@ export default function ClientDetailPage() {
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-medium">
-                                {paiement.dossier?.titre ?? 'Dossier inconnu'}
+                                {paiement.dossier?.titre ??
+                                  (estRTL ? 'ملف غير معروف' : 'Dossier inconnu')}
                               </p>
                               <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                                 {format(new Date(paiement.date), 'dd MMMM yyyy', {
-                                  locale: fr,
+                                  locale: localeDate,
                                 })}
                                 {modeStyle && paiement.modePaiement && (
                                   <>
@@ -629,7 +663,7 @@ export default function ClientDetailPage() {
         </div>
       </div>
 
-      {/* ── Dialogs ───────────────────────────────────────────────── */}
+      {/* ── Dialogs ── */}
       {dialogModifier && (
         <DialogModifierClient client={c} onFermer={() => setDialogModifier(false)} />
       )}
@@ -643,19 +677,24 @@ export default function ClientDetailPage() {
       )}
 
       <AlertDialog open={confirmerArchivage} onOpenChange={setConfirmerArchivage}>
-        <AlertDialogContent>
+        <AlertDialogContent dir={estRTL ? 'rtl' : 'ltr'}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Archiver ce client ?</AlertDialogTitle>
+            <AlertDialogTitle>{t('delete_confirm')}</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{nomClient}</strong> sera archivé. Ses dossiers restent accessibles mais il
-              n'apparaîtra plus dans la liste des clients actifs.
+              <strong>{nomClient}</strong> {t('delete_warning')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={archivageEnCours}>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={archivageEnCours}>{tc('cancel')}</AlertDialogCancel>
             <AlertDialogAction asChild>
               <Button variant="destructive" disabled={archivageEnCours} onClick={() => archiver()}>
-                {archivageEnCours ? 'Archivage\u2026' : 'Archiver'}
+                {archivageEnCours
+                  ? estRTL
+                    ? 'جاري الأرشفة…'
+                    : 'Archivage…'
+                  : estRTL
+                    ? 'أرشفة'
+                    : 'Archiver'}
               </Button>
             </AlertDialogAction>
           </AlertDialogFooter>

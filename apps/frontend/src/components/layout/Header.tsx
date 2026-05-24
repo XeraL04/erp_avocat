@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { KeyRound, LogOut, Menu, Moon, Sun, User, Users } from 'lucide-react';
+import { Languages, LogOut, Menu, Moon, Sun, User, Users } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -27,11 +28,13 @@ interface HeaderProps {
 
 type Theme = 'light' | 'dark';
 
-export default function Header({ titre, onToggleSidebar }: HeaderProps) {
+export default function Header({ onToggleSidebar }: HeaderProps) {
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation('common');
   const utilisateur = useAuthStore((s) => s.utilisateur);
   const deconnecter = useAuthStore((s) => s.deconnecter);
   const estAdminCabinet = utilisateur?.role === 'admin';
+  const estRTL = i18n.language === 'ar';
 
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === 'undefined') return 'light';
@@ -41,13 +44,14 @@ export default function Header({ titre, onToggleSidebar }: HeaderProps) {
   });
 
   useEffect(() => {
-    const root = document.documentElement;
-    root.classList.toggle('dark', theme === 'dark');
+    document.documentElement.classList.toggle('dark', theme === 'dark');
     sessionStorage.setItem('erp-theme', theme);
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
+  const toggleTheme = () => setTheme((c) => (c === 'dark' ? 'light' : 'dark'));
+
+  const changerLangue = () => {
+    i18n.changeLanguage(estRTL ? 'fr' : 'ar');
   };
 
   const { mutate: seDeconnecter, isPending } = useMutation({
@@ -63,30 +67,41 @@ export default function Header({ titre, onToggleSidebar }: HeaderProps) {
   return (
     <TooltipProvider delayDuration={250}>
       <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-border/70 bg-background/85 px-4 backdrop-blur-md md:px-6">
-        {/* Gauche */}
+        {/* ── Gauche (logo + titre) ── */}
         <div className="flex min-w-0 items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
             className="h-10 w-10 shrink-0 md:hidden"
             onClick={onToggleSidebar}
-            aria-label="Ouvrir le menu de navigation"
+            aria-label={estRTL ? 'فتح القائمة' : 'Ouvrir le menu de navigation'}
           >
             <Menu className="h-5 w-5" aria-hidden="true" />
           </Button>
-
-          <div className="min-w-0">
-            <h1 className="truncate text-base font-semibold tracking-tight text-foreground sm:text-lg">
-              {titre ?? 'ERP Avocat'}
-            </h1>
-            <p className="hidden text-xs text-muted-foreground sm:block">
-              Gestion opérationnelle du cabinet
-            </p>
-          </div>
         </div>
 
-        {/* Droite */}
+        {/* ── Droite (actions) ── */}
         <div className="flex items-center gap-1.5 shrink-0">
+          {/* Bouton langue */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-10 gap-1.5 px-2.5 font-medium"
+                onClick={changerLangue}
+                aria-label={t('language')}
+              >
+                <Languages className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="hidden sm:inline text-sm">{estRTL ? 'FR' : 'عربي'}</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {estRTL ? 'Passer en français' : 'التبديل إلى العربية'}
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Bouton thème */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -94,7 +109,15 @@ export default function Header({ titre, onToggleSidebar }: HeaderProps) {
                 size="icon"
                 className="h-10 w-10"
                 onClick={toggleTheme}
-                aria-label={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
+                aria-label={
+                  theme === 'dark'
+                    ? estRTL
+                      ? 'الوضع الفاتح'
+                      : 'Passer en mode clair'
+                    : estRTL
+                      ? 'الوضع الداكن'
+                      : 'Passer en mode sombre'
+                }
               >
                 {theme === 'dark' ? (
                   <Sun className="h-4 w-4" aria-hidden="true" />
@@ -104,18 +127,25 @@ export default function Header({ titre, onToggleSidebar }: HeaderProps) {
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              {theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
+              {theme === 'dark'
+                ? estRTL
+                  ? 'الوضع الفاتح'
+                  : 'Mode clair'
+                : estRTL
+                  ? 'الوضع الداكن'
+                  : 'Mode sombre'}
             </TooltipContent>
           </Tooltip>
 
           <Separator orientation="vertical" className="mx-1 h-6" />
 
+          {/* Menu utilisateur */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 className="h-10 px-2.5 hover:bg-accent"
-                aria-label="Ouvrir le menu utilisateur"
+                aria-label={estRTL ? 'قائمة المستخدم' : 'Ouvrir le menu utilisateur'}
               >
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
@@ -123,7 +153,9 @@ export default function Header({ titre, onToggleSidebar }: HeaderProps) {
                   </AvatarFallback>
                 </Avatar>
 
-                <div className="ml-2 hidden min-w-0 flex-col items-start leading-none sm:flex">
+                <div
+                  className={`${estRTL ? 'mr-2' : 'ml-2'} hidden min-w-0 flex-col items-start leading-none sm:flex`}
+                >
                   <span className="max-w-40 truncate text-sm font-medium text-foreground">
                     {utilisateur?.nom}
                   </span>
@@ -134,7 +166,7 @@ export default function Header({ titre, onToggleSidebar }: HeaderProps) {
               </Button>
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align={estRTL ? 'start' : 'end'} className="w-56">
               <DropdownMenuLabel className="font-normal">
                 <div className="space-y-1">
                   <p className="truncate text-sm font-medium text-foreground">{utilisateur?.nom}</p>
@@ -145,21 +177,21 @@ export default function Header({ titre, onToggleSidebar }: HeaderProps) {
               <DropdownMenuSeparator />
 
               <DropdownMenuItem onClick={() => navigate('/profil')}>
-                <User className="mr-2 h-4 w-4" aria-hidden="true" />
-                Mon profil
+                <User className="h-4 w-4" aria-hidden="true" />
+                {t('profile')}
               </DropdownMenuItem>
 
-              <DropdownMenuItem onClick={() => navigate('/mot-de-passe')}>
-                <KeyRound className="mr-2 h-4 w-4" aria-hidden="true" />
-                Mot de passe
-              </DropdownMenuItem>
+              {/* <DropdownMenuItem onClick={() => navigate('/mot-de-passe')}>
+                <KeyRound className="h-4 w-4" aria-hidden="true" />
+                {t('change_password')}
+              </DropdownMenuItem> */}
 
               {estAdminCabinet && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate('/cabinet/utilisateurs')}>
-                    <Users className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Gérer l’équipe
+                    <Users className="h-4 w-4" aria-hidden="true" />
+                    {estRTL ? 'إدارة الفريق' : "Gérer l'équipe"}
                   </DropdownMenuItem>
                 </>
               )}
@@ -171,8 +203,8 @@ export default function Header({ titre, onToggleSidebar }: HeaderProps) {
                 disabled={isPending}
                 onClick={() => seDeconnecter()}
               >
-                <LogOut className="mr-2 h-4 w-4" aria-hidden="true" />
-                {isPending ? 'Déconnexion…' : 'Se déconnecter'}
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+                {isPending ? (estRTL ? 'جاري تسجيل الخروج…' : 'Déconnexion…') : t('logout')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

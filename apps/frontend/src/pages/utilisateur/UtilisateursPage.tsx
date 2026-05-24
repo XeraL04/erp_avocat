@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, ar } from 'date-fns/locale';
 import {
   Users,
   Plus,
@@ -16,6 +16,7 @@ import {
   Building2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -43,13 +44,11 @@ import {
   listerUtilisateurs,
   changerStatutUtilisateur,
   supprimerUtilisateur,
+  obtenirMonCabinet,
   type Utilisateur,
 } from '@/api/utilisateur.api';
 import { cn } from '@/lib/utils';
-
 import { useAuthStore } from '@/stores/auth.store';
-
-import { obtenirMonCabinet } from '@/api/utilisateur.api';
 
 import DialogModifierAdmin from '@/components/admin/DialogModifierAdmin';
 import DialogModifierMonCabinet from '@/components/admin/DialogModifierMonCabinet';
@@ -60,14 +59,18 @@ export default function UtilisateursPage() {
   const queryClient = useQueryClient();
   const moi = useAuthStore((s) => s.utilisateur);
 
+  const { t, i18n } = useTranslation('utilisateurs');
+  const { t: tc } = useTranslation('common');
+  const estRTL = i18n.language === 'ar';
+  const locale = estRTL ? ar : fr;
+
   const [dialogCreer, setDialogCreer] = useState(false);
   const [userAModifier, setUserAModifier] = useState<Utilisateur | null>(null);
   const [userASupprimer, setUserASupprimer] = useState<Utilisateur | null>(null);
-
   const [dialogMonProfil, setDialogMonProfil] = useState(false);
   const [dialogMonCabinet, setDialogMonCabinet] = useState(false);
 
-  // ── Query ──────────────────────────────────────────────────────────────────
+  // ── Queries ──────────────────────────────────────────────────
   const { data: utilisateurs = [], isLoading } = useQuery({
     queryKey: ['cabinet', 'utilisateurs'],
     queryFn: listerUtilisateurs,
@@ -78,47 +81,47 @@ export default function UtilisateursPage() {
     queryFn: obtenirMonCabinet,
   });
 
-  // ── Mutations ──────────────────────────────────────────────────────────────
+  // ── Mutations ─────────────────────────────────────────────────
   const { mutate: basculerStatut, isPending: changementStatut } = useMutation({
     mutationFn: ({ id, actif }: { id: string; actif: boolean }) =>
       changerStatutUtilisateur(id, actif),
     onSuccess: (u) => {
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'utilisateurs'] });
-      toast.success(`${u.nom} ${u.actif ? 'activé' : 'désactivé'}`);
+      toast.success(`${u.nom} ${u.actif ? t('status_activated') : t('status_deactivated')}`);
     },
-    onError: () => toast.error('Erreur lors du changement de statut'),
+    onError: () => toast.error(t('error_status')),
   });
 
   const { mutate: supprimer, isPending: suppressionEnCours } = useMutation({
     mutationFn: () => supprimerUtilisateur(userASupprimer!._id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'utilisateurs'] });
-      toast.success('Assistant supprimé');
+      toast.success(t('assistant_deleted'));
       setUserASupprimer(null);
     },
-    onError: () => toast.error('Erreur lors de la suppression'),
+    onError: () => toast.error(tc('error')),
   });
 
   return (
     <div className="space-y-6">
-      {/* ── En-tête ─────────────────────────────────────────────── */}
+      {/* ── En-tête ── */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Équipe</h2>
+          <h2 className="text-2xl font-bold tracking-tight">{t('title')}</h2>
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Users className="h-4 w-4" />
+            <Users className="h-4 w-4" aria-hidden="true" />
             {isLoading
-              ? 'Chargement…'
-              : `${utilisateurs.length} assistant${utilisateurs.length > 1 ? 's' : ''}`}
+              ? tc('loading')
+              : `${utilisateurs.length} ${utilisateurs.length > 1 ? t('assistants_plural') : t('assistant_singular')}`}
           </p>
         </div>
         <Button size="sm" onClick={() => setDialogCreer(true)}>
-          <Plus className="mr-1.5 h-4 w-4" />
-          Ajouter un assistant
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          {t('add_assistant')}
         </Button>
       </div>
 
-      {/* ── Compte admin (moi) — non modifiable ─────────────────── */}
+      {/* ── Carte admin (moi) ── */}
       {moi && (
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="flex items-center gap-4 p-4">
@@ -129,18 +132,16 @@ export default function UtilisateursPage() {
               <p className="truncate font-medium">{moi.nom}</p>
               <p className="truncate text-sm text-muted-foreground">{moi.email}</p>
             </div>
-            {/* Badge admin — token primary, pas de classe hover inutile */}
             <span className="shrink-0 inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-              Administrateur
+              {t('role_admin')}
             </span>
-
             <div className="flex gap-1">
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
                 onClick={() => setDialogMonProfil(true)}
-                aria-label="Modifier mon profil"
+                aria-label={t('edit_my_profile')}
               >
                 <Settings className="h-4 w-4" />
               </Button>
@@ -149,7 +150,7 @@ export default function UtilisateursPage() {
                 size="icon"
                 className="h-8 w-8"
                 onClick={() => setDialogMonCabinet(true)}
-                aria-label="Modifier le cabinet"
+                aria-label={t('edit_cabinet')}
               >
                 <Building2 className="h-4 w-4" />
               </Button>
@@ -158,16 +159,14 @@ export default function UtilisateursPage() {
         </Card>
       )}
 
-      {/* ── Skeleton ────────────────────────────────────────────── */}
+      {/* ── Skeleton ── */}
       {isLoading && (
         <Card>
           <CardContent className="p-0">
             <div className="divide-y">
               {[...Array(3)].map((_, i) => (
                 <div key={i} className="flex items-center gap-4 px-4 py-3 sm:px-6 sm:py-4">
-                  {/* Avatar */}
                   <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
-                  {/* Infos */}
                   <div className="flex-1 space-y-1.5">
                     <div className="flex items-center gap-2">
                       <Skeleton className="h-4 w-36" />
@@ -175,7 +174,6 @@ export default function UtilisateursPage() {
                     </div>
                     <Skeleton className="h-3 w-52" />
                   </div>
-                  {/* Menu */}
                   <Skeleton className="h-8 w-8 shrink-0 rounded-md" />
                 </div>
               ))}
@@ -184,21 +182,21 @@ export default function UtilisateursPage() {
         </Card>
       )}
 
-      {/* ── Empty state ─────────────────────────────────────────── */}
+      {/* ── Empty state ── */}
       {!isLoading && utilisateurs.length === 0 && (
         <EmptyState
           icone={Users}
-          titre="Aucun assistant"
-          description="Ajoutez un assistant pour qu'il puisse accéder au cabinet."
+          titre={t('no_assistants')}
+          description={t('no_assistants_desc')}
           action={{
-            label: 'Ajouter un assistant',
+            label: t('add_assistant'),
             onClick: () => setDialogCreer(true),
             icone: Plus,
           }}
         />
       )}
 
-      {/* ── Liste assistants ─────────────────────────────────────── */}
+      {/* ── Liste assistants ── */}
       {!isLoading && utilisateurs.length > 0 && (
         <Card>
           <CardContent className="p-0">
@@ -217,8 +215,6 @@ export default function UtilisateursPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="truncate text-sm font-medium">{u.nom}</span>
-
-                      {/* Badge statut — tokens sémantiques, plus de dark: manuel */}
                       <span
                         className={cn(
                           'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
@@ -233,15 +229,14 @@ export default function UtilisateursPage() {
                             u.actif ? 'bg-status-actif' : 'bg-destructive'
                           )}
                         />
-                        {u.actif ? 'Actif' : 'Désactivé'}
+                        {u.actif ? t('status_active') : t('status_inactive')}
                       </span>
                     </div>
-
                     <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <span>{u.email}</span>
-                      <span>·</span>
+                      <span aria-hidden="true">·</span>
                       <span>
-                        Ajouté le {format(parseISO(u.createdAt), 'd MMM yyyy', { locale: fr })}
+                        {t('added_on')} {format(parseISO(u.createdAt), 'd MMM yyyy', { locale })}
                       </span>
                     </div>
                   </div>
@@ -253,15 +248,15 @@ export default function UtilisateursPage() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 shrink-0"
-                        aria-label={`Actions pour ${u.nom}`}
+                        aria-label={`${t('actions_for')} ${u.nom}`}
                       >
                         <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align={estRTL ? 'start' : 'end'}>
                       <DropdownMenuItem onClick={() => setUserAModifier(u)}>
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Modifier
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                        {tc('edit')}
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         disabled={changementStatut}
@@ -269,13 +264,13 @@ export default function UtilisateursPage() {
                       >
                         {u.actif ? (
                           <>
-                            <XCircle className="mr-2 h-4 w-4" />
-                            Désactiver
+                            <XCircle className="h-4 w-4" aria-hidden="true" />
+                            {t('action_deactivate')}
                           </>
                         ) : (
                           <>
-                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                            Activer
+                            <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                            {t('action_activate')}
                           </>
                         )}
                       </DropdownMenuItem>
@@ -284,8 +279,8 @@ export default function UtilisateursPage() {
                         className="text-destructive focus:text-destructive"
                         onClick={() => setUserASupprimer(u)}
                       >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Supprimer
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        {tc('delete')}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -296,7 +291,7 @@ export default function UtilisateursPage() {
         </Card>
       )}
 
-      {/* ── Dialogs ──────────────────────────────────────────────── */}
+      {/* ── Dialogs ── */}
       {dialogCreer && (
         <DialogCreerAssistant
           onFermer={() => setDialogCreer(false)}
@@ -322,9 +317,7 @@ export default function UtilisateursPage() {
         <DialogModifierAdmin
           utilisateur={moi}
           onFermer={() => setDialogMonProfil(false)}
-          onSuccess={() => {
-            setDialogMonProfil(false);
-          }}
+          onSuccess={() => setDialogMonProfil(false)}
         />
       )}
 
@@ -338,25 +331,28 @@ export default function UtilisateursPage() {
           }}
         />
       )}
-      {/* ── Confirmation suppression ─────────────────────────────── */}
+
+      {/* ── Confirmation suppression ── */}
       <AlertDialog open={!!userASupprimer} onOpenChange={(o) => !o && setUserASupprimer(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent dir={estRTL ? 'rtl' : 'ltr'}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer cet assistant ?</AlertDialogTitle>
+            <AlertDialogTitle>{t('delete_title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Le compte de <strong>{userASupprimer?.nom}</strong> sera définitivement supprimé. Il
-              ne pourra plus se connecter au cabinet.
+              {t('delete_desc_prefix')} <strong>{userASupprimer?.nom}</strong>{' '}
+              {t('delete_desc_suffix')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>{tc('cancel')}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
               onClick={() => supprimer()}
               disabled={suppressionEnCours}
             >
-              {suppressionEnCours && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Supprimer
+              {suppressionEnCours && (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              )}
+              {tc('delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

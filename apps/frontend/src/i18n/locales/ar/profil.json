@@ -1,0 +1,12 @@
+{
+  "my_profile": "ملفي الشخصي",
+  "profile_updated_toast": "تم تحديث الملف الشخصي",
+  "form_fullname": "الاسم الكامل",
+  "form_fullname_placeholder": "الأستاذ بن علي",
+  "change_password": "تغيير كلمة المرور",
+  "form_old_password": "كلمة المرور القديمة",
+  "form_new_password_short": "الجديدة",
+  "form_confirm_password": "تأكيد",
+  "error_wrong_password": "كلمة المرور القديمة غير صحيحة",
+  "error_email_used": "هذا البريد الإلكتروني مستخدم بالفعل"
+}

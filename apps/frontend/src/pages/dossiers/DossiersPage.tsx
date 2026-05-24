@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDebounce } from 'use-debounce';
+import { useTranslation } from 'react-i18next';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -74,7 +75,6 @@ import { useAuthStore } from '@/stores/auth.store';
 import DialogCreerDossier from '@/components/dossier/DialogCreerDossier';
 import DialogModifierDossier from '@/components/dossier/DialogModifierDossier';
 
-// ─── Types state de navigation ────────────────────────────────────────────────
 interface LocationState {
   ouvrirCreerDossier?: boolean;
   clientId?: string;
@@ -86,6 +86,10 @@ export default function DossiersPage() {
   const queryClient = useQueryClient();
   const utilisateur = useAuthStore((s) => s.utilisateur);
   const estAdmin = utilisateur?.role === 'admin';
+
+  const { t, i18n } = useTranslation('dossiers');
+  const { t: tc } = useTranslation('common');
+  const estRTL = i18n.language === 'ar';
 
   // ─── Filtres ────────────────────────────────────────────────────
   const [recherche, setRecherche] = useState('');
@@ -150,10 +154,10 @@ export default function DossiersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'dossiers'] });
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'dashboard'] });
-      toast.success('Dossier archivé avec succès');
+      toast.success(t('archived'));
       setDossierASupprimer(null);
     },
-    onError: () => toast.error('Erreur lors de la suppression'),
+    onError: () => toast.error(tc('error')),
   });
 
   const reinitialiserFiltres = useCallback(() => {
@@ -177,26 +181,30 @@ export default function DossiersPage() {
 
   return (
     <div className="space-y-6 px-1">
-      {/* ── En-tête ────────────────────────────────────────────── */}
+      {/* ── En-tête ── */}
       <div
         className="animate-fade-up opacity-0 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
         style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}
       >
         <div className="space-y-0.5">
-          <h2 className="text-xl font-semibold tracking-tight">Dossiers</h2>
+          <h2 className="text-xl font-semibold tracking-tight">{t('title')}</h2>
           <p className="text-sm text-muted-foreground">
             {meta
-              ? `${meta.total} dossier${meta.total > 1 ? 's' : ''} au total`
-              : 'Gestion de vos affaires juridiques'}
+              ? estRTL
+                ? `${meta.total} ${meta.total === 1 ? 'ملف' : 'ملفات'} في المجموع`
+                : `${meta.total} dossier${meta.total > 1 ? 's' : ''} au total`
+              : estRTL
+                ? 'إدارة قضاياك القانونية'
+                : 'Gestion de vos affaires juridiques'}
           </p>
         </div>
         <Button size="sm" onClick={() => setDialogCreer(true)}>
-          <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-          Nouveau dossier
+          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+          {t('new_dossier')}
         </Button>
       </div>
 
-      {/* ── Filtres ────────────────────────────────────────────── */}
+      {/* ── Filtres ── */}
       <div
         className="animate-fade-up opacity-0 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"
         style={{ animationDelay: '60ms', animationFillMode: 'forwards' }}
@@ -204,12 +212,14 @@ export default function DossiersPage() {
         {/* Recherche */}
         <div className="relative flex-1 sm:min-w-56">
           <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+            className={`pointer-events-none absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground ${estRTL ? 'right-3' : 'left-3'}`}
             aria-hidden="true"
           />
           <Input
-            placeholder="Référence, adversaire, n° dossier…"
-            className="h-9 pl-8.5 pr-9 text-sm"
+            placeholder={
+              estRTL ? 'المرجع، الخصم، رقم الملف…' : 'Référence, adversaire, n° dossier…'
+            }
+            className={`h-9 text-sm ${estRTL ? 'pr-8.5 pl-9' : 'pl-8.5 pr-9'}`}
             value={recherche}
             onChange={(e) => {
               setRecherche(e.target.value);
@@ -222,15 +232,15 @@ export default function DossiersPage() {
                 setRecherche('');
                 setPage(1);
               }}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
-              aria-label="Effacer la recherche"
+              className={`absolute top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground ${estRTL ? 'left-2.5' : 'right-2.5'}`}
+              aria-label={estRTL ? 'مسح البحث' : 'Effacer la recherche'}
             >
               <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
 
-        {/* Statut */}
+        {/* Filtre statut */}
         <Select
           value={filtreStatut}
           onValueChange={(v) => {
@@ -242,7 +252,7 @@ export default function DossiersPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="tous">Tous les statuts</SelectItem>
+            <SelectItem value="tous">{t('all_status')}</SelectItem>
             {(Object.entries(LABELS_STATUT_DOSSIER) as [StatutDossier, string][]).map(
               ([val, label]) => (
                 <SelectItem key={val} value={val}>
@@ -253,7 +263,7 @@ export default function DossiersPage() {
           </SelectContent>
         </Select>
 
-        {/* Type affaire */}
+        {/* Filtre type affaire */}
         <Select
           value={filtreType}
           onValueChange={(v) => {
@@ -265,7 +275,7 @@ export default function DossiersPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="tous">Tous les types</SelectItem>
+            <SelectItem value="tous">{t('all_types')}</SelectItem>
             {(Object.entries(LABELS_TYPE_AFFAIRE) as [TypeAffaire, string][]).map(
               ([val, label]) => (
                 <SelectItem key={val} value={val}>
@@ -276,7 +286,7 @@ export default function DossiersPage() {
           </SelectContent>
         </Select>
 
-        {/* Institution */}
+        {/* Filtre institution */}
         <Select
           value={filtreInstitution}
           onValueChange={(v) => {
@@ -288,7 +298,7 @@ export default function DossiersPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="tous">Toutes les institutions</SelectItem>
+            <SelectItem value="tous">{estRTL ? 'كل الجهات' : 'Toutes les institutions'}</SelectItem>
             {GROUPES_INSTITUTION.map((groupe) => (
               <SelectGroup key={groupe.label}>
                 <SelectLabel>{groupe.label}</SelectLabel>
@@ -302,7 +312,7 @@ export default function DossiersPage() {
           </SelectContent>
         </Select>
 
-        {/* Reset */}
+        {/* Reset filtres */}
         {filtresActifs && (
           <Button
             variant="ghost"
@@ -310,13 +320,13 @@ export default function DossiersPage() {
             className="h-9 shrink-0 text-muted-foreground hover:text-foreground"
             onClick={reinitialiserFiltres}
           >
-            <X className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-            Réinitialiser
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+            {estRTL ? 'إعادة ضبط' : 'Réinitialiser'}
           </Button>
         )}
       </div>
 
-      {/* ── Tableau ────────────────────────────────────────────── */}
+      {/* ── Tableau ── */}
       <div
         className="animate-fade-up opacity-0"
         style={{ animationDelay: '120ms', animationFillMode: 'forwards' }}
@@ -328,15 +338,17 @@ export default function DossiersPage() {
             {!isLoading && dossiers.length === 0 && (
               <EmptyState
                 icone={FolderOpen}
-                titre={filtresActifs ? 'Aucun dossier trouvé' : 'Aucun dossier pour le moment'}
+                titre={filtresActifs ? t('no_dossiers_filtered') : t('no_dossiers')}
                 description={
                   filtresActifs
-                    ? 'Aucun dossier ne correspond à vos critères. Modifiez ou réinitialisez les filtres.'
-                    : 'Ouvrez votre premier dossier pour commencer à gérer vos affaires.'
+                    ? estRTL
+                      ? 'لا يوجد ملف يطابق معايير البحث. عدّل الفلاتر أو أعد ضبطها.'
+                      : 'Aucun dossier ne correspond à vos critères. Modifiez ou réinitialisez les filtres.'
+                    : t('no_dossiers_desc')
                 }
                 action={
                   !filtresActifs
-                    ? { label: 'Nouveau dossier', onClick: () => setDialogCreer(true), icone: Plus }
+                    ? { label: t('new_dossier'), onClick: () => setDialogCreer(true), icone: Plus }
                     : undefined
                 }
               />
@@ -347,12 +359,18 @@ export default function DossiersPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="pl-5 text-xs">Référence</TableHead>
-                      <TableHead className="hidden text-xs md:table-cell">Parties</TableHead>
-                      <TableHead className="hidden text-xs lg:table-cell">Type</TableHead>
-                      <TableHead className="hidden text-xs lg:table-cell">Institution</TableHead>
-                      <TableHead className="hidden text-xs sm:table-cell">Ouverture</TableHead>
-                      <TableHead className="hidden text-xs sm:table-cell">Statut</TableHead>
+                      <TableHead className="pl-5 text-xs">{t('reference')}</TableHead>
+                      <TableHead className="hidden text-xs md:table-cell">
+                        {estRTL ? 'الأطراف' : 'Parties'}
+                      </TableHead>
+                      <TableHead className="hidden text-xs lg:table-cell">{t('type')}</TableHead>
+                      <TableHead className="hidden text-xs lg:table-cell">
+                        {estRTL ? 'الجهة' : 'Institution'}
+                      </TableHead>
+                      <TableHead className="hidden text-xs sm:table-cell">
+                        {t('opening_date')}
+                      </TableHead>
+                      <TableHead className="hidden text-xs sm:table-cell">{tc('status')}</TableHead>
                       <TableHead className="w-12 pr-4" />
                     </TableRow>
                   </TableHeader>
@@ -448,20 +466,25 @@ export default function DossiersPage() {
                                   size="icon"
                                   className="h-7 w-7 text-muted-foreground hover:text-foreground"
                                   onClick={(e) => e.stopPropagation()}
-                                  aria-label="Actions sur ce dossier"
+                                  aria-label={`${tc('actions')} ${dossier.reference}`}
                                 >
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-40">
+                              <DropdownMenuContent
+                                align={estRTL ? 'start' : 'end'}
+                                className="w-40"
+                              >
                                 <DropdownMenuItem
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     navigate(`/cabinet/dossiers/${dossier._id}`);
                                   }}
                                 >
-                                  <ChevronRight className="mr-2 h-3.5 w-3.5" />
-                                  Ouvrir
+                                  <ChevronRight
+                                    className={`h-3.5 w-3.5 ${estRTL ? 'rotate-180' : ''}`}
+                                  />
+                                  {estRTL ? 'فتح' : 'Ouvrir'}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={(e) => {
@@ -469,8 +492,8 @@ export default function DossiersPage() {
                                     setDossierAModifier(dossier);
                                   }}
                                 >
-                                  <Pencil className="mr-2 h-3.5 w-3.5" />
-                                  Modifier
+                                  <Pencil className="h-3.5 w-3.5" />
+                                  {tc('edit')}
                                 </DropdownMenuItem>
                                 {estAdmin && (
                                   <>
@@ -482,8 +505,8 @@ export default function DossiersPage() {
                                         setDossierASupprimer(dossier);
                                       }}
                                     >
-                                      <Trash2 className="mr-2 h-3.5 w-3.5" />
-                                      Archiver
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                      {estRTL ? 'أرشفة' : 'Archiver'}
                                     </DropdownMenuItem>
                                   </>
                                 )}
@@ -499,13 +522,18 @@ export default function DossiersPage() {
             )}
           </CardContent>
 
-          {/* ── Pagination ──────────────────────────────────────── */}
+          {/* ── Pagination ── */}
           {meta && meta.totalPages > 1 && (
             <div className="flex items-center justify-between border-t px-4 py-3">
               <p className="text-xs text-muted-foreground">
-                Page {meta.page} sur {meta.totalPages}
+                {tc('page')} {meta.page} {tc('of')} {meta.totalPages}
                 <span className="mx-1.5 text-muted-foreground/40">·</span>
-                {meta.total} dossier{meta.total > 1 ? 's' : ''}
+                {meta.total}{' '}
+                {estRTL
+                  ? meta.total === 1
+                    ? 'ملف'
+                    : 'ملفات'
+                  : `dossier${meta.total > 1 ? 's' : ''}`}
               </p>
               <div className="flex gap-1.5">
                 <Button
@@ -515,7 +543,7 @@ export default function DossiersPage() {
                   disabled={page === 1}
                   onClick={() => setPage((p) => p - 1)}
                 >
-                  Précédent
+                  {tc('previous')}
                 </Button>
                 <Button
                   variant="outline"
@@ -524,7 +552,7 @@ export default function DossiersPage() {
                   disabled={page >= meta.totalPages}
                   onClick={() => setPage((p) => p + 1)}
                 >
-                  Suivant
+                  {tc('next')}
                 </Button>
               </div>
             </div>
@@ -532,7 +560,7 @@ export default function DossiersPage() {
         </Card>
       </div>
 
-      {/* ── Dialogs ─────────────────────────────────────────────── */}
+      {/* ── Dialogs ── */}
       <DialogCreerDossier
         ouvert={dialogCreer}
         onFermer={fermerDialogCreer}
@@ -550,25 +578,32 @@ export default function DossiersPage() {
         open={!!dossierASupprimer}
         onOpenChange={(o) => !o && setDossierASupprimer(null)}
       >
-        <AlertDialogContent>
+        <AlertDialogContent dir={estRTL ? 'rtl' : 'ltr'}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Archiver ce dossier ?</AlertDialogTitle>
+            <AlertDialogTitle>{t('archive_title')}</AlertDialogTitle>
             <AlertDialogDescription>
               {dossierASupprimer && (
                 <>
-                  Le dossier <strong>{nomClient(dossierASupprimer)}</strong> c/{' '}
+                  {estRTL ? 'ملف ' : 'Le dossier '}
+                  <strong>{nomClient(dossierASupprimer)}</strong> c/{' '}
                   <strong>{dossierASupprimer.adversaire}</strong>{' '}
-                  <span className="font-mono text-xs">({dossierASupprimer.reference})</span> sera
-                  archivé. Documents, paiements et événements liés restent accessibles.
+                  <span className="font-mono text-xs">({dossierASupprimer.reference})</span>{' '}
+                  {t('archive_warning')}
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={suppression}>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={suppression}>{tc('cancel')}</AlertDialogCancel>
             <AlertDialogAction asChild>
               <Button variant="destructive" disabled={suppression} onClick={() => supprimer()}>
-                {suppression ? 'Archivage…' : 'Archiver'}
+                {suppression
+                  ? estRTL
+                    ? 'جاري الأرشفة…'
+                    : 'Archivage…'
+                  : estRTL
+                    ? 'أرشفة'
+                    : 'Archiver'}
               </Button>
             </AlertDialogAction>
           </AlertDialogFooter>

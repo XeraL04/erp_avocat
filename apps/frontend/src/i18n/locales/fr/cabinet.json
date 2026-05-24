@@ -1,0 +1,13 @@
+{
+  "cabinet_info_title": "Informations du cabinet",
+  "cabinet_updated_toast": "Informations du cabinet mises à jour",
+  "form_cabinet_name": "Nom du cabinet",
+  "form_cabinet_name_placeholder": "Cabinet Maître Benali",
+  "form_city": "Ville",
+  "form_city_placeholder": "Alger",
+  "form_address_placeholder": "Rue Didouche Mourad, Alger",
+  "section_fiscal": "Informations fiscales",
+  "form_fiscal_number": "Numéro fiscal",
+  "form_tva": "TVA (%)",
+  "form_rib": "RIB bancaire"
+}

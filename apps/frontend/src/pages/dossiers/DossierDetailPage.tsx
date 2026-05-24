@@ -15,10 +15,10 @@ import {
   CheckCircle,
   PauseCircle,
   Play,
-  // Receipt,
   CalendarClock,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,32 +57,10 @@ import { useAuthStore } from '@/stores/auth.store';
 
 import DialogModifierDossier from '@/components/dossier/DialogModifierDossier';
 import TabReports from '@/components/dossier/TabReports';
-// import TabHonoraires from '@/components/dossier/TabHonoraires';
-// import TabFactures from '@/components/dossier/TabFactures';
 import TabDocuments from '@/components/dossier/TabDocuments';
 import TabAgenda from '@/components/dossier/TabAgenda';
 import TabEtapes from '@/components/dossier/TabEtapes';
-
 import TabFinances from '@/components/dossier/TabFinances';
-
-// ─── Config tabs ──────────────────────────────────────────────────────────────
-// const TABS = [
-//   { value: 'reports',    label: 'Reports',    icon: CalendarClock },
-//   { value: 'honoraires', label: 'Honoraires', icon: DollarSign    },
-//   { value: 'factures',   label: 'Factures',   icon: Receipt       },
-//   { value: 'documents',  label: 'Documents',  icon: FileText      },
-//   { value: 'agenda',     label: 'Agenda',     icon: Calendar      },
-//   { value: 'etapes',     label: 'Étapes',     icon: ListChecks    },
-// ] as const;
-
-const TABS = [
-  { value: 'reports', label: 'Reports', icon: CalendarClock },
-  // { value: 'factures',   label: 'Factures',   icon: Receipt       },
-  { value: 'finances', label: 'Finances', icon: DollarSign }, // ← fusionne honoraires + factures
-  { value: 'documents', label: 'Documents', icon: FileText },
-  { value: 'agenda', label: 'Agenda', icon: Calendar },
-  { value: 'etapes', label: 'Étapes', icon: ListChecks },
-] as const;
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function DossierDetailPage() {
@@ -91,6 +69,19 @@ export default function DossierDetailPage() {
   const queryClient = useQueryClient();
   const utilisateur = useAuthStore((s) => s.utilisateur);
   const estAdmin = utilisateur?.role === 'admin';
+
+  const { t, i18n } = useTranslation('dossiers');
+  const { t: tc } = useTranslation('common');
+  const estRTL = i18n.language === 'ar';
+
+  // Config tabs traduite — dans le composant pour réactivité i18n
+  const TABS = [
+    { value: 'reports', label: estRTL ? 'التقارير' : 'Reports', icon: CalendarClock },
+    { value: 'finances', label: estRTL ? 'المالية' : 'Finances', icon: DollarSign },
+    { value: 'documents', label: estRTL ? 'المستندات' : 'Documents', icon: FileText },
+    { value: 'agenda', label: estRTL ? 'الأجندة' : 'Agenda', icon: Calendar },
+    { value: 'etapes', label: estRTL ? 'المراحل' : 'Étapes', icon: ListChecks },
+  ] as const;
 
   const [dialogModifier, setDialogModifier] = useState(false);
   const [confirmerSupprimer, setConfirmerSupprimer] = useState(false);
@@ -109,9 +100,13 @@ export default function DossierDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'dossier', id] });
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'dossiers'] });
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'dashboard'] });
-      toast.success(`${libelleStatutDossier(dossierMaj.statut)} — statut mis à jour`);
+      toast.success(
+        estRTL
+          ? `${libelleStatutDossier(dossierMaj.statut)} — تم تحديث الحالة`
+          : `${libelleStatutDossier(dossierMaj.statut)} — statut mis à jour`
+      );
     },
-    onError: () => toast.error('Erreur lors du changement de statut'),
+    onError: () => toast.error(tc('error')),
   });
 
   const { mutate: supprimer, isPending: suppression } = useMutation({
@@ -119,10 +114,10 @@ export default function DossierDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'dossiers'] });
       queryClient.invalidateQueries({ queryKey: ['cabinet', 'dashboard'] });
-      toast.success('Dossier archivé avec succès');
+      toast.success(t('archived'));
       navigate('/cabinet/dossiers', { replace: true });
     },
-    onError: () => toast.error('Erreur lors de la suppression'),
+    onError: () => toast.error(tc('error')),
   });
 
   // ── Dérivations ────────────────────────────────────────────────────────────
@@ -141,10 +136,10 @@ export default function DossierDetailPage() {
     return (
       <div className="flex flex-col items-center gap-3 py-24 text-center">
         <FolderOpen className="h-10 w-10 text-muted-foreground/25" aria-hidden="true" />
-        <p className="text-sm font-medium">Dossier introuvable</p>
+        <p className="text-sm font-medium">{estRTL ? 'الملف غير موجود' : 'Dossier introuvable'}</p>
         <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
-          <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-          Retour
+          <ArrowLeft className={`h-3.5 w-3.5 ${estRTL ? 'rotate-180' : ''}`} />
+          {tc('back')}
         </Button>
       </div>
     );
@@ -158,13 +153,13 @@ export default function DossierDetailPage() {
 
   return (
     <div className="space-y-6 px-1">
-      {/* ── Fil d'Ariane ────────────────────────────────────────── */}
+      {/* ── Fil d'Ariane ── */}
       <nav
-        aria-label="Fil d'Ariane"
+        aria-label={estRTL ? 'مسار التنقل' : "Fil d'Ariane"}
         className="flex items-center gap-1.5 text-xs text-muted-foreground"
       >
         <Link to="/cabinet/dossiers" className="transition-colors hover:text-foreground">
-          Dossiers
+          {t('title')}
         </Link>
         <span aria-hidden="true" className="text-muted-foreground/40">
           /
@@ -172,7 +167,7 @@ export default function DossierDetailPage() {
         <span className="truncate font-medium text-foreground">{intituleDossier}</span>
       </nav>
 
-      {/* ── En-tête ─────────────────────────────────────────────── */}
+      {/* ── En-tête ── */}
       <div
         className="animate-fade-up opacity-0 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
         style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}
@@ -206,33 +201,34 @@ export default function DossierDetailPage() {
           </div>
         </div>
 
+        {/* Actions */}
         <div className="flex shrink-0 items-center gap-2">
           {estAdmin && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" disabled={changementStatut}>
-                  <span className={cn('mr-1.5 h-1.5 w-1.5 rounded-full', s.dot)} />
-                  Statut
-                  <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <span className={cn('h-1.5 w-1.5 rounded-full', s.dot)} />
+                  {tc('status')}
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuContent align={estRTL ? 'start' : 'end'} className="w-48">
                 {dossier.statut !== 'encours' && (
                   <DropdownMenuItem onClick={() => changerStatut('encours')}>
-                    <Play className="mr-2 h-3.5 w-3.5 text-status-encours" />
-                    Remettre en cours
+                    <Play className="h-3.5 w-3.5 text-status-encours" />
+                    {estRTL ? 'إعادة تفعيل' : 'Remettre en cours'}
                   </DropdownMenuItem>
                 )}
                 {dossier.statut !== 'suspendu' && (
                   <DropdownMenuItem onClick={() => changerStatut('suspendu')}>
-                    <PauseCircle className="mr-2 h-3.5 w-3.5 text-status-suspendu" />
-                    Suspendre
+                    <PauseCircle className="h-3.5 w-3.5 text-status-suspendu" />
+                    {t('suspend')}
                   </DropdownMenuItem>
                 )}
                 {dossier.statut !== 'cloture' && (
                   <DropdownMenuItem onClick={() => changerStatut('cloture')}>
-                    <CheckCircle className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
-                    Clôturer
+                    <CheckCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                    {t('close')}
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -240,8 +236,8 @@ export default function DossierDetailPage() {
           )}
 
           <Button variant="outline" size="sm" onClick={() => setDialogModifier(true)}>
-            <Pencil className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-            Modifier
+            <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+            {tc('edit')}
           </Button>
 
           {estAdmin && (
@@ -250,7 +246,7 @@ export default function DossierDetailPage() {
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:bg-destructive/8 hover:text-destructive"
               onClick={() => setConfirmerSupprimer(true)}
-              aria-label="Archiver ce dossier"
+              aria-label={estRTL ? 'أرشفة هذا الملف' : 'Archiver ce dossier'}
             >
               <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
             </Button>
@@ -258,7 +254,7 @@ export default function DossierDetailPage() {
         </div>
       </div>
 
-      {/* ── Infos permanentes ───────────────────────────────────── */}
+      {/* ── Infos permanentes ── */}
       <div
         className="animate-fade-up opacity-0 grid gap-4 sm:grid-cols-2"
         style={{ animationDelay: '60ms', animationFillMode: 'forwards' }}
@@ -266,12 +262,14 @@ export default function DossierDetailPage() {
         {/* Parties */}
         <Card>
           <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Parties</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {estRTL ? 'الأطراف' : 'Parties'}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 pb-4">
             <div className="space-y-1.5">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                Pour le compte de
+                {estRTL ? 'بالنيابة عن' : 'Pour le compte de'}
               </p>
               {clientPopule ? (
                 <div className="space-y-1">
@@ -286,17 +284,21 @@ export default function DossierDetailPage() {
                     <p className="text-xs text-muted-foreground">{clientPopule.email}</p>
                   )}
                   <Button variant="outline" size="sm" className="mt-2 h-7 text-xs" asChild>
-                    <Link to={`/cabinet/clients/${clientPopule._id}`}>Voir la fiche client</Link>
+                    <Link to={`/cabinet/clients/${clientPopule._id}`}>
+                      {estRTL ? 'عرض بطاقة العميل' : 'Voir la fiche client'}
+                    </Link>
                   </Button>
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground">Client non disponible</p>
+                <p className="text-xs text-muted-foreground">
+                  {estRTL ? 'العميل غير متوفر' : 'Client non disponible'}
+                </p>
               )}
             </div>
             <Separator />
             <div className="space-y-1.5">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                Contre
+                {estRTL ? 'ضد' : 'Contre'}
               </p>
               <p className="text-sm font-semibold">{dossier.adversaire}</p>
               <p className="text-xs text-muted-foreground">
@@ -310,38 +312,51 @@ export default function DossierDetailPage() {
         <Card>
           <CardHeader className="pb-2 pt-4">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Informations
+              {estRTL ? 'معلومات الملف' : 'Informations'}
             </CardTitle>
           </CardHeader>
           <CardContent className="pb-4">
             <dl className="divide-y divide-border/60">
-              <InfoLigne label="Référence" valeur={dossier.reference} mono />
+              <InfoLigne label={t('reference')} valeur={dossier.reference} mono />
               {dossier.dossierNumero && (
-                <InfoLigne label="N° dossier" valeur={dossier.dossierNumero} mono />
-              )}
-              {dossier.institution && (
-                <InfoLigne label="Institution" valeur={LABELS_INSTITUTION[dossier.institution]} />
-              )}
-              {dossier.typeAffaire && (
                 <InfoLigne
-                  label="Type d'affaire"
-                  valeur={LABELS_TYPE_AFFAIRE[dossier.typeAffaire]}
+                  label={estRTL ? 'رقم الملف' : 'N° dossier'}
+                  valeur={dossier.dossierNumero}
+                  mono
                 />
               )}
+              {dossier.institution && (
+                <InfoLigne
+                  label={estRTL ? 'الجهة' : 'Institution'}
+                  valeur={LABELS_INSTITUTION[dossier.institution]}
+                />
+              )}
+              {dossier.typeAffaire && (
+                <InfoLigne label={t('type')} valeur={LABELS_TYPE_AFFAIRE[dossier.typeAffaire]} />
+              )}
               {dossier.specialite && (
-                <InfoLigne label="Spécialité" valeur={LABELS_SPECIALITE[dossier.specialite]} />
+                <InfoLigne
+                  label={estRTL ? 'التخصص' : 'Spécialité'}
+                  valeur={LABELS_SPECIALITE[dossier.specialite]}
+                />
               )}
-              <InfoLigne label="Ouvert le" valeur={formaterDate(dossier.dateOuverture)} />
+              <InfoLigne label={t('opening_date')} valeur={formaterDate(dossier.dateOuverture)} />
               {dossier.dateCloture && (
-                <InfoLigne label="Clôturé le" valeur={formaterDate(dossier.dateCloture)} />
+                <InfoLigne
+                  label={estRTL ? 'تاريخ الإغلاق' : 'Clôturé le'}
+                  valeur={formaterDate(dossier.dateCloture)}
+                />
               )}
-              <InfoLigne label="Créé le" valeur={formaterDate(dossier.createdAt)} />
+              <InfoLigne
+                label={estRTL ? 'تاريخ الإنشاء' : 'Créé le'}
+                valeur={formaterDate(dossier.createdAt)}
+              />
             </dl>
           </CardContent>
         </Card>
       </div>
 
-      {/* ── Description ─────────────────────────────────────────── */}
+      {/* ── Description ── */}
       {dossier.description && (
         <div
           className="animate-fade-up opacity-0"
@@ -350,7 +365,7 @@ export default function DossierDetailPage() {
           <Card>
             <CardHeader className="pb-2 pt-4">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Description
+                {estRTL ? 'الوصف' : 'Description'}
               </CardTitle>
             </CardHeader>
             <CardContent className="pb-4">
@@ -362,18 +377,12 @@ export default function DossierDetailPage() {
         </div>
       )}
 
-      {/* ── Tabs ────────────────────────────────────────────────── */}
+      {/* ── Tabs ── */}
       <div
         className="animate-fade-up opacity-0"
         style={{ animationDelay: '140ms', animationFillMode: 'forwards' }}
       >
         <Tabs defaultValue="reports" className="w-full flex-col">
-          {/* ── Pill bar ──────────────────────────────────────────
-              • flex (pas inline-flex) + justify-start pour coller à gauche
-              • w-full pour occuper toute la largeur du conteneur
-              • overflow-x-auto + [&::-webkit-scrollbar]:hidden pour
-                le scroll mobile sans scrollbar visible
-          ─────────────────────────────────────────────────────── */}
           <div className="mb-6">
             <TabsList
               className={cn(
@@ -425,7 +434,7 @@ export default function DossierDetailPage() {
             </TabsList>
           </div>
 
-          {/* ── Contenus ────────────────────────────────────────── */}
+          {/* Contenus tabs */}
           <TabsContent value="reports" className="focus-visible:outline-none">
             <TabReports
               dossierId={dossier._id}
@@ -436,12 +445,6 @@ export default function DossierDetailPage() {
               }
             />
           </TabsContent>
-          {/* <TabsContent value="honoraires" className="focus-visible:outline-none">
-            <TabHonoraires dossierId={id!} />
-          </TabsContent> */}
-          {/* <TabsContent value="factures" className="focus-visible:outline-none">
-            <TabFactures dossierId={id!} clientId={clientId} />
-          </TabsContent> */}
           <TabsContent value="finances" className="focus-visible:outline-none">
             <TabFinances dossierId={id!} clientId={clientId} />
           </TabsContent>
@@ -457,26 +460,33 @@ export default function DossierDetailPage() {
         </Tabs>
       </div>
 
-      {/* ── Dialogs ─────────────────────────────────────────────── */}
+      {/* ── Dialogs ── */}
       {dialogModifier && (
         <DialogModifierDossier dossier={dossier} onFermer={() => setDialogModifier(false)} />
       )}
 
       <AlertDialog open={confirmerSupprimer} onOpenChange={setConfirmerSupprimer}>
-        <AlertDialogContent>
+        <AlertDialogContent dir={estRTL ? 'rtl' : 'ltr'}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Archiver ce dossier ?</AlertDialogTitle>
+            <AlertDialogTitle>{t('archive_title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Le dossier <strong>{intituleDossier}</strong>{' '}
-              <span className="font-mono text-xs">({dossier.reference})</span> sera archivé.
-              Documents, paiements et événements liés restent conservés.
+              {estRTL ? 'الملف ' : 'Le dossier '}
+              <strong>{intituleDossier}</strong>{' '}
+              <span className="font-mono text-xs">({dossier.reference})</span>{' '}
+              {t('archive_warning')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={suppression}>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={suppression}>{tc('cancel')}</AlertDialogCancel>
             <AlertDialogAction asChild>
               <Button variant="destructive" disabled={suppression} onClick={() => supprimer()}>
-                {suppression ? 'Archivage…' : 'Archiver'}
+                {suppression
+                  ? estRTL
+                    ? 'جاري الأرشفة…'
+                    : 'Archivage…'
+                  : estRTL
+                    ? 'أرشفة'
+                    : 'Archiver'}
               </Button>
             </AlertDialogAction>
           </AlertDialogFooter>

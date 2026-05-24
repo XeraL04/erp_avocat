@@ -1,0 +1,13 @@
+{
+  "cabinet_info_title": "معلومات المكتب",
+  "cabinet_updated_toast": "تم تحديث معلومات المكتب",
+  "form_cabinet_name": "اسم المكتب",
+  "form_cabinet_name_placeholder": "مكتب الأستاذ بن علي",
+  "form_city": "المدينة",
+  "form_city_placeholder": "الجزائر",
+  "form_address_placeholder": "شارع ديدوش مراد، الجزائر",
+  "section_fiscal": "المعلومات الجبائية",
+  "form_fiscal_number": "الرقم الجبائي",
+  "form_tva": "TVA (%)",
+  "form_rib": "رقم الحساب البنكي (RIB)"
+}

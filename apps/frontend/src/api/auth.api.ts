@@ -22,9 +22,14 @@ export async function logout(): Promise<void> {
   await apiClient.post('/auth/logout');
 }
 
+// export async function getMonProfil(): Promise<UtilisateurProfil> {
+//   const { data } = await apiClient.get<ApiSuccess<UtilisateurProfil>>('/auth/me');
+//   return data.data;
+// }
+
 export async function getMonProfil(): Promise<UtilisateurProfil> {
-  const { data } = await apiClient.get<ApiSuccess<UtilisateurProfil>>('/auth/me');
-  return data.data;
+  const { data } = await apiClient.get<ApiSuccess<{ utilisateur: UtilisateurProfil }>>('/auth/me');
+  return data.data.utilisateur;
 }
 
 export async function changerMotDePasse(payload: {

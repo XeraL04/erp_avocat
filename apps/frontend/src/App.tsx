@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
+import { useDirection } from '@/hooks/useDirection';
+
 import AuthGuard from '@/components/guards/AuthGuard';
 import RoleGuard from '@/components/guards/RoleGuard';
 import AppLayout from '@/components/layout/AppLayout';
@@ -30,7 +32,11 @@ import EtapesPage from './pages/etapes/EtapesPage';
 import PaiementsPage from './pages/paiements/PaiementsPage';
 import UtilisateursPage from './pages/utilisateur/UtilisateursPage';
 
+import ProfilePage from './pages/profile/ProfilePage';
+
 export default function App() {
+  useDirection();
+
   return (
     <BrowserRouter>
       <Routes>
@@ -40,6 +46,9 @@ export default function App() {
         {/* Routes protégées — requièrent une auth */}
         <Route element={<AuthGuard />}>
           <Route element={<AppLayout />}>
+            <Route path="/profil" element={<ProfilePage />} />
+            {/* <Route path="/mot-de-passe" element={<MotDePassePage />} /> */}
+
             {/* Routes Super Admin uniquement */}
             <Route element={<RoleGuard rolesAutorises={['superadmin']} />}>
               <Route path="/superadmin/dashboard" element={<SuperAdminDashboardPage />} />

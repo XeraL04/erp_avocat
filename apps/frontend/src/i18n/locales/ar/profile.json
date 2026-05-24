@@ -1,0 +1,67 @@
+{
+  "common": {
+    "error": "خطأ",
+    "retry": "إعادة المحاولة",
+    "notAvailable": "—"
+  },
+  "status": {
+    "active": "نشط",
+    "inactive": "غير نشط"
+  },
+  "roles": {
+    "superadmin": "مشرف عام",
+    "admin": "مدير",
+    "assistant": "مساعد"
+  },
+  "profile": {
+    "title": "ملفي الشخصي",
+    "subtitle": "اطّلع على معلومات الحساب المتصل حالياً.",
+    "loadError": "تعذر تحميل معلومات الملف الشخصي.",
+    "refresh": "تحديث",
+    "changePassword": "تغيير كلمة المرور",
+    "personalInfo": "المعلومات الشخصية",
+    "personalInfoDescription": "بيانات الحساب المتصل حالياً.",
+    "fields": {
+      "name": "الاسم",
+      "email": "البريد الإلكتروني",
+      "role": "الدور",
+      "status": "الحالة",
+      "tenantId": "معرّف المكتب",
+      "createdAt": "تاريخ الإنشاء"
+    },
+    "accountCard": {
+      "title": "الحساب",
+      "description": "ملخص سريع لصلاحيات الوصول الحالية.",
+      "connectedAs": "متصل باسم",
+      "accessLevel": "مستوى الوصول"
+    },
+    "security": {
+      "title": "الأمان",
+      "description": "الإعدادات المتعلقة بأمان الحساب.",
+      "passwordTitle": "كلمة المرور",
+      "passwordDescription": "قم بتغيير كلمة المرور بانتظام لتعزيز أمان حسابك."
+    },
+    "passwordModal": {
+      "title": "تغيير كلمة المرور",
+      "description": "قم بتحديث كلمة المرور لحماية حسابك.",
+      "successMessage": "تم تغيير كلمة المرور بنجاح.",
+      "fields": {
+        "currentPassword": "كلمة المرور الحالية",
+        "newPassword": "كلمة المرور الجديدة",
+        "confirmPassword": "تأكيد كلمة المرور الجديدة"
+      },
+      "actions": {
+        "cancel": "إلغاء",
+        "submit": "تحديث كلمة المرور",
+        "showPassword": "إظهار كلمة المرور",
+        "hidePassword": "إخفاء كلمة المرور"
+      },
+      "validation": {
+        "currentPasswordRequired": "كلمة المرور الحالية مطلوبة.",
+        "newPasswordMin": "يجب أن تحتوي كلمة المرور الجديدة على 6 أحرف على الأقل.",
+        "confirmPasswordRequired": "تأكيد كلمة المرور مطلوب.",
+        "passwordsMismatch": "كلمتا المرور غير متطابقتين."
+      }
+    }
+  }
+}
