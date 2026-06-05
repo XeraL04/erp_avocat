@@ -69,8 +69,14 @@ export default function LoginPage() {
           <div className="hidden lg:flex lg:flex-col lg:justify-center">
             <div className={`max-w-xl space-y-6 ${estRTL ? 'text-right' : ''}`}>
               <div className="inline-flex items-center gap-3 rounded-full border border-border/70 bg-card/80 px-4 py-2 shadow-sm backdrop-blur">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-                  <Scale className="h-5 w-5" aria-hidden="true" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-primary-foreground shadow-sm">
+                  {/* <Scale className="h-5 w-5" aria-hidden="true" /> */}
+                  <img
+                    src="/image.svg"
+                    alt="Logo"
+                    className="h-8 w-8 object-contain"
+                    aria-hidden="true"
+                  />
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold tracking-tight text-foreground">

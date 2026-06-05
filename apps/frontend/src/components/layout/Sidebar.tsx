@@ -6,7 +6,7 @@ import {
   FolderOpen,
   LayoutDashboard,
   Paperclip,
-  Scale,
+  // Scale,
   ShieldCheck,
   Users,
 } from 'lucide-react';
@@ -77,7 +77,16 @@ export default function Sidebar({ onClose }: SidebarProps) {
       <div className="shrink-0 border-b border-sidebar-border px-5 py-4">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
-            <Scale className="h-5 w-5" aria-hidden="true" />
+            {/* <Scale className="h-5 w-5" aria-hidden="true" /> */}
+
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm overflow-hidden">
+              <img
+                src="/image.svg"
+                alt="Logo"
+                className="h-8 w-8 object-contain"
+                aria-hidden="true"
+              />
+            </div>
           </div>
 
           <div className="min-w-0">
