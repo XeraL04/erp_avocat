@@ -225,7 +225,7 @@ export default function CabinetDashboardPage() {
           <h2 className="text-xl font-semibold tracking-tight">
             {td('welcome')}, {prenom}
           </h2>
-          <p className="text-sm text-muted-foreground">
+          <div className="text-sm text-muted-foreground">
             {isLoading ? (
               <Skeleton className="mt-1 h-4 w-48" />
             ) : (
@@ -233,7 +233,7 @@ export default function CabinetDashboardPage() {
                 {td('overview')} — {cabinet?.nom}
               </>
             )}
-          </p>
+          </div>
         </div>
 
         <div className="flex shrink-0 gap-2">
@@ -253,7 +253,7 @@ export default function CabinetDashboardPage() {
       </div>
 
       {/* ── Cartes KPI ── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-5">
         {CARTE_STATS_CONFIG.map((cfg, i) => (
           <CarteKPI
             key={cfg.cle}

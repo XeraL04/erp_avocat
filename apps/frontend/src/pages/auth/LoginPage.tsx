@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Scale, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import type { AxiosError } from 'axios';
 import { useTranslation } from 'react-i18next';
 
@@ -136,8 +136,14 @@ export default function LoginPage() {
           <div className="mx-auto flex w-full max-w-md flex-col justify-center">
             {/* Logo mobile */}
             <div className="mb-6 flex flex-col items-center gap-3 lg:hidden">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md">
-                <Scale className="h-7 w-7" aria-hidden="true" />
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-primary-foreground shadow-md">
+                {/* <Scale className="h-7 w-7" aria-hidden="true" /> */}
+                <img
+                  src="/image.svg"
+                  alt="Logo"
+                  className="h-10 w-10 object-contain"
+                  aria-hidden="true"
+                />
               </div>
               <div className="text-center">
                 <h1 className="text-2xl font-semibold tracking-tight text-foreground">
