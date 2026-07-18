@@ -340,3 +340,31 @@ export interface Facture {
   createdAt: string;
   updatedAt: string;
 }
+
+export type TypeNotification = 'audience' | 'rdv' | 'rappel';
+
+export interface NotificationItem {
+  id: string;
+  titre: string;
+  message: string;
+  type: TypeNotification;
+  lu: boolean;
+  dateLecture: string | null;
+  createdAt: string;
+  updatedAt: string;
+  evenementId: string | null;
+  dossier: {
+    id: string;
+    reference: string;
+    titre: string;
+    type: string;
+  } | null;
+}
+
+export interface NotificationCountResponse {
+  count: number;
+}
+
+export interface NotificationsListResponse {
+  notifications: NotificationItem[];
+}

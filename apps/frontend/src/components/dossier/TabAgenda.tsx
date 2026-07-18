@@ -603,7 +603,7 @@ export default function TabAgenda({ dossierId }: Props) {
                     onClick={fermerDialog}
                     disabled={isPending}
                   >
-                    {tc('annuler')}
+                    {tc('cancel')}
                   </Button>
                   <Button type="submit" size="sm" form={`${uid}-form`} disabled={isPending}>
                     {isPending && (

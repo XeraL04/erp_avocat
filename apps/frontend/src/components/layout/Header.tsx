@@ -17,6 +17,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
+import NotificationsDropdown from '@/components/layout/notifications-dropdown';
 import { logout } from '@/api/auth.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { initialesAvatar } from '@/lib/utils';
@@ -34,6 +35,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
   const utilisateur = useAuthStore((s) => s.utilisateur);
   const deconnecter = useAuthStore((s) => s.deconnecter);
   const estAdminCabinet = utilisateur?.role === 'admin';
+  const estCabinet = utilisateur?.role === 'admin' || utilisateur?.role === 'assistant';
   const estRTL = i18n.language === 'ar';
 
   const [theme, setTheme] = useState<Theme>(() => {
@@ -81,7 +83,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
         </div>
 
         {/* ── Droite (actions) ── */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex shrink-0 items-center gap-1.5">
           {/* Bouton langue */}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -93,7 +95,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
                 aria-label={t('language')}
               >
                 <Languages className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span className="hidden sm:inline text-sm">{estRTL ? 'FR' : 'عربي'}</span>
+                <span className="hidden text-sm sm:inline">{estRTL ? 'FR' : 'عربي'}</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
@@ -137,6 +139,13 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
             </TooltipContent>
           </Tooltip>
 
+          {estCabinet ? (
+            <>
+              <Separator orientation="vertical" className="mx-1 h-6" />
+              <NotificationsDropdown />
+            </>
+          ) : null}
+
           <Separator orientation="vertical" className="mx-1 h-6" />
 
           {/* Menu utilisateur */}
@@ -148,7 +157,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
                 aria-label={estRTL ? 'قائمة المستخدم' : 'Ouvrir le menu utilisateur'}
               >
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
+                  <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
                     {initiales}
                   </AvatarFallback>
                 </Avatar>
@@ -180,11 +189,6 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
                 <User className="h-4 w-4" aria-hidden="true" />
                 {t('profile')}
               </DropdownMenuItem>
-
-              {/* <DropdownMenuItem onClick={() => navigate('/mot-de-passe')}>
-                <KeyRound className="h-4 w-4" aria-hidden="true" />
-                {t('change_password')}
-              </DropdownMenuItem> */}
 
               {estAdminCabinet && (
                 <>
